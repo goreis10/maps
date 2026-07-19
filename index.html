@@ -37,7 +37,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MOSAICO · Mapa de Áreas</title>
+<title>Maker Map</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -157,8 +157,7 @@
 <body>
 
 <header>
-  <div class="brand"><div class="brand-mark"></div><div class="brand-name">MOSAICO</div></div>
-  <div class="hd-title"><b>Mapa de Áreas</b></div>
+  <div class="brand"><div class="brand-mark"></div><div class="brand-name">Maker Map</div></div>
   <div class="hd-stats">
     <div class="st"><b id="stHa">—</b>hectares</div>
     <div class="st"><b id="stAreas">—</b>áreas</div>
@@ -186,7 +185,7 @@
 
   <div id="ctrl">
     <div class="seg">
-      <button id="bmClaro" class="on">MOSAICO</button>
+      <button id="bmClaro" class="on">Maker Map</button>
       <button id="bmSat">Satélite</button>
     </div>
     <div class="chip" id="chipMask"><span class="dot"></span>Máscara</div>
@@ -1065,7 +1064,7 @@ function montarEditor(){
       const d = LBL_PADRAO[t.k];
       chk.checked = d.halo; hcor.value = d.haloCor; hw.value = Math.round(d.haloW*10);
     });
-    toast('Padrão MOSAICO restaurado — uploads e desenhos preservados.');
+    toast('Padrão Maker Map restaurado — uploads e desenhos preservados.');
   }
   document.getElementById('edReset').onclick = resetPadrao;
 
@@ -1404,7 +1403,7 @@ document.getElementById('btnExport').onclick = async function(){
     await new Promise(res=> map.once('idle', res));
     const url = map.getCanvas().toDataURL('image/png');
     const a=document.createElement('a');
-    a.download = `MOSAICO_mapa_${new Date().toISOString().slice(0,10)}_${scale}x.png`;
+    a.download = `MakerMap_mapa_${new Date().toISOString().slice(0,10)}_${scale}x.png`;
     a.href = url; a.click();
     const c = map.getCanvas();
     toast(`PNG exportado em ${c.width}×${c.height}px — enquadre antes de exportar.`);
