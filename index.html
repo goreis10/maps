@@ -1,4 +1,38 @@
 <!DOCTYPE html>
+<!--
+═══════════════════════════════════════════════════════════════════
+  MAPA MOSAICO — ferramenta de mapas (arquivo único, estático)
+  Deploy: renomear para index.html e publicar (Netlify/Vercel/S3).
+  Dados: KMZs subidos e desenhos são processados APENAS no navegador
+  do usuário — nada é enviado ao servidor.
+
+  ÍNDICE DO ARQUIVO (buscar pelo termo):
+  • CSS ................. :root (cores da marca), header, #panel,
+                          #ctrl (chips), #editor (painel de edição)
+  • Dados ............... const DATA (glebas), const RAIO (círculo),
+                          const CORES (paleta por município)
+  • Estilo do basemap ... aplicarPaleta()  — cores por camada vetorial
+  • Montagem ............ montarCamadas()  — fontes, camadas, popups
+  • Satélite híbrido .... setSat()         — cores/larguras por modo
+  • Vias (tiers) ........ tierDe(), classificarTiers(), viaCfg,
+                          aplicarTierEstilo(), larguraFinal()
+  • Máscara spotlight ... construirMascara() — mundo + furos saneados
+                          (anelLimpo/anelOrientado: winding correto)
+  • Pilha sobre o véu ... tierAcima(), aplicarPilhaAcima(), ordemAcima
+  • Editor .............. montarEditor()   — todas as seções da UI
+  • Rótulos ............. lblCfg, classificarRotulos(), aplicarLbl()
+  • Raio ................ gerarCirculo(), atualizarRaio(), centroRaio
+  • Upload KMZ/KML ...... kmlParaFeats(), integrarFeats()
+  • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
+  • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
+  • Exportar PNG ........ btnExport (devicePixelRatio × escala)
+
+  Requisitos de rede do visitante: cdnjs.cloudflare.com,
+  tiles.openfreemap.org, server.arcgisonline.com,
+  fonts.googleapis.com e (busca de endereço) nominatim.openstreetmap.org
+═══════════════════════════════════════════════════════════════════
+-->
+
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -169,7 +203,7 @@
   </div>
 
   <div id="editor">
-    <div class="e-head">Editor de estilo</div>
+    <div class="e-head" style="display:flex;justify-content:space-between;align-items:baseline">Editor de estilo <a id="edReset" style="color:var(--azul);cursor:pointer;text-transform:none;letter-spacing:0;font-size:11px;font-weight:600">restaurar padrão</a></div>
     <details open><summary>Por cidade</summary><div id="edCidades"></div>
       <div class="e-hint">Pintar a cidade sobrescreve as áreas dela.</div></details>
     <details><summary>Por área</summary><div id="edAreas"></div></details>
@@ -331,7 +365,14 @@ fetch('https://tiles.openfreemap.org/styles/positron')
     });
     map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({unit:'metric'}), 'bottom-left');
-    map.on('error', e=>{ console.error(e); });
+    let ultimoErroToast = 0;
+    map.on('error', e=>{
+      console.error(e);
+      const msg = e && e.error && e.error.message ? e.error.message : '';
+      if(!msg || /tile|abort|fetch|network/i.test(msg)) return;   // ruído de rede
+      const agora = Date.now();
+      if(agora - ultimoErroToast > 5000){ ultimoErroToast = agora; toast('Aviso do mapa: '+msg.slice(0,120)); }
+    });
     map.on('load', montarCamadas);
   })
   .catch(err=>{ console.error(err); fail(); });
@@ -394,6 +435,7 @@ function montarCamadas(){
 
   ['gleba-fill','gleba-linha','gleba-ponto'].forEach(id=>{
     map.on('click', id, e=>{
+      if (drawing || pickCentro) return;
       const p = e.features[0].properties;
       new maplibregl.Popup({closeButton:true, maxWidth:'280px'})
         .setLngLat(e.lngLat)
@@ -416,11 +458,41 @@ function montarCamadas(){
 }
 
 let maskCobreGlebas = false;
+function anelLimpo(ring){
+  let pts = ring.slice();
+  if(pts.length>1 && pts[0][0]===pts[pts.length-1][0] && pts[0][1]===pts[pts.length-1][1]) pts = pts.slice(0,-1);
+  const out=[];
+  pts.forEach(p=>{
+    const q = out[out.length-1];
+    if(!q || Math.abs(p[0]-q[0])>1e-9 || Math.abs(p[1]-q[1])>1e-9) out.push(p);
+  });
+  if(out.length>1){
+    const a=out[0], b=out[out.length-1];
+    if(Math.abs(a[0]-b[0])<=1e-9 && Math.abs(a[1]-b[1])<=1e-9) out.pop();
+  }
+  return out.length>=3 ? out : null;
+}
+function areaAssinada(pts){
+  let s=0;
+  for(let i=0;i<pts.length;i++){
+    const [x1,y1]=pts[i], [x2,y2]=pts[(i+1)%pts.length];
+    s += x1*y2 - x2*y1;
+  }
+  return s/2;
+}
+function anelOrientado(pts, horario){
+  const ehHorario = areaAssinada(pts) < 0;
+  const arr = (ehHorario === horario) ? pts.slice() : pts.slice().reverse();
+  arr.push(arr[0]);
+  return arr;
+}
 function construirMascara(){
-  const mundo = [[-179.9,-85],[179.9,-85],[179.9,85],[-179.9,85],[-179.9,-85]];
+  const mundo = anelOrientado([[-179.9,-85],[179.9,-85],[179.9,85],[-179.9,85]], false); // anti-horário
   const furos = maskCobreGlebas ? [] : DATA.features
     .filter(f=> f.geometry.type==='Polygon' && grupos[f.properties.municipio].on)
-    .map(f=> f.geometry.coordinates[0]);
+    .map(f=> anelLimpo(f.geometry.coordinates[0]))
+    .filter(Boolean)
+    .map(pts=> anelOrientado(pts, true));                                                // furos horários
   return {type:'Feature', properties:{},
     geometry:{type:'Polygon', coordinates:[mundo, ...furos]}};
 }
@@ -574,7 +646,11 @@ function aplicarTierEstilo(tier){
     map.setLayoutProperty(id,'visibility', cfg.on ? 'visible' : 'none');
     map.setPaintProperty(id,'line-opacity', cfg.op);
     map.setPaintProperty(id,'line-width', larguraFinal(id));
-    if(cfg.cor) map.setPaintProperty(id,'line-color', ehCasing(id) ? escurecer(cfg.cor, 0.45) : cfg.cor);
+    if(cfg.cor){
+      if(ehCasing(id)){ if(!(id in viasOrigCas)) viasOrigCas[id] = {c: map.getPaintProperty(id,'line-color')}; }
+      else if(!(id in viasOrigCor)) viasOrigCor[id] = map.getPaintProperty(id,'line-color');
+      map.setPaintProperty(id,'line-color', ehCasing(id) ? escurecer(cfg.cor, 0.45) : cfg.cor);
+    }
   });
 }
 function reaplicarVias(){ ['rodovia','avenida','rua'].forEach(aplicarTierEstilo); }
@@ -766,7 +842,7 @@ function montarEditor(){
     demais:  {cor:null, tam:1, halo:true,  haloCor:'#FFFFFF', haloW:1.2}
   };
   const lblTiers = {cidade:[], estrada:[], avenida:[], rua:[], demais:[]};
-  const origTS = {};
+  const origTS = {}, origTC = {};
   function classificarRotulos(){
     if(lblTiers.cidade.length || lblTiers.demais.length) return;
     map.getStyle().layers.forEach(l=>{
@@ -788,7 +864,10 @@ function montarEditor(){
     const c = lblCfg[t];
     lblTiers[t].forEach(id=>{
       if(!map.getLayer(id)) return;
-      if(c.cor) map.setPaintProperty(id,'text-color', c.cor);
+      if(c.cor){
+        if(!(id in origTC)) origTC[id] = map.getPaintProperty(id,'text-color');
+        map.setPaintProperty(id,'text-color', c.cor);
+      }
       if(!(id in origTS)){
         const s = map.getLayoutProperty(id,'text-size');
         origTS[id] = (s===undefined || s===null) ? 12 : s;
@@ -889,6 +968,106 @@ function montarEditor(){
     };
   });
   renumerar();
+
+  const LBL_PADRAO = JSON.parse(JSON.stringify(lblCfg));
+  const ORDEM_PADRAO = ordemAcima.slice();
+  function resetPadrao(){
+    if(!map){ toast('Aguarde o mapa carregar.'); return; }
+    // modos interativos
+    if(drawing) drawSetMode(false);
+    pickCentro = false; map.getCanvas().style.cursor='';
+    // pilha acima da máscara
+    ['edViaRod','edViaAv','edViaRua','edCidAcima'].forEach(i=> document.getElementById(i).checked=false);
+    cidadesAcima = false; cidadesSel = []; document.getElementById('edCidSel').value='';
+    atualizarCidadesAcima();
+    ['rodovia','avenida','rua'].forEach(t=> tierAcima(t,false));
+    ordemAcima.length = 0; ORDEM_PADRAO.forEach(g=> ordemAcima.push(g)); renumerar();
+    // vias
+    Object.assign(viaCfg.rodovia,{on:true, cor:null, op:1, esp:1});
+    Object.assign(viaCfg.avenida,{on:true, cor:null, op:1, esp:1});
+    Object.assign(viaCfg.rua,   {on:false, cor:null, op:1, esp:1});
+    // rótulos
+    Object.keys(lblCfg).forEach(k=> Object.assign(lblCfg[k], JSON.parse(JSON.stringify(LBL_PADRAO[k]))));
+    Object.keys(lblTiers).forEach(t=>{
+      lblTiers[t].forEach(id=>{ if(map.getLayer(id) && (id in origTC)) map.setPaintProperty(id,'text-color', origTC[id]); });
+      aplicarLbl(t);
+    });
+    // fundo claro (restaura cores e larguras originais das vias)
+    setSat(false);
+    // máscara
+    maskCobreGlebas = false;
+    if(map.getLayer('mascara')){
+      map.setPaintProperty('mascara','fill-color','#1C1917');
+      map.setPaintProperty('mascara','fill-opacity',0.55);
+      map.setLayoutProperty('mascara','visibility','none');
+      map.getSource('mascara').setData(construirMascara());
+    }
+    document.getElementById('chipMask').classList.remove('on');
+    document.getElementById('edMaskCor').value = '#1C1917';
+    document.getElementById('edMaskOp').value = 55;
+    document.getElementById('edMaskOpV').textContent = '55%';
+    document.getElementById('edMaskCobre').checked = false;
+    // raio
+    raioKm = 100; centroRaio = CENTRO_SE.slice();
+    document.getElementById('edRaioKm').value = 100;
+    document.getElementById('edRaioCor').value = '#337FFF';
+    document.getElementById('edRaioFill').checked = true;
+    document.getElementById('edCtEnd').value = '';
+    atualizarRaio();
+    if(map.getLayer('raio-borda')){
+      map.setPaintProperty('raio-borda','line-color','#337FFF');
+      map.setPaintProperty('raio-fill','fill-color','#337FFF');
+      map.setPaintProperty('raio-fill','fill-opacity',0.05);
+      map.setPaintProperty('raio-centro','circle-color','#337FFF');
+      map.setPaintProperty('raio-rotulo','text-color','#337FFF');
+      ['raio-fill','raio-borda','raio-centro','raio-rotulo'].forEach(id=> map.setLayoutProperty(id,'visibility','visible'));
+    }
+    document.getElementById('chipRaio').classList.add('on');
+    // glebas: cores de grupo, preenchimento, filtros e rótulos
+    DATA.features.forEach(f=>{
+      f.properties.cor_final = CORES[f.properties.municipio] || '#8A8F98';
+      f.properties.fill_on = 1;
+    });
+    refreshGlebas();
+    Object.values(grupos).forEach(g=> g.on = true);
+    document.querySelectorAll('#groups .grp').forEach(el=>{
+      el.classList.remove('off');
+      const m = el.querySelector('.g-name').textContent, c = CORES[m] || '#8A8F98';
+      el.querySelector('.sw').style.background = c;
+      el.querySelector('.g-bar i').style.background = c;
+    });
+    aplicarFiltros(); refreshStats();
+    if(map.getLayer('gleba-rotulo')) map.setLayoutProperty('gleba-rotulo','visibility','none');
+    document.getElementById('chipLbl').classList.remove('on');
+    // inputs do editor
+    document.querySelectorAll('#edCidades .e-row').forEach(r=>{
+      const m = r.querySelector('.e-nome').textContent;
+      r.querySelector('input[type=color]').value = CORES[m] || '#8A8F98';
+      r.querySelector('input[type=checkbox]').checked = true;
+    });
+    document.querySelectorAll('#edAreas .e-row').forEach(r=>{
+      const c = r.querySelector('input[type=color]');
+      c.value = CORES[c.dataset.mun] || '#8A8F98';
+      const k = r.querySelector('input[type=checkbox]');
+      if(!k.disabled) k.checked = true;
+    });
+    document.querySelectorAll('#edVias .e-row').forEach((r,i)=>{
+      const [chk,cor,esp,op] = r.querySelectorAll('input');
+      chk.checked = viaCfg[tiersUi[i].k].on;
+      cor.value = tiersUi[i].cor;
+      esp.value = 100; op.value = 100;
+    });
+    const rot = document.querySelectorAll('#edRotulos .e-row');
+    lblUi.forEach((t,i)=>{
+      const [cor,tam] = rot[i*2].querySelectorAll('input');
+      cor.value = '#1C1917'; tam.value = 100;
+      const [chk,hcor,hw] = rot[i*2+1].querySelectorAll('input');
+      const d = LBL_PADRAO[t.k];
+      chk.checked = d.halo; hcor.value = d.haloCor; hw.value = Math.round(d.haloW*10);
+    });
+    toast('Padrão MOSAICO restaurado — uploads e desenhos preservados.');
+  }
+  document.getElementById('edReset').onclick = resetPadrao;
 
   document.getElementById('edCidAcima').onchange = e=>{
     cidadesAcima = e.target.checked;
@@ -1168,7 +1347,8 @@ function drawSetMode(on){
 }
 function drawFinalizar(){
   if(drawPts.length < 3){ toast('São necessários ao menos 3 vértices.'); return; }
-  const pts = drawPts.slice();
+  const pts = drawPts.filter((p,i,a)=> i===0 || Math.abs(p[0]-a[i-1][0])>1e-7 || Math.abs(p[1]-a[i-1][1])>1e-7);
+  if(pts.length < 3){ toast('São necessários ao menos 3 vértices distintos.'); return; }
   const nome = (window.prompt('Nome da área desenhada:') || '').trim() || ('Área '+(DATA.features.length+1));
   const lon = pts.reduce((s,p)=>s+p[0],0)/pts.length;
   const lat = pts.reduce((s,p)=>s+p[1],0)/pts.length;
@@ -1182,7 +1362,9 @@ document.getElementById('chipDraw').onclick = ()=>{
   drawSetMode(!drawing);
 };
 window.addEventListener('keydown', e=>{
-  if(e.key==='Escape' && drawing) drawSetMode(false);
+  if(e.key !== 'Escape') return;
+  if(drawing) drawSetMode(false);
+  if(pickCentro){ pickCentro = false; if(map) map.getCanvas().style.cursor=''; toast('Seleção de centro cancelada.'); }
 });
 
 // ── Máscara spotlight ──
@@ -1222,7 +1404,7 @@ document.getElementById('btnExport').onclick = async function(){
     await new Promise(res=> map.once('idle', res));
     const url = map.getCanvas().toDataURL('image/png');
     const a=document.createElement('a');
-    a.download = `MOSAICO_FIDC_mapa_${scale}x.png`;
+    a.download = `MOSAICO_mapa_${new Date().toISOString().slice(0,10)}_${scale}x.png`;
     a.href = url; a.click();
     const c = map.getCanvas();
     toast(`PNG exportado em ${c.width}×${c.height}px — enquadre antes de exportar.`);
