@@ -2,11 +2,14 @@
 <!--
 ═══════════════════════════════════════════════════════════════════
   MAKER MAP — página inicial de login e cadastro
-  Autenticação: Netlify Identity (via gotrue-js). Requer o Identity
-  ATIVADO no painel do Netlify (Site → Identity → Enable Identity).
+  Autenticação: Netlify Identity via chamadas REST diretas
+  (/.netlify/identity/*) com fetch — SEM biblioteca/CDN externo.
+  Requer o Identity ATIVADO no painel do Netlify
+  (Site → Identity → Enable Identity).
   Após entrar, o usuário é levado a app.html (o mapa).
   Campos do cadastro: nome, sobrenome, e-mail, telefone, senha.
-  Nome/sobrenome/telefone são salvos em user_metadata.
+  Nome/sobrenome/telefone são salvos em user_metadata (campo "data").
+  Sessão guardada em localStorage sob a chave 'makermap.user'.
 ═══════════════════════════════════════════════════════════════════
 -->
 <html lang="pt-BR">
@@ -15,7 +18,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Maker Map · Entrar</title>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/gotrue-js@0.9.29/dist/gotrue.js"></script>
 <style>
   :root{
     --laranja:#E04010; --magenta:#E00070; --azul:#337FFF;
@@ -80,8 +82,8 @@
     <div class="sub">Gestão de mapas e imagens para apresentação.</div>
 
     <div class="tabs">
-      <button id="tabLogin" class="on">Entrar</button>
-      <button id="tabSignup">Criar conta</button>
+      <button type="button" id="tabLogin" class="on">Entrar</button>
+      <button type="button" id="tabSignup">Criar conta</button>
     </div>
 
     <div id="msg" class="msg"></div>
@@ -140,109 +142,152 @@
   </div>
 
 <script>
-  var auth = new GoTrue({ APIUrl: location.origin + '/.netlify/identity', setCookie: true });
+  var IDENTITY = location.origin + '/.netlify/identity';
   var APP = 'app.html';
-
   var el = function(id){ return document.getElementById(id); };
-  var msg = el('msg');
-  function show(text, kind){
-    msg.textContent = text;
-    msg.className = 'msg on ' + (kind === 'ok' ? 'ok' : 'err');
-  }
-  function clearMsg(){ msg.className = 'msg'; }
-  function msgOf(err){
-    if(!err) return 'Não foi possível concluir. Tente novamente.';
-    if(err.json && (err.json.error_description || err.json.msg)) return err.json.error_description || err.json.msg;
-    if(err.message) return err.message;
-    try{ return JSON.stringify(err); }catch(e){ return String(err); }
-  }
-  // Mensagens comuns do gotrue traduzidas
-  function humano(err){
-    var m = (msgOf(err) || '').toLowerCase();
-    if(/invalid|no user|not found|credentials/.test(m)) return 'E-mail ou senha incorretos.';
-    if(/email not confirmed|confirm/.test(m)) return 'Confirme seu e-mail pelo link que enviamos e depois entre.';
-    if(/already (been )?registered|already exists|duplicate/.test(m)) return 'Este e-mail já tem cadastro. Use "Entrar".';
-    if(/password/.test(m) && /short|least|6/.test(m)) return 'A senha precisa de pelo menos 6 caracteres.';
-    if(/failed to fetch|networkerror|identity/.test(m)) return 'Não foi possível falar com o servidor de login. O Netlify Identity está ativado neste site?';
-    return msgOf(err);
-  }
 
-  // ── Abas ──
+  // ── UI: abas (independente de rede — sempre funciona) ──
   var forms = { login: el('formLogin'), signup: el('formSignup'), recover: el('formRecover') };
+  var msg = el('msg');
+  function show(text, kind){ msg.textContent = text; msg.className = 'msg on ' + (kind === 'ok' ? 'ok' : 'err'); }
+  function clearMsg(){ msg.className = 'msg'; }
   function mostrarForm(nome){
     Object.keys(forms).forEach(function(k){ forms[k].classList.toggle('on', k === nome); });
     el('tabLogin').classList.toggle('on', nome === 'login');
     el('tabSignup').classList.toggle('on', nome === 'signup');
   }
-  el('tabLogin').onclick = function(){ clearMsg(); mostrarForm('login'); };
-  el('tabSignup').onclick = function(){ clearMsg(); mostrarForm('signup'); };
+  el('tabLogin').addEventListener('click', function(){ clearMsg(); mostrarForm('login'); });
+  el('tabSignup').addEventListener('click', function(){ clearMsg(); mostrarForm('signup'); });
 
-  // Se já estiver logado, vai direto para o app
-  if(auth.currentUser()){ location.replace(APP); }
+  // ── Sessão em localStorage ──
+  function saveSession(tok, user){
+    localStorage.setItem('makermap.user', JSON.stringify({
+      access_token: tok.access_token,
+      refresh_token: tok.refresh_token,
+      expires_at: Date.now() + ((tok.expires_in || 3600) * 1000),
+      user: user || null
+    }));
+  }
+  function getSession(){ try{ return JSON.parse(localStorage.getItem('makermap.user') || 'null'); }catch(e){ return null; } }
+
+  // ── Chamada à API do Netlify Identity ──
+  function api(path, opts){
+    return fetch(IDENTITY + path, opts).then(function(res){
+      return res.text().then(function(t){
+        var data = {};
+        try{ data = t ? JSON.parse(t) : {}; }catch(e){ data = { raw: t }; }
+        if(!res.ok){ throw { status: res.status, data: data }; }
+        return data;
+      });
+    });
+  }
+  function msgOf(err){
+    if(err && err.data){ return err.data.error_description || err.data.msg || err.data.error || JSON.stringify(err.data); }
+    if(err && err.message) return err.message;
+    return '';
+  }
+  function humano(err){
+    var m = (msgOf(err) || '').toLowerCase();
+    if(err && (err.status === 0 || (!err.status && !err.data))) return 'Não foi possível falar com o servidor de login. Publique no Netlify e ative o Identity (aba Identity → Enable Identity).';
+    if(/invalid|no user|not found|grant|credential/.test(m)) return 'E-mail ou senha incorretos.';
+    if(/not confirmed|confirm/.test(m)) return 'Confirme seu e-mail pelo link que enviamos e depois entre.';
+    if(/already (been )?registered|already exists|duplicate|registered/.test(m)) return 'Este e-mail já tem cadastro. Use "Entrar".';
+    if(/password/.test(m) && /(short|least|6|weak)/.test(m)) return 'A senha precisa de pelo menos 6 caracteres.';
+    if(/signup.*disabled|disabled/.test(m)) return 'O cadastro está desativado no painel do Netlify (Identity → Registration).';
+    if(/404|not.*found.*identity/.test(m) || (err && err.status === 404)) return 'Netlify Identity não está ativado neste site. Ative na aba Identity do painel.';
+    return msgOf(err) || 'Falha inesperada. Tente novamente.';
+  }
+
+  // ── Faz login (token) e busca o usuário ──
+  function loginFlow(email, password){
+    var body = new URLSearchParams({ grant_type: 'password', username: email, password: password });
+    return fetch(IDENTITY + '/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      })
+      .then(function(res){
+        return res.text().then(function(t){
+          var data = {}; try{ data = t ? JSON.parse(t) : {}; }catch(e){}
+          if(!res.ok){ throw { status: res.status, data: data }; }
+          return data;
+        });
+      })
+      .then(function(tok){
+        return fetch(IDENTITY + '/user', { headers: { Authorization: 'Bearer ' + tok.access_token } })
+          .then(function(r){ return r.ok ? r.json() : { email: email }; })
+          .catch(function(){ return { email: email }; })
+          .then(function(user){ saveSession(tok, user); });
+      });
+  }
+
+  // ── Se já estiver logado, vai direto para o app ──
+  (function(){ var s = getSession(); if(s && s.access_token){ location.replace(APP); } })();
 
   // ── Login ──
   el('formLogin').addEventListener('submit', function(e){
-    e.preventDefault();
-    clearMsg();
+    e.preventDefault(); clearMsg();
     var b = el('btnLogin'); b.disabled = true; b.textContent = 'Entrando…';
-    auth.login(el('liEmail').value.trim(), el('liSenha').value, true)
+    loginFlow(el('liEmail').value.trim(), el('liSenha').value)
       .then(function(){ location.href = APP; })
-      .catch(function(err){ show(humano(err), 'err'); })
-      .then(function(){ b.disabled = false; b.textContent = 'Entrar'; });
+      .catch(function(err){ show(humano(err), 'err'); b.disabled = false; b.textContent = 'Entrar'; });
   });
 
   // ── Cadastro ──
   el('formSignup').addEventListener('submit', function(e){
-    e.preventDefault();
-    clearMsg();
+    e.preventDefault(); clearMsg();
     var nome = el('suNome').value.trim();
     var sobrenome = el('suSobrenome').value.trim();
     var email = el('suEmail').value.trim();
     var tel = el('suTel').value.trim();
     var senha = el('suSenha').value;
     var b = el('btnSignup'); b.disabled = true; b.textContent = 'Criando…';
-    auth.signup(email, senha, {
-        first_name: nome,
-        last_name: sobrenome,
-        full_name: (nome + ' ' + sobrenome).trim(),
-        phone: tel
+    api('/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email, password: senha,
+          data: { first_name: nome, last_name: sobrenome, full_name: (nome + ' ' + sobrenome).trim(), phone: tel }
+        })
       })
-      .then(function(){
-        // Tenta entrar direto (funciona se a confirmação por e-mail estiver desativada)
-        return auth.login(email, senha, true);
+      .then(function(user){
+        // Se o e-mail já vem confirmado (confirmação desativada), entra direto.
+        if(user && user.confirmed_at){ return loginFlow(email, senha).then(function(){ location.href = APP; }); }
+        // Caso contrário, tenta logar; se exigir confirmação, avisa.
+        return loginFlow(email, senha)
+          .then(function(){ location.href = APP; })
+          .catch(function(){
+            show('Cadastro criado! Enviamos um e-mail de confirmação para ' + email + '. Confirme pelo link e depois entre.', 'ok');
+            mostrarForm('login'); el('liEmail').value = email;
+          });
       })
-      .then(function(){ location.href = APP; })
-      .catch(function(err){
-        var m = (msgOf(err) || '').toLowerCase();
-        if(/confirm/.test(m)){
-          show('Cadastro criado! Enviamos um e-mail de confirmação para ' + email + '. Confirme pelo link e depois entre.', 'ok');
-          mostrarForm('login');
-          el('liEmail').value = email;
-        } else {
-          show(humano(err), 'err');
-        }
-      })
+      .catch(function(err){ show(humano(err), 'err'); })
       .then(function(){ b.disabled = false; b.textContent = 'Criar conta'; });
   });
 
   // ── Esqueci a senha ──
-  el('linkForgot').onclick = function(){
+  el('linkForgot').addEventListener('click', function(){
     clearMsg();
     var email = el('liEmail').value.trim();
     if(!email){ show('Digite seu e-mail no campo acima e clique novamente em "Esqueci minha senha".', 'err'); el('liEmail').focus(); return; }
-    auth.requestPasswordRecovery(email)
+    api('/recover', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })
       .then(function(){ show('Se houver conta para ' + email + ', enviamos um link para redefinir a senha.', 'ok'); })
       .catch(function(err){ show(humano(err), 'err'); });
-  };
+  });
 
   // ── Nova senha (após clicar no link de recuperação) ──
-  var recoveredUser = null;
+  var recoveryToken = null;
   el('formRecover').addEventListener('submit', function(e){
     e.preventDefault();
-    if(!recoveredUser){ show('Link de recuperação inválido ou expirado. Peça um novo em "Esqueci minha senha".', 'err'); return; }
+    if(!recoveryToken){ show('Link de recuperação inválido ou expirado. Peça um novo em "Esqueci minha senha".', 'err'); return; }
     var b = el('btnRecover'); b.disabled = true; b.textContent = 'Salvando…';
-    recoveredUser.update({ password: el('rcSenha').value })
-      .then(function(){ location.href = APP; })
+    var novaSenha = el('rcSenha').value;
+    // 1) troca o recovery_token por um access_token; 2) atualiza a senha
+    api('/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'recovery', token: recoveryToken }) })
+      .then(function(tok){
+        return api('/user', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok.access_token }, body: JSON.stringify({ password: novaSenha }) })
+          .then(function(){ saveSession(tok, null); location.href = APP; });
+      })
       .catch(function(err){ show(humano(err), 'err'); b.disabled = false; b.textContent = 'Salvar nova senha'; });
   });
 
@@ -253,17 +298,16 @@
     var params = new URLSearchParams(raw);
     var conf = params.get('confirmation_token');
     var rec = params.get('recovery_token');
-    // limpa o hash da barra de endereços
     if(history.replaceState) history.replaceState(null, '', location.pathname + location.search);
 
     if(conf){
-      auth.confirm(conf, true)
-        .then(function(){ location.href = APP; })
+      api('/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'signup', token: conf }) })
+        .then(function(tok){ saveSession(tok, null); location.href = APP; })
         .catch(function(err){ show('Não foi possível confirmar o e-mail: ' + humano(err), 'err'); });
     } else if(rec){
-      auth.recover(rec, true)
-        .then(function(user){ recoveredUser = user; mostrarForm('recover'); show('Defina uma nova senha para sua conta.', 'ok'); })
-        .catch(function(err){ show('Link de recuperação inválido ou expirado: ' + humano(err), 'err'); });
+      recoveryToken = rec;
+      mostrarForm('recover');
+      show('Defina uma nova senha para sua conta.', 'ok');
     }
   })();
 </script>

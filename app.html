@@ -39,15 +39,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Maker Map</title>
 <style>html{visibility:hidden}</style>
-<script src="https://cdn.jsdelivr.net/npm/gotrue-js@0.9.29/dist/gotrue.js"></script>
 <script>
 // Guard de sessão: sem login, volta para a página inicial. Roda antes de renderizar o mapa.
 (function(){
   try{
-    window._auth = new GoTrue({ APIUrl: location.origin + '/.netlify/identity', setCookie: true });
-    if(window._auth.currentUser()){ document.documentElement.style.visibility='visible'; }
+    var s = JSON.parse(localStorage.getItem('makermap.user') || 'null');
+    if(s && s.access_token){ document.documentElement.style.visibility='visible'; }
     else { location.replace('index.html'); }
-  }catch(e){ document.documentElement.style.visibility='visible'; } // CDN indisponível: não trava a tela
+  }catch(e){ location.replace('index.html'); }
 })();
 </script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
@@ -1434,22 +1433,24 @@ document.getElementById('btnExport').onclick = async function(){
   }
 };
 
-// ── Conta: exibe nome e trata logout ──
+// ── Conta: exibe nome e trata logout (sessão em localStorage) ──
 (function(){
   var nameEl = document.getElementById('hdUserName');
   var btn = document.getElementById('btnLogout');
-  try{
-    var u = window._auth && window._auth.currentUser();
-    if(u && nameEl){
-      var md = u.user_metadata || {};
-      nameEl.textContent = md.first_name ? (md.first_name + (md.last_name ? ' ' + md.last_name : '')) : (u.email || '');
-    }
-  }catch(e){}
+  var s = null;
+  try{ s = JSON.parse(localStorage.getItem('makermap.user') || 'null'); }catch(e){}
+  if(s && s.user && nameEl){
+    var md = s.user.user_metadata || {};
+    nameEl.textContent = md.first_name ? (md.first_name + (md.last_name ? ' ' + md.last_name : '')) : (s.user.email || '');
+  }
   if(btn) btn.onclick = function(){
+    // encerra a sessão local e, best-effort, revoga o token no servidor
     try{
-      var u = window._auth && window._auth.currentUser();
-      if(u){ u.logout().finally(function(){ location.replace('index.html'); }); return; }
+      if(s && s.access_token){
+        fetch(location.origin + '/.netlify/identity/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + s.access_token } }).catch(function(){});
+      }
     }catch(e){}
+    localStorage.removeItem('makermap.user');
     location.replace('index.html');
   };
 })();
