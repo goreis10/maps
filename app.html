@@ -95,6 +95,10 @@
   .grp:hover{background:#FAF9F7}
   .grp.off{opacity:.38}
   .sw{width:13px;height:13px;border-radius:4px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+  .g-del{flex:none;border:0;background:none;cursor:pointer;color:var(--ink-2);opacity:.45;
+    padding:5px;border-radius:6px;line-height:0;display:flex;align-items:center}
+  .grp:hover .g-del{opacity:.9}
+  .g-del:hover{color:#D92D20;background:#FEF3F2;opacity:1}
   .g-body{flex:1;min-width:0}
   .g-name{font-size:12.5px;font-weight:600;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .g-meta{font-size:10.5px;color:var(--ink-2);margin-top:1px}
@@ -599,21 +603,34 @@ function refreshStats(){
 }
 
 // ── Painel ──
+const TRASH_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>';
+function metaGrupo(g){
+  return `${g.n} ${g.n>1?'áreas':'área'} · ${fmt(g.ha)} ha · ${(g.ha*10000).toLocaleString('pt-BR',{maximumFractionDigits:0})} m²`;
+}
 let maxHa = Math.max(1, ...Object.values(grupos).map(g=>g.ha));
 const ordem = Object.keys(grupos).sort((a,b)=> grupos[b].ha - grupos[a].ha);
 const groupsEl = document.getElementById('groups');
+function ligarLinhaGrupo(el, m, g){
+  el.onclick = ()=>{ g.on = !g.on; el.classList.toggle('off', !g.on); aplicarFiltros(); refreshStats(); };
+  el._g = g;
+  const del = el.querySelector('.g-del');
+  if(del) del.onclick = ev=>{ ev.stopPropagation(); excluirGrupo(m); };
+}
+function htmlLinhaGrupo(m, g, cor){
+  return `<span class="sw" style="background:${cor}"></span>
+    <span class="g-body">
+      <span class="g-name">${m}</span>
+      <span class="g-meta">${metaGrupo(g)}</span>
+      <span class="g-bar"><i style="width:${Math.min(100,Math.max(3,100*g.ha/maxHa))}%;background:${cor}"></i></span>
+    </span>
+    <button class="g-del" title="excluir este grupo">${TRASH_SVG}</button>`;
+}
 ordem.forEach(m=>{
   const g = grupos[m], cor = CORES[m] || '#8A8F98';
   const el = document.createElement('div');
   el.className='grp';
-  el.innerHTML = `<span class="sw" style="background:${cor}"></span>
-    <span class="g-body">
-      <span class="g-name">${m}</span>
-      <span class="g-meta">${g.n} ${g.n>1?'áreas':'área'} · ${fmt(g.ha)} ha</span>
-      <span class="g-bar"><i style="width:${Math.max(3,100*g.ha/maxHa)}%;background:${cor}"></i></span>
-    </span>`;
-  el.onclick = ()=>{ g.on = !g.on; el.classList.toggle('off', !g.on); aplicarFiltros(); refreshStats(); };
-  el._g = g;
+  el.innerHTML = htmlLinhaGrupo(m, g, cor);
+  ligarLinhaGrupo(el, m, g);
   groupsEl.appendChild(el);
 });
 refreshStats();
@@ -1473,24 +1490,45 @@ function appendPanelRow(m){
   const g = grupos[m], cor = CORES[m];
   const el = document.createElement('div');
   el.className='grp';
-  el.innerHTML = `<span class="sw" style="background:${cor}"></span>
-    <span class="g-body">
-      <span class="g-name">${m}</span>
-      <span class="g-meta">${g.n} ${g.n>1?'áreas':'área'} · ${fmt(g.ha)} ha</span>
-      <span class="g-bar"><i style="width:${Math.min(100,Math.max(3,100*g.ha/maxHa))}%;background:${cor}"></i></span>
-    </span>`;
-  el.onclick = ()=>{ g.on = !g.on; el.classList.toggle('off', !g.on); aplicarFiltros(); refreshStats(); };
-  el._g = g;
+  el.innerHTML = htmlLinhaGrupo(m, g, cor);
+  ligarLinhaGrupo(el, m, g);
   document.getElementById('groups').appendChild(el);
 }
 function updatePanelRow(m){
   const g = grupos[m];
   document.querySelectorAll('#groups .grp').forEach(el=>{
     if(el.querySelector('.g-name').textContent===m){
-      el.querySelector('.g-meta').textContent = `${g.n} ${g.n>1?'áreas':'área'} · ${fmt(g.ha)} ha`;
+      el.querySelector('.g-meta').textContent = metaGrupo(g);
       el.querySelector('.g-bar i').style.width = Math.min(100,Math.max(3,100*g.ha/maxHa))+'%';
     }
   });
+}
+// exclui um grupo (desenho ou KMZ) e tudo que depende dele
+function excluirGrupo(m){
+  if(!grupos[m]) return;
+  if(!confirm(`Excluir "${m}" e todas as suas áreas? Esta ação não pode ser desfeita.`)) return;
+  DATA.features = DATA.features.filter(f=> f.properties.municipio !== m);
+  labelPts.features = labelPts.features.filter(f=> f.properties.municipio !== m);
+  DATA.features.forEach((f,i)=> f.properties.idx = i);   // reindexa (setArea usa idx)
+  delete grupos[m];
+  const oi = ordem.indexOf(m); if(oi>=0) ordem.splice(oi,1);
+  // remove a linha do painel e a linha "Por cidade" do editor
+  document.querySelectorAll('#groups .grp').forEach(el=>{ if(el.querySelector('.g-name').textContent===m) el.remove(); });
+  document.querySelectorAll('#edCidades .e-row').forEach(r=>{ if(r.querySelector('.e-nome').textContent===m) r.remove(); });
+  // reconstrói "Por área" porque os índices mudaram
+  const edA = document.getElementById('edAreas');
+  if(edA){ edA.innerHTML=''; DATA.features.forEach(f=> appendEditorArea(f)); }
+  // atualiza barras e mapa
+  maxHa = Math.max(1, ...Object.values(grupos).map(g=>g.ha), 1);
+  Object.keys(grupos).forEach(updatePanelRow);
+  if(map && map.getSource('glebas')){
+    map.getSource('glebas').setData(DATA);
+    map.getSource('glebas-pts').setData(labelPts);
+    if(map.getSource('mascara')) map.getSource('mascara').setData(construirMascara());
+    aplicarFiltros();
+  }
+  refreshStats();
+  toast(`"${m}" excluído.`);
 }
 function appendEditorCidade(m){
   const row = document.createElement('div');
