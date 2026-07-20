@@ -292,13 +292,15 @@
     <details><summary>Vias</summary><div id="edVias"></div>
       <div class="e-hint">Sliders: espessura (20–300%) e opacidade. Cor vale nos dois fundos; contorno escurece automático.</div>
     </details>
-    <details><summary>Vias sobre a máscara</summary>
+    <details><summary>Sobre a máscara</summary>
       <div class="e-row"><label><input type="checkbox" id="edViaRod"> Rodovias</label>
         <span class="ord"><b class="on-num" data-g="rodovia"></b><button class="ob" data-g="rodovia" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="rodovia" data-d="1" title="enviar para trás">↓</button></span></div>
       <div class="e-row"><label><input type="checkbox" id="edViaAv"> Avenidas principais</label>
         <span class="ord"><b class="on-num" data-g="avenida"></b><button class="ob" data-g="avenida" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="avenida" data-d="1" title="enviar para trás">↓</button></span></div>
       <div class="e-row"><label><input type="checkbox" id="edViaRua"> Ruas</label>
         <span class="ord"><b class="on-num" data-g="rua"></b><button class="ob" data-g="rua" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="rua" data-d="1" title="enviar para trás">↓</button></span></div>
+      <div class="e-row"><label><input type="checkbox" id="edDemaisAcima"> Demais rótulos</label>
+        <span class="ord"><b class="on-num" data-g="demais"></b><button class="ob" data-g="demais" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="demais" data-d="1" title="enviar para trás">↓</button></span></div>
       <div class="e-row"><label><input type="checkbox" id="edCidAcima"> Nomes de cidade</label>
         <span class="ord"><b class="on-num" data-g="cidades"></b><button class="ob" data-g="cidades" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="cidades" data-d="1" title="enviar para trás">↓</button></span></div>
       <div class="e-row"><input type="text" id="edCidSel" placeholder="quais? ex.: Campinas, Valinhos — vazio = todas" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
@@ -1019,12 +1021,23 @@ function montarEditor(){
     });
   }
   // ordem da pilha acima da máscara (índice 0 = topo)
-  const ordemAcima = ['cidades','rodovia','avenida','rua'];
+  const ordemAcima = ['cidades','demais','rodovia','avenida','rua'];
   function renumerar(){
     document.querySelectorAll('.on-num').forEach(b=> b.textContent = ordemAcima.indexOf(b.dataset.g)+1);
   }
+  // "Demais rótulos" sobre a máscara: move as camadas de rótulo diversas
+  function demaisSobreMascara(on){
+    if(!map || !map.getLayer('mascara')) return;
+    classificarRotulos();
+    lblTiers.demais.forEach(id=>{
+      if(!map.getLayer(id)) return;
+      if(on) map.moveLayer(id, 'raio-fill');   // por cima do véu
+      else   map.moveLayer(id, 'mascara');     // volta para baixo do véu
+    });
+  }
   function grupoAtivo(g){
     if(g==='cidades') return cidadesAcima;
+    if(g==='demais')  return document.getElementById('edDemaisAcima').checked;
     return document.getElementById(g==='rodovia'?'edViaRod':g==='avenida'?'edViaAv':'edViaRua').checked;
   }
   function aplicarPilhaAcima(){
@@ -1033,7 +1046,7 @@ function montarEditor(){
     // reempilha da base para o topo: o último movido fica mais acima
     ordemAcima.slice().reverse().forEach(g=>{
       if(!grupoAtivo(g)) return;
-      const ids = g==='cidades' ? clonesCidade : [...viasTiers[g], ...viasNomes[g]];
+      const ids = g==='cidades' ? clonesCidade : g==='demais' ? lblTiers.demais : [...viasTiers[g], ...viasNomes[g]];
       ids.forEach(id=>{ if(map.getLayer(id)) map.moveLayer(id, 'raio-fill'); });
     });
   }
@@ -1056,9 +1069,10 @@ function montarEditor(){
     if(drawing) drawSetMode(false);
     pickCentro = false; map.getCanvas().style.cursor='';
     // pilha acima da máscara
-    ['edViaRod','edViaAv','edViaRua','edCidAcima'].forEach(i=> document.getElementById(i).checked=false);
+    ['edViaRod','edViaAv','edViaRua','edDemaisAcima','edCidAcima'].forEach(i=> document.getElementById(i).checked=false);
     cidadesAcima = false; cidadesSel = []; document.getElementById('edCidSel').value='';
     atualizarCidadesAcima();
+    demaisSobreMascara(false);
     ['rodovia','avenida','rua'].forEach(t=> tierAcima(t,false));
     ordemAcima.length = 0; ORDEM_PADRAO.forEach(g=> ordemAcima.push(g)); renumerar();
     // vias
@@ -1153,6 +1167,10 @@ function montarEditor(){
     atualizarCidadesAcima();
     aplicarPilhaAcima();
   };
+  document.getElementById('edDemaisAcima').onchange = e=>{
+    demaisSobreMascara(e.target.checked);
+    aplicarPilhaAcima();
+  };
   document.getElementById('edCidSel').onchange = e=>{
     cidadesSel = e.target.value.split(/[,;]/).map(s=>s.trim().toLowerCase()).filter(Boolean);
     atualizarCidadesAcima();
@@ -1229,6 +1247,7 @@ function montarEditor(){
               rod: document.getElementById('edViaRod').checked,
               av:  document.getElementById('edViaAv').checked,
               rua: document.getElementById('edViaRua').checked,
+              dem: document.getElementById('edDemaisAcima').checked,
               cid: cidadesAcima, cidSel: cidadesSel.slice() }
     };
   }
@@ -1339,10 +1358,15 @@ function montarEditor(){
         document.getElementById('edViaRua').checked=!!s.acima.rua;
         cidadesAcima=!!s.acima.cid;
         document.getElementById('edCidAcima').checked=cidadesAcima;
+        document.getElementById('edDemaisAcima').checked=!!s.acima.dem;
         cidadesSel=(s.acima.cidSel||[]).slice();
         document.getElementById('edCidSel').value=cidadesSel.join(', ');
-        if(s.acima.ordem && s.acima.ordem.length){ ordemAcima.length=0; s.acima.ordem.forEach(function(g){ ordemAcima.push(g); }); }
+        if(s.acima.ordem && s.acima.ordem.length){
+          ordemAcima.length=0; s.acima.ordem.forEach(function(g){ ordemAcima.push(g); });
+          ORDEM_PADRAO.forEach(function(g){ if(ordemAcima.indexOf(g)<0) ordemAcima.push(g); });
+        }
         atualizarCidadesAcima();
+        demaisSobreMascara(!!s.acima.dem);
         tierAcima('rodovia',!!s.acima.rod);
         tierAcima('avenida',!!s.acima.av);
         tierAcima('rua',!!s.acima.rua);
