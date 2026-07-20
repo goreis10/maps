@@ -126,11 +126,43 @@
   .pp-row{display:flex;justify-content:space-between;gap:18px;font-size:12px;color:var(--ink-2);padding:2px 0}
   .pp-row b{color:var(--ink);font-weight:600}
 
-  #editor{position:absolute;z-index:1000;right:14px;top:262px;width:336px;max-width:calc(100vw - 28px);
-    max-height:calc(100% - 286px);
-    background:rgba(255,255,255,.97);border:1px solid var(--line);border-radius:12px;
-    box-shadow:0 8px 28px rgba(28,25,23,.14);overflow-y:auto;overflow-x:hidden;display:none;font-size:12px}
-  #editor.show{display:block}
+  #editor{position:absolute;z-index:1050;top:0;right:0;bottom:0;width:340px;max-width:88vw;
+    background:rgba(255,255,255,.98);border-left:1px solid var(--line);
+    box-shadow:-10px 0 30px rgba(28,25,23,.16);overflow-y:auto;overflow-x:hidden;font-size:12px;
+    transform:translateX(101%);transition:transform .32s ease}
+  #editor.show{transform:translateX(0)}
+  #map{transition:right .32s ease}
+  #ctrl{transition:right .32s ease}
+  #wrap.editing #map{right:340px}
+  #wrap.editing #ctrl{right:354px}
+  .e-x{border:1px solid var(--line);background:#fff;border-radius:6px;width:24px;height:24px;
+    font-size:15px;line-height:1;cursor:pointer;color:var(--ink-2);padding:0}
+  .e-x:hover{border-color:var(--laranja);color:var(--laranja)}
+
+  /* janela de configurações (abre ao clicar no nome) */
+  .cfg-overlay{position:fixed;inset:0;z-index:2000;background:rgba(28,25,23,.38);
+    display:none;align-items:center;justify-content:center;padding:20px}
+  .cfg-overlay.show{display:flex}
+  .cfg-modal{width:100%;max-width:380px;background:var(--paper);border:1px solid var(--line);
+    border-radius:16px;box-shadow:0 24px 60px rgba(28,25,23,.28);padding:20px 22px;font-size:13px}
+  .cfg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .cfg-x{border:0;background:none;font-size:22px;line-height:1;color:var(--ink-2);cursor:pointer;padding:0 4px}
+  .cfg-x:hover{color:var(--ink)}
+  .cfg-acct{background:#F6F4F1;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+  .cfg-nome{font-weight:700;font-size:14px}
+  .cfg-email{color:var(--ink-2);font-size:12px;margin-top:2px}
+  .cfg-sec-tt{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:8px}
+  .cfg-status{font-size:12.5px;font-weight:600;margin-bottom:6px}
+  .cfg-desc{font-size:12px;color:var(--ink-2);line-height:1.5;margin-bottom:14px}
+  .cfg-btn{width:100%;border:0;border-radius:10px;padding:12px;cursor:pointer;margin-bottom:9px;
+    background:var(--laranja);color:#fff;font:700 13.5px 'Archivo',sans-serif;box-shadow:0 6px 16px rgba(224,64,16,.28)}
+  .cfg-btn:hover{filter:brightness(1.05)}
+  .cfg-btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+  .cfg-link{display:block;width:100%;text-align:center;background:none;border:0;color:var(--azul);
+    font:600 12.5px 'Archivo',sans-serif;cursor:pointer;margin-top:6px;padding:4px}
+  .cfg-link:hover{text-decoration:underline}
+  #hdUserName{cursor:pointer;font-weight:600;color:var(--ink)}
+  #hdUserName:hover{text-decoration:underline}
   #editor .e-head{padding:11px 14px 7px;font-size:11px;font-weight:700;letter-spacing:.12em;
     text-transform:uppercase;color:var(--ink-2)}
   #editor details{border-top:1px solid var(--line)}
@@ -175,7 +207,7 @@
     <div class="st"><b id="stMun">—</b>grupos</div>
   </div>
   <div id="hdUser" style="display:flex;align-items:center;gap:10px;margin-left:16px;padding-left:16px;border-left:1px solid var(--line);font-size:12px;color:var(--ink-2)">
-    <span id="hdUserName" title="conta conectada"></span>
+    <span id="hdUserName" title="abrir configurações"></span>
     <button id="btnLogout" style="border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font:600 12px 'Archivo',sans-serif;color:var(--ink-2);cursor:pointer">Sair</button>
   </div>
 </header>
@@ -207,7 +239,7 @@
     <div class="chip on" id="chipRaio"><span class="dot"></span>Raio 100 km</div>
     <div class="chip" id="chipLbl"><span class="dot"></span>Rótulos</div>
     <div class="chip" id="chipDraw"><span class="dot"></span>Desenhar</div>
-    <div class="chip" id="chipEdit"><span class="dot"></span>Editar</div>
+    <div class="chip" id="chipEdit"><span class="dot"></span>Edição</div>
     <select id="expScale" title="Resolução da imagem exportada">
       <option value="2">PNG 2×</option>
       <option value="3" selected>PNG 3×</option>
@@ -217,7 +249,11 @@
   </div>
 
   <div id="editor">
-    <div class="e-head" style="display:flex;justify-content:space-between;align-items:baseline">Editor de estilo <a id="edReset" style="color:var(--azul);cursor:pointer;text-transform:none;letter-spacing:0;font-size:11px;font-weight:600">restaurar padrão</a></div>
+    <div class="e-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px">Edição
+      <span style="display:flex;align-items:center;gap:10px">
+        <a id="edReset" style="color:var(--azul);cursor:pointer;text-transform:none;letter-spacing:0;font-size:11px;font-weight:600">restaurar padrão</a>
+        <button id="edFechar" class="e-x" title="fechar edição">×</button>
+      </span></div>
     <details open><summary>Por cidade</summary><div id="edCidades"></div>
       <div class="e-hint">Pintar a cidade sobrescreve as áreas dela.</div></details>
     <details><summary>Por área</summary><div id="edAreas"></div></details>
@@ -263,6 +299,25 @@
   </div>
 
   <div id="toast"></div>
+</div>
+
+<div id="cfgOverlay" class="cfg-overlay">
+  <div class="cfg-modal" role="dialog" aria-modal="true">
+    <div class="cfg-head">
+      <div class="brand"><div class="brand-mark"></div><div class="brand-name">Configurações</div></div>
+      <button id="cfgClose" class="cfg-x" title="fechar">×</button>
+    </div>
+    <div class="cfg-acct">
+      <div id="cfgNome" class="cfg-nome">—</div>
+      <div id="cfgEmail" class="cfg-email">—</div>
+    </div>
+    <div class="cfg-sec-tt">Minhas edições</div>
+    <div id="cfgStatus" class="cfg-status">—</div>
+    <p class="cfg-desc">Ao salvar, o mapa abre exatamente como você deixou na próxima vez que entrar. Sem salvar, ele sempre abre no padrão.</p>
+    <button id="cfgSalvar" class="cfg-btn">Salvar minhas edições</button>
+    <button id="cfgPadrao" class="cfg-btn ghost">Voltar ao padrão</button>
+    <button id="cfgSair" class="cfg-link">Sair da conta</button>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
@@ -469,6 +524,8 @@ function montarCamadas(){
   drawSetup();
   classificarTiers();
   refreshStats();
+  // reaplica as edições do usuário, se ele optou por salvá-las
+  try{ if(window.MakerMap) window.MakerMap.restaurar(); }catch(e){ console.error(e); }
 }
 
 let maskCobreGlebas = false;
@@ -1131,15 +1188,194 @@ function montarEditor(){
   document.getElementById('edViaRod').onchange = e=>{ tierAcima('rodovia', e.target.checked); aplicarPilhaAcima(); };
   document.getElementById('edViaAv').onchange  = e=>{ tierAcima('avenida', e.target.checked); aplicarPilhaAcima(); };
   document.getElementById('edViaRua').onchange = e=>{ tierAcima('rua', e.target.checked); aplicarPilhaAcima(); };
+
+  // ── Salvar / restaurar as edições do usuário (localStorage por conta) ──
+  function usuarioEmail(){
+    try{ var s=JSON.parse(localStorage.getItem('makermap.user')||'null'); return (s&&s.user&&s.user.email)?s.user.email:''; }
+    catch(e){ return ''; }
+  }
+  function chaveEdits(){ return 'makermap.edits.'+(usuarioEmail()||'anon'); }
+  function chaveRemember(){ return 'makermap.remember.'+(usuarioEmail()||'anon'); }
+
+  function coletarEstado(){
+    var grp={}; Object.keys(grupos).forEach(function(m){ grp[m]=!!grupos[m].on; });
+    return {
+      v:1,
+      sat: bS.classList.contains('on'),
+      chips:{
+        mask: document.getElementById('chipMask').classList.contains('on'),
+        raio: document.getElementById('chipRaio').classList.contains('on'),
+        lbl:  document.getElementById('chipLbl').classList.contains('on')
+      },
+      grupos: grp,
+      areas: DATA.features.map(function(f){ return {idx:f.properties.idx, cor:f.properties.cor_final, fill:f.properties.fill_on}; }),
+      raio:{ km: raioKm, centro: centroRaio.slice(),
+             cor: document.getElementById('edRaioCor').value,
+             fill: document.getElementById('edRaioFill').checked },
+      mask:{ cor: document.getElementById('edMaskCor').value,
+             op: +document.getElementById('edMaskOp').value,
+             cobre: maskCobreGlebas },
+      vias: JSON.parse(JSON.stringify(viaCfg)),
+      lbl:  JSON.parse(JSON.stringify(lblCfg)),
+      acima:{ ordem: ordemAcima.slice(),
+              rod: document.getElementById('edViaRod').checked,
+              av:  document.getElementById('edViaAv').checked,
+              rua: document.getElementById('edViaRua').checked,
+              cid: cidadesAcima, cidSel: cidadesSel.slice() }
+    };
+  }
+
+  function aplicarEstado(s){
+    if(!map || !s) return;
+    try{
+      if(typeof drawing!=='undefined' && drawing) drawSetMode(false);
+      pickCentro=false; map.getCanvas().style.cursor='';
+
+      // vias (config + fundo) e inputs da seção Vias
+      ['rodovia','avenida','rua'].forEach(function(t){ if(s.vias && s.vias[t]) Object.assign(viaCfg[t], s.vias[t]); });
+      setSat(!!s.sat);
+      document.querySelectorAll('#edVias .e-row').forEach(function(r,i){
+        var cfg=viaCfg[tiersUi[i].k], ins=r.querySelectorAll('input');
+        ins[0].checked=!!cfg.on; if(cfg.cor) ins[1].value=cfg.cor;
+        ins[2].value=Math.round((cfg.esp||1)*100);
+        ins[3].value=Math.round((cfg.op!=null?cfg.op:1)*100);
+      });
+
+      // rótulos do basemap
+      if(s.lbl) Object.keys(lblCfg).forEach(function(k){ if(s.lbl[k]) Object.assign(lblCfg[k], s.lbl[k]); });
+      Object.keys(lblTiers).forEach(function(t){ aplicarLbl(t); });
+      var rot=document.querySelectorAll('#edRotulos .e-row');
+      lblUi.forEach(function(t,i){
+        var c=lblCfg[t.k];
+        var a=rot[i*2].querySelectorAll('input'); if(c.cor) a[0].value=c.cor; a[1].value=Math.round((c.tam||1)*100);
+        var b=rot[i*2+1].querySelectorAll('input'); b[0].checked=!!c.halo; b[1].value=c.haloCor; b[2].value=Math.round((c.haloW||1.2)*10);
+      });
+
+      // máscara
+      maskCobreGlebas=!!(s.mask&&s.mask.cobre);
+      document.getElementById('edMaskCobre').checked=maskCobreGlebas;
+      var mCor=(s.mask&&s.mask.cor)||'#1C1917', mOp=(s.mask&&s.mask.op!=null)?s.mask.op:55;
+      document.getElementById('edMaskCor').value=mCor;
+      document.getElementById('edMaskOp').value=mOp;
+      document.getElementById('edMaskOpV').textContent=mOp+'%';
+      if(map.getLayer('mascara')){
+        map.setPaintProperty('mascara','fill-color',mCor);
+        map.setPaintProperty('mascara','fill-opacity',mOp/100);
+        map.getSource('mascara').setData(construirMascara());
+        var maskOn=!!(s.chips&&s.chips.mask);
+        map.setLayoutProperty('mascara','visibility',maskOn?'visible':'none');
+        document.getElementById('chipMask').classList.toggle('on',maskOn);
+      }
+
+      // raio
+      if(s.raio){
+        raioKm=s.raio.km||100;
+        centroRaio=(s.raio.centro&&s.raio.centro.length===2)?s.raio.centro.slice():CENTRO_SE.slice();
+        document.getElementById('edRaioKm').value=raioKm;
+        document.getElementById('edRaioCor').value=s.raio.cor||'#337FFF';
+        document.getElementById('edRaioFill').checked=s.raio.fill!==false;
+        atualizarRaio();
+        if(map.getLayer('raio-borda')){
+          var rc=s.raio.cor||'#337FFF';
+          map.setPaintProperty('raio-borda','line-color',rc);
+          map.setPaintProperty('raio-fill','fill-color',rc);
+          map.setPaintProperty('raio-fill','fill-opacity',s.raio.fill===false?0:0.05);
+          map.setPaintProperty('raio-centro','circle-color',rc);
+          map.setPaintProperty('raio-rotulo','text-color',rc);
+          var raioOn=!s.chips || s.chips.raio!==false;
+          ['raio-fill','raio-borda','raio-centro','raio-rotulo'].forEach(function(id){ map.setLayoutProperty(id,'visibility',raioOn?'visible':'none'); });
+          document.getElementById('chipRaio').classList.toggle('on',raioOn);
+        }
+      }
+
+      // glebas: cores + preenchimento
+      if(s.areas){
+        var byIdx={}; s.areas.forEach(function(a){ byIdx[a.idx]=a; });
+        DATA.features.forEach(function(f){ var a=byIdx[f.properties.idx]; if(a){ f.properties.cor_final=a.cor; f.properties.fill_on=a.fill; } });
+        refreshGlebas();
+      }
+      if(s.grupos) Object.keys(grupos).forEach(function(m){ if(m in s.grupos) grupos[m].on=!!s.grupos[m]; });
+      document.querySelectorAll('#groups .grp').forEach(function(el){
+        var m=el.querySelector('.g-name').textContent;
+        var on=grupos[m]?grupos[m].on:true;
+        el.classList.toggle('off',!on);
+        var ff=DATA.features.find(function(f){ return f.properties.municipio===m; });
+        var c=ff?ff.properties.cor_final:(CORES[m]||'#8A8F98');
+        el.querySelector('.sw').style.background=c;
+        el.querySelector('.g-bar i').style.background=c;
+      });
+      aplicarFiltros(); refreshStats();
+
+      // inputs do editor (cidade e área)
+      document.querySelectorAll('#edCidades .e-row').forEach(function(r){
+        var m=r.querySelector('.e-nome').textContent;
+        var ff=DATA.features.find(function(f){ return f.properties.municipio===m; });
+        if(ff) r.querySelector('input[type=color]').value=ff.properties.cor_final;
+      });
+      var areaRows=document.querySelectorAll('#edAreas .e-row');
+      DATA.features.forEach(function(f,i){
+        var r=areaRows[i]; if(!r) return;
+        var c=r.querySelector('input[type=color]'); if(c) c.value=f.properties.cor_final;
+        var k=r.querySelector('input[type=checkbox]'); if(k && !k.disabled) k.checked=f.properties.fill_on!==0;
+      });
+
+      // rótulos das glebas (chip Rótulos)
+      var lblOn=!!(s.chips&&s.chips.lbl);
+      if(map.getLayer('gleba-rotulo')) map.setLayoutProperty('gleba-rotulo','visibility',lblOn?'visible':'none');
+      document.getElementById('chipLbl').classList.toggle('on',lblOn);
+
+      // vias/nomes sobre a máscara
+      if(s.acima){
+        document.getElementById('edViaRod').checked=!!s.acima.rod;
+        document.getElementById('edViaAv').checked=!!s.acima.av;
+        document.getElementById('edViaRua').checked=!!s.acima.rua;
+        cidadesAcima=!!s.acima.cid;
+        document.getElementById('edCidAcima').checked=cidadesAcima;
+        cidadesSel=(s.acima.cidSel||[]).slice();
+        document.getElementById('edCidSel').value=cidadesSel.join(', ');
+        if(s.acima.ordem && s.acima.ordem.length){ ordemAcima.length=0; s.acima.ordem.forEach(function(g){ ordemAcima.push(g); }); }
+        atualizarCidadesAcima();
+        tierAcima('rodovia',!!s.acima.rod);
+        tierAcima('avenida',!!s.acima.av);
+        tierAcima('rua',!!s.acima.rua);
+        renumerar(); aplicarPilhaAcima();
+      }
+    }catch(e){ console.error('aplicarEstado falhou', e); }
+  }
+
+  window.MakerMap = {
+    coletar: coletarEstado,
+    salvar: function(){
+      try{ localStorage.setItem(chaveEdits(), JSON.stringify(coletarEstado())); localStorage.setItem(chaveRemember(),'1'); return true; }
+      catch(e){ return false; }
+    },
+    temSalvo: function(){ return localStorage.getItem(chaveRemember())==='1' && !!localStorage.getItem(chaveEdits()); },
+    limpar: function(){ try{ localStorage.removeItem(chaveEdits()); localStorage.setItem(chaveRemember(),'0'); }catch(e){} },
+    restaurar: function(){
+      try{
+        if(localStorage.getItem(chaveRemember())!=='1') return false;
+        var blob=localStorage.getItem(chaveEdits()); if(!blob) return false;
+        aplicarEstado(JSON.parse(blob)); return true;
+      }catch(e){ console.error(e); return false; }
+    },
+    padrao: function(){ try{ resetPadrao(); }catch(e){} }
+  };
 }
 montarEditor();
 
-document.getElementById('chipEdit').onclick = function(){
+const __wrap = document.getElementById('wrap');
+function abrirEdicao(on){
   const ed = document.getElementById('editor');
-  const on = !ed.classList.contains('show');
   ed.classList.toggle('show', on);
-  this.classList.toggle('on', on);
+  __wrap.classList.toggle('editing', on);
+  document.getElementById('chipEdit').classList.toggle('on', on);
+  // reajusta o mapa depois que o deslize termina, para preencher a nova largura
+  setTimeout(function(){ if(map) map.resize(); }, 360);
+}
+document.getElementById('chipEdit').onclick = function(){
+  abrirEdicao(!document.getElementById('editor').classList.contains('show'));
 };
+document.getElementById('edFechar').onclick = function(){ abrirEdicao(false); };
 
 // ── Upload de KMZ/KML ──
 const POOL_CORES = ['#FFB020','#0FB5A6','#8B5CF6','#D946EF','#059669','#B45309','#DC2626','#0284C7','#4D7C0F','#9333EA'];
@@ -1433,18 +1669,17 @@ document.getElementById('btnExport').onclick = async function(){
   }
 };
 
-// ── Conta: exibe nome e trata logout (sessão em localStorage) ──
+// ── Conta: nome, janela de configurações e logout (sessão em localStorage) ──
 (function(){
   var nameEl = document.getElementById('hdUserName');
   var btn = document.getElementById('btnLogout');
   var s = null;
   try{ s = JSON.parse(localStorage.getItem('makermap.user') || 'null'); }catch(e){}
-  if(s && s.user && nameEl){
-    var md = s.user.user_metadata || {};
-    nameEl.textContent = md.first_name ? (md.first_name + (md.last_name ? ' ' + md.last_name : '')) : (s.user.email || '');
-  }
-  if(btn) btn.onclick = function(){
-    // encerra a sessão local e, best-effort, revoga o token no servidor
+  var md = (s && s.user && s.user.user_metadata) ? s.user.user_metadata : {};
+  var nomeCompleto = md.first_name ? (md.first_name + (md.last_name ? ' ' + md.last_name : '')) : ((s && s.user && s.user.email) || '');
+  if(nameEl) nameEl.textContent = nomeCompleto || 'Conta';
+
+  function doLogout(){
     try{
       if(s && s.access_token){
         fetch(location.origin + '/.netlify/identity/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + s.access_token } }).catch(function(){});
@@ -1452,7 +1687,42 @@ document.getElementById('btnExport').onclick = async function(){
     }catch(e){}
     localStorage.removeItem('makermap.user');
     location.replace('index.html');
+  }
+  if(btn) btn.onclick = doLogout;
+
+  // ── Janela de configurações ──
+  var overlay = document.getElementById('cfgOverlay');
+  function atualizarStatus(){
+    var st = document.getElementById('cfgStatus');
+    var lembrando = window.MakerMap && window.MakerMap.temSalvo && window.MakerMap.temSalvo();
+    st.textContent = lembrando ? 'Suas edições estão sendo lembradas ✔' : 'O site abre sempre no padrão.';
+    st.style.color = lembrando ? 'var(--laranja)' : 'var(--ink-2)';
+  }
+  function abrirCfg(){
+    document.getElementById('cfgNome').textContent = nomeCompleto || 'Conta';
+    document.getElementById('cfgEmail').textContent = (s && s.user && s.user.email) || '';
+    atualizarStatus();
+    overlay.classList.add('show');
+  }
+  function fecharCfg(){ overlay.classList.remove('show'); }
+
+  if(nameEl) nameEl.onclick = abrirCfg;
+  document.getElementById('cfgClose').onclick = fecharCfg;
+  overlay.onclick = function(e){ if(e.target === overlay) fecharCfg(); };
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && overlay.classList.contains('show')) fecharCfg(); });
+
+  document.getElementById('cfgSalvar').onclick = function(){
+    if(window.MakerMap && window.MakerMap.salvar()){
+      atualizarStatus();
+      if(typeof toast === 'function') toast('Edições salvas — vão reaparecer no próximo acesso.');
+    } else if(typeof toast === 'function'){ toast('Não foi possível salvar as edições.'); }
   };
+  document.getElementById('cfgPadrao').onclick = function(){
+    if(window.MakerMap){ window.MakerMap.limpar(); window.MakerMap.padrao(); }
+    atualizarStatus();
+    fecharCfg();
+  };
+  document.getElementById('cfgSair').onclick = doLogout;
 })();
 </script>
 </body>
