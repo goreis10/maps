@@ -139,6 +139,8 @@
   .e-x{border:1px solid var(--line);background:#fff;border-radius:6px;width:24px;height:24px;
     font-size:15px;line-height:1;cursor:pointer;color:var(--ink-2);padding:0}
   .e-x:hover{border-color:var(--laranja);color:var(--laranja)}
+  .e-toggles{display:flex;flex-wrap:wrap;gap:8px;padding:8px 14px 12px;border-bottom:1px solid var(--line)}
+  #editor .e-toggles .chip{box-shadow:none}
 
   /* janela de configurações (abre ao clicar no nome) */
   .cfg-overlay{position:fixed;inset:0;z-index:2000;background:rgba(28,25,23,.38);
@@ -193,7 +195,7 @@
 
   @media (max-width:640px){
     .hd-title{display:none}
-    .hd-stats .st:nth-child(3){display:none}
+    .hd-stats .st:nth-child(3),.hd-stats .st:nth-child(4){display:none}
     #panel{width:220px}
   }
 </style>
@@ -206,6 +208,7 @@
       onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Maker Map</div></div>
   <div class="hd-stats">
     <div class="st"><b id="stHa">—</b>hectares</div>
+    <div class="st"><b id="stM2">—</b>m²</div>
     <div class="st"><b id="stAreas">—</b>áreas</div>
     <div class="st"><b id="stMun">—</b>grupos</div>
   </div>
@@ -238,9 +241,6 @@
       <button id="bmClaro" class="on">Maker Map</button>
       <button id="bmSat">Satélite</button>
     </div>
-    <div class="chip" id="chipMask"><span class="dot"></span>Máscara</div>
-    <div class="chip on" id="chipRaio"><span class="dot"></span>Raio 100 km</div>
-    <div class="chip" id="chipLbl"><span class="dot"></span>Rótulos</div>
     <div class="chip" id="chipDraw"><span class="dot"></span>Desenhar</div>
     <div class="chip" id="chipEdit"><span class="dot"></span>Edição</div>
     <select id="expScale" title="Resolução da imagem exportada">
@@ -257,6 +257,11 @@
         <a id="edReset" style="color:var(--azul);cursor:pointer;text-transform:none;letter-spacing:0;font-size:11px;font-weight:600">restaurar padrão</a>
         <button id="edFechar" class="e-x" title="fechar edição">×</button>
       </span></div>
+    <div class="e-toggles">
+      <div class="chip" id="chipMask"><span class="dot"></span>Máscara</div>
+      <div class="chip" id="chipRaio"><span class="dot"></span>Raio</div>
+      <div class="chip" id="chipLbl"><span class="dot"></span>Rótulos</div>
+    </div>
     <details open><summary>Por cidade</summary><div id="edCidades"></div>
       <div class="e-hint">Pintar a cidade sobrescreve as áreas dela.</div></details>
     <details><summary>Por área</summary><div id="edAreas"></div></details>
@@ -473,17 +478,17 @@ function montarCamadas(){
 
   map.addSource('raio', {type:'geojson', data:RAIO});
   map.addLayer({id:'raio-fill', type:'fill', source:'raio',
-    filter:['==',['geometry-type'],'Polygon'],
+    filter:['==',['geometry-type'],'Polygon'], layout:{visibility:'none'},
     paint:{'fill-color':'#337FFF', 'fill-opacity':0.05}});
   map.addLayer({id:'raio-borda', type:'line', source:'raio',
-    filter:['==',['geometry-type'],'Polygon'],
+    filter:['==',['geometry-type'],'Polygon'], layout:{visibility:'none'},
     paint:{'line-color':'#337FFF', 'line-width':2, 'line-dasharray':[3,2]}});
   map.addLayer({id:'raio-centro', type:'circle', source:'raio',
-    filter:['==',['geometry-type'],'Point'],
+    filter:['==',['geometry-type'],'Point'], layout:{visibility:'none'},
     paint:{'circle-radius':5, 'circle-color':'#337FFF', 'circle-stroke-color':'#FFFFFF', 'circle-stroke-width':2}});
   map.addLayer({id:'raio-rotulo', type:'symbol', source:'raio',
     filter:['==',['geometry-type'],'Point'],
-    layout:{'text-field':'Marco Zero · raio 100 km', 'text-font':['Noto Sans Regular'],
+    layout:{visibility:'none', 'text-field':'Marco Zero · raio 100 km', 'text-font':['Noto Sans Regular'],
       'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
     paint:{'text-color':'#1D4FA8', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
 
@@ -586,6 +591,7 @@ function refreshStats(){
   let n=0, ha=0, mun=0;
   Object.values(grupos).forEach(g=>{ if(g.on){ n+=g.n; ha+=g.ha; mun++; }});
   document.getElementById('stHa').textContent = ha.toLocaleString('pt-BR',{maximumFractionDigits:0});
+  document.getElementById('stM2').textContent = (ha*10000).toLocaleString('pt-BR',{maximumFractionDigits:0});
   document.getElementById('stAreas').textContent = n;
   document.getElementById('stMun').textContent = mun;
 }
@@ -849,7 +855,6 @@ function montarEditor(){
       map.setLayoutProperty('raio-rotulo','text-field',
         `${centroEhSe() ? 'Marco Zero' : 'Centro'} · raio ${raioKm} km`);
     }
-    document.querySelector('#chipRaio').lastChild.textContent = `Raio ${raioKm} km`;
     document.getElementById('edCtLat').value = centroRaio[1].toFixed(5);
     document.getElementById('edCtLon').value = centroRaio[0].toFixed(5);
   }
@@ -1094,9 +1099,9 @@ function montarEditor(){
       map.setPaintProperty('raio-fill','fill-opacity',0.05);
       map.setPaintProperty('raio-centro','circle-color','#337FFF');
       map.setPaintProperty('raio-rotulo','text-color','#337FFF');
-      ['raio-fill','raio-borda','raio-centro','raio-rotulo'].forEach(id=> map.setLayoutProperty(id,'visibility','visible'));
+      ['raio-fill','raio-borda','raio-centro','raio-rotulo'].forEach(id=> map.setLayoutProperty(id,'visibility','none'));
     }
-    document.getElementById('chipRaio').classList.add('on');
+    document.getElementById('chipRaio').classList.remove('on');
     // glebas: cores de grupo, preenchimento, filtros e rótulos
     DATA.features.forEach(f=>{
       f.properties.cor_final = CORES[f.properties.municipio] || '#8A8F98';
@@ -1628,7 +1633,7 @@ document.getElementById('chipMask').onclick = function(){
   this.classList.toggle('on', on);
 };
 
-// ── Raio 100 km ──
+// ── Raio ──
 document.getElementById('chipRaio').onclick = function(){
   if(!map || !map.getLayer('raio-borda')) return;
   const on = map.getLayoutProperty('raio-borda','visibility') === 'none';
