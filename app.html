@@ -170,6 +170,25 @@
   .cfg-link:hover{text-decoration:underline}
   #hdUserName{cursor:pointer;font-weight:600;color:var(--ink)}
   #hdUserName:hover{text-decoration:underline}
+  .hd-btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 14px;
+    font:700 12.5px 'Archivo',sans-serif;color:var(--ink);cursor:pointer}
+  .hd-btn:hover{border-color:var(--laranja);color:var(--laranja)}
+  .cfg-input{width:100%;border:1px solid var(--line);border-radius:9px;padding:11px 12px;
+    font:500 13.5px 'Archivo',sans-serif;color:var(--ink);margin-bottom:14px}
+  .cfg-input:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 3px rgba(51,127,255,.15)}
+  .proj-list{max-height:min(52vh,360px);overflow-y:auto;margin-bottom:8px}
+  .proj-empty{font-size:12.5px;color:var(--ink-2);text-align:center;padding:22px 0}
+  .proj-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+    border-radius:10px;margin-bottom:8px}
+  .proj-info{flex:1;min-width:0}
+  .proj-nome{font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .proj-data{font-size:11px;color:var(--ink-2);margin-top:1px}
+  .proj-abrir{border:0;background:var(--laranja);color:#fff;border-radius:8px;padding:8px 14px;
+    font:700 12px 'Archivo',sans-serif;cursor:pointer;flex:none}
+  .proj-abrir:hover{filter:brightness(1.05)}
+  .proj-del{flex:none;border:1px solid var(--line);background:#fff;border-radius:8px;width:32px;height:32px;
+    cursor:pointer;color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+  .proj-del:hover{color:#D92D20;border-color:#FECDCA;background:#FEF3F2}
   #editor .e-head{padding:11px 14px 7px;font-size:11px;font-weight:700;letter-spacing:.12em;
     text-transform:uppercase;color:var(--ink-2)}
   #editor details{border-top:1px solid var(--line)}
@@ -210,12 +229,7 @@
   <div class="brand"><img src="logo-makermap.png" alt="Maker Map" class="brand-logo"
       onload="this.parentNode.querySelectorAll('.brand-mark,.brand-name').forEach(function(e){e.style.display='none'});"
       onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Maker Map</div></div>
-  <div class="hd-stats">
-    <div class="st"><b id="stHa">—</b>hectares</div>
-    <div class="st"><b id="stM2">—</b>m²</div>
-    <div class="st"><b id="stAreas">—</b>áreas</div>
-    <div class="st"><b id="stMun">—</b>grupos</div>
-  </div>
+  <button id="btnProjetos" class="hd-btn" style="margin-left:auto">Meus Projetos</button>
   <div id="hdUser" style="display:flex;align-items:center;gap:10px;margin-left:16px;padding-left:16px;border-left:1px solid var(--line);font-size:12px;color:var(--ink-2)">
     <span id="hdUserName" title="abrir configurações"></span>
     <button id="btnLogout" style="border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font:600 12px 'Archivo',sans-serif;color:var(--ink-2);cursor:pointer">Sair</button>
@@ -245,6 +259,7 @@
       <button id="bmClaro" class="on">Maker Map</button>
       <button id="bmSat">Satélite</button>
     </div>
+    <div class="chip" id="btnSalvarProj"><span class="dot" style="background:var(--laranja)"></span>Salvar Projeto</div>
     <div class="chip" id="chipDraw"><span class="dot"></span>Desenhar</div>
     <div class="chip" id="chipEdit"><span class="dot"></span>Edição</div>
     <select id="expScale" title="Resolução da imagem exportada">
@@ -325,12 +340,35 @@
       <div id="cfgNome" class="cfg-nome">—</div>
       <div id="cfgEmail" class="cfg-email">—</div>
     </div>
-    <div class="cfg-sec-tt">Minhas edições</div>
-    <div id="cfgStatus" class="cfg-status">—</div>
-    <p class="cfg-desc">Ao salvar, o mapa abre exatamente como você deixou na próxima vez que entrar. Sem salvar, ele sempre abre no padrão.</p>
-    <button id="cfgSalvar" class="cfg-btn">Salvar minhas edições</button>
-    <button id="cfgPadrao" class="cfg-btn ghost">Voltar ao padrão</button>
+    <p class="cfg-desc">Seus desenhos, KMZ e edições ficam guardados em <b>Meus Projetos</b> (botão no topo). Use <b>Salvar Projeto</b> no menu do mapa para criar um novo.</p>
     <button id="cfgSair" class="cfg-link">Sair da conta</button>
+  </div>
+</div>
+
+<!-- Janela: Salvar Projeto -->
+<div id="saveOverlay" class="cfg-overlay">
+  <div class="cfg-modal" role="dialog" aria-modal="true">
+    <div class="cfg-head">
+      <div class="brand"><div class="brand-mark"></div><div class="brand-name">Salvar Projeto</div></div>
+      <button id="saveClose" class="cfg-x" title="fechar">×</button>
+    </div>
+    <p class="cfg-desc">Dê um nome ao projeto. Serão salvos todos os desenhos, KMZ e a edição atual.</p>
+    <input type="text" id="saveNome" class="cfg-input" placeholder="Nome do projeto" maxlength="80">
+    <button id="saveConfirmar" class="cfg-btn">Salvar</button>
+    <button id="saveCancelar" class="cfg-link">Cancelar</button>
+  </div>
+</div>
+
+<!-- Janela: Meus Projetos -->
+<div id="projOverlay" class="cfg-overlay">
+  <div class="cfg-modal" role="dialog" aria-modal="true">
+    <div class="cfg-head">
+      <div class="brand"><div class="brand-mark"></div><div class="brand-name">Meus Projetos</div></div>
+      <button id="projClose" class="cfg-x" title="fechar">×</button>
+    </div>
+    <div id="projLista" class="proj-list"></div>
+    <button id="projNovo" class="cfg-btn ghost">Começar do zero (novo)</button>
+    <button id="projFechar" class="cfg-link">Fechar</button>
   </div>
 </div>
 
@@ -345,6 +383,7 @@ const CORES = {
   "Itatiba":"#FF8A3D","Limeira":"#A21CAF","Sumaré":"#6D4DF5","Itu":"#0E9F8A",
   "Itapetininga":"#7A2E12","Cordeirópolis":"#FF5C8A","Não identificado":"#8A8F98"
 };
+const CORES_BASE = Object.assign({}, CORES);   // paleta padrão (para "começar do zero")
 const fmt = n => n.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
 const fail = msg => {
   const f = document.getElementById('fail');
@@ -538,8 +577,7 @@ function montarCamadas(){
   drawSetup();
   classificarTiers();
   refreshStats();
-  // reaplica as edições do usuário, se ele optou por salvá-las
-  try{ if(window.MakerMap) window.MakerMap.restaurar(); }catch(e){ console.error(e); }
+  // cada sessão começa do zero; projetos são abertos manualmente em "Meus Projetos"
 }
 
 let maskCobreGlebas = false;
@@ -592,14 +630,16 @@ function aplicarFiltros(){
   if (map.getSource('mascara')) map.getSource('mascara').setData(construirMascara());
 }
 
-// ── Header stats ──
+// ── Header stats (indicadores removidos do topo; função mantida à prova de ausência) ──
 function refreshStats(){
+  const elHa = document.getElementById('stHa');
+  if(!elHa) return;
   let n=0, ha=0, mun=0;
   Object.values(grupos).forEach(g=>{ if(g.on){ n+=g.n; ha+=g.ha; mun++; }});
-  document.getElementById('stHa').textContent = ha.toLocaleString('pt-BR',{maximumFractionDigits:0});
-  document.getElementById('stM2').textContent = (ha*10000).toLocaleString('pt-BR',{maximumFractionDigits:0});
-  document.getElementById('stAreas').textContent = n;
-  document.getElementById('stMun').textContent = mun;
+  elHa.textContent = ha.toLocaleString('pt-BR',{maximumFractionDigits:0});
+  const elM2=document.getElementById('stM2'); if(elM2) elM2.textContent = (ha*10000).toLocaleString('pt-BR',{maximumFractionDigits:0});
+  const elA=document.getElementById('stAreas'); if(elA) elA.textContent = n;
+  const elM=document.getElementById('stMun'); if(elM) elM.textContent = mun;
 }
 
 // ── Painel ──
@@ -1394,6 +1434,7 @@ function montarEditor(){
 
   window.MakerMap = {
     coletar: coletarEstado,
+    aplicar: aplicarEstado,
     salvar: function(){
       try{ localStorage.setItem(chaveEdits(), JSON.stringify(coletarEstado())); localStorage.setItem(chaveRemember(),'1'); return true; }
       catch(e){ return false; }
@@ -1739,14 +1780,14 @@ document.getElementById('btnExport').onclick = async function(){
   }
 };
 
-// ── Conta: nome, janela de configurações e logout (sessão em localStorage) ──
+// ── Conta, Configurações, Salvar Projeto e Meus Projetos ──
 (function(){
   var nameEl = document.getElementById('hdUserName');
-  var btn = document.getElementById('btnLogout');
   var s = null;
   try{ s = JSON.parse(localStorage.getItem('makermap.user') || 'null'); }catch(e){}
   var md = (s && s.user && s.user.user_metadata) ? s.user.user_metadata : {};
   var nomeCompleto = md.first_name ? (md.first_name + (md.last_name ? ' ' + md.last_name : '')) : ((s && s.user && s.user.email) || '');
+  var email = (s && s.user && s.user.email) || 'anon';
   if(nameEl) nameEl.textContent = nomeCompleto || 'Conta';
 
   function doLogout(){
@@ -1758,41 +1799,156 @@ document.getElementById('btnExport').onclick = async function(){
     localStorage.removeItem('makermap.user');
     location.replace('index.html');
   }
-  if(btn) btn.onclick = doLogout;
+  var btnLogout = document.getElementById('btnLogout');
+  if(btnLogout) btnLogout.onclick = doLogout;
 
-  // ── Janela de configurações ──
-  var overlay = document.getElementById('cfgOverlay');
-  function atualizarStatus(){
-    var st = document.getElementById('cfgStatus');
-    var lembrando = window.MakerMap && window.MakerMap.temSalvo && window.MakerMap.temSalvo();
-    st.textContent = lembrando ? 'Suas edições estão sendo lembradas ✔' : 'O site abre sempre no padrão.';
-    st.style.color = lembrando ? 'var(--laranja)' : 'var(--ink-2)';
-  }
+  // ── Configurações (clique no nome) ──
+  var cfgOv = document.getElementById('cfgOverlay');
   function abrirCfg(){
     document.getElementById('cfgNome').textContent = nomeCompleto || 'Conta';
-    document.getElementById('cfgEmail').textContent = (s && s.user && s.user.email) || '';
-    atualizarStatus();
-    overlay.classList.add('show');
+    document.getElementById('cfgEmail').textContent = email;
+    cfgOv.classList.add('show');
   }
-  function fecharCfg(){ overlay.classList.remove('show'); }
-
+  function fecharCfg(){ cfgOv.classList.remove('show'); }
   if(nameEl) nameEl.onclick = abrirCfg;
   document.getElementById('cfgClose').onclick = fecharCfg;
-  overlay.onclick = function(e){ if(e.target === overlay) fecharCfg(); };
-  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && overlay.classList.contains('show')) fecharCfg(); });
-
-  document.getElementById('cfgSalvar').onclick = function(){
-    if(window.MakerMap && window.MakerMap.salvar()){
-      atualizarStatus();
-      if(typeof toast === 'function') toast('Edições salvas — vão reaparecer no próximo acesso.');
-    } else if(typeof toast === 'function'){ toast('Não foi possível salvar as edições.'); }
-  };
-  document.getElementById('cfgPadrao').onclick = function(){
-    if(window.MakerMap){ window.MakerMap.limpar(); window.MakerMap.padrao(); }
-    atualizarStatus();
-    fecharCfg();
-  };
+  cfgOv.onclick = function(e){ if(e.target === cfgOv) fecharCfg(); };
   document.getElementById('cfgSair').onclick = doLogout;
+
+  // ── Armazenamento de projetos (por conta, neste navegador) ──
+  function projKey(){ return 'makermap.projetos.' + email; }
+  function listarProjetos(){ try{ return JSON.parse(localStorage.getItem(projKey()) || '[]'); }catch(e){ return []; } }
+  function gravarProjetos(arr){ localStorage.setItem(projKey(), JSON.stringify(arr)); }
+  function excluirProjeto(id){ gravarProjetos(listarProjetos().filter(function(p){ return p.id !== id; })); }
+  function coletarProjeto(nome){
+    return {
+      id: 'p' + Date.now() + Math.floor(Math.random()*1000),
+      nome: nome, ts: Date.now(),
+      data: JSON.parse(JSON.stringify(DATA.features)),
+      pts: JSON.parse(JSON.stringify(labelPts.features)),
+      grupos: JSON.parse(JSON.stringify(grupos)),
+      cores: JSON.parse(JSON.stringify(CORES)),
+      estado: (window.MakerMap && window.MakerMap.coletar) ? window.MakerMap.coletar() : null
+    };
+  }
+  function salvarProjetoAtual(nome){
+    var arr = listarProjetos(), proj = coletarProjeto(nome);
+    var i = arr.findIndex(function(p){ return p.nome.toLowerCase() === nome.toLowerCase(); });
+    if(i >= 0) arr[i] = proj; else arr.push(proj);
+    try{ gravarProjetos(arr); return true; }catch(e){ console.error(e); return false; }
+  }
+
+  // ── Limpar tudo (começar do zero) ──
+  function limparProjetoAtual(){
+    DATA.features = [];
+    labelPts.features = [];
+    Object.keys(grupos).forEach(function(m){ delete grupos[m]; });
+    Object.keys(CORES).forEach(function(k){ delete CORES[k]; });
+    Object.assign(CORES, CORES_BASE);
+    ordem.length = 0; maxHa = 1;
+    ['groups','edCidades','edAreas'].forEach(function(id){ var el=document.getElementById(id); if(el) el.innerHTML=''; });
+    if(map && map.getSource('glebas')){
+      map.getSource('glebas').setData(DATA);
+      map.getSource('glebas-pts').setData(labelPts);
+      if(map.getSource('mascara')) map.getSource('mascara').setData(construirMascara());
+      aplicarFiltros();
+    }
+    refreshStats();
+  }
+
+  // ── Abrir um projeto salvo ──
+  function carregarProjeto(proj){
+    if(!map){ toast('Aguarde o mapa carregar.'); return; }
+    limparProjetoAtual();
+    DATA.features = JSON.parse(JSON.stringify(proj.data || []));
+    labelPts.features = JSON.parse(JSON.stringify(proj.pts || []));
+    DATA.features.forEach(function(f,i){ f.properties.idx = i; });
+    if(proj.grupos) Object.keys(proj.grupos).forEach(function(m){ grupos[m] = proj.grupos[m]; });
+    if(proj.cores) Object.assign(CORES, proj.cores);
+    ordem.length = 0;
+    Object.keys(grupos).sort(function(a,b){ return grupos[b].ha - grupos[a].ha; }).forEach(function(m){ ordem.push(m); });
+    maxHa = Math.max(1, ...Object.values(grupos).map(function(g){ return g.ha; }), 1);
+    ordem.forEach(function(m){ appendPanelRow(m); appendEditorCidade(m); });
+    DATA.features.forEach(function(f){ appendEditorArea(f); });
+    Object.keys(grupos).forEach(updatePanelRow);
+    map.getSource('glebas').setData(DATA);
+    map.getSource('glebas-pts').setData(labelPts);
+    if(map.getSource('mascara')) map.getSource('mascara').setData(construirMascara());
+    aplicarFiltros(); refreshStats();
+    // enquadra nos dados
+    var mi=[180,90], ma=[-180,-90], tem=false;
+    DATA.features.forEach(function(f){
+      var g=f.geometry, cs = g.type==='Polygon' ? g.coordinates[0] : (g.type==='Point' ? [g.coordinates] : g.coordinates);
+      cs.forEach(function(c){ tem=true; mi=[Math.min(mi[0],c[0]),Math.min(mi[1],c[1])]; ma=[Math.max(ma[0],c[0]),Math.max(ma[1],c[1])]; });
+    });
+    if(tem) map.fitBounds([mi,ma],{padding:80, maxZoom:14});
+    if(proj.estado && window.MakerMap && window.MakerMap.aplicar) window.MakerMap.aplicar(proj.estado);
+    toast('Projeto "' + proj.nome + '" aberto.');
+  }
+
+  // ── Janela: Salvar Projeto ──
+  var saveOv = document.getElementById('saveOverlay');
+  var saveNome = document.getElementById('saveNome');
+  function abrirSave(){ if(!map){ toast('Aguarde o mapa carregar.'); return; } saveNome.value=''; saveOv.classList.add('show'); setTimeout(function(){ saveNome.focus(); }, 60); }
+  function fecharSave(){ saveOv.classList.remove('show'); }
+  function confirmarSave(){
+    var nome = saveNome.value.trim();
+    if(!nome){ toast('Dê um nome ao projeto.'); saveNome.focus(); return; }
+    if(listarProjetos().some(function(p){ return p.nome.toLowerCase()===nome.toLowerCase(); })
+       && !confirm('Já existe um projeto "' + nome + '". Substituir?')) return;
+    if(salvarProjetoAtual(nome)){ fecharSave(); toast('Projeto "' + nome + '" salvo em Meus Projetos.'); }
+    else toast('Não foi possível salvar (armazenamento do navegador cheio?).');
+  }
+  document.getElementById('btnSalvarProj').onclick = abrirSave;
+  document.getElementById('saveClose').onclick = fecharSave;
+  document.getElementById('saveCancelar').onclick = fecharSave;
+  document.getElementById('saveConfirmar').onclick = confirmarSave;
+  saveNome.addEventListener('keydown', function(e){ if(e.key==='Enter') confirmarSave(); });
+  saveOv.onclick = function(e){ if(e.target === saveOv) fecharSave(); };
+
+  // ── Janela: Meus Projetos ──
+  var projOv = document.getElementById('projOverlay');
+  function renderLista(){
+    var arr = listarProjetos().sort(function(a,b){ return b.ts - a.ts; });
+    var box = document.getElementById('projLista');
+    if(!arr.length){ box.innerHTML = '<div class="proj-empty">Nenhum projeto salvo ainda.<br>Crie um com “Salvar Projeto” no menu do mapa.</div>'; return; }
+    box.innerHTML = '';
+    arr.forEach(function(p){
+      var row = document.createElement('div'); row.className='proj-row';
+      var d = new Date(p.ts);
+      var qtd = (p.data && p.data.length) ? (p.data.length + (p.data.length>1 ? ' áreas' : ' área')) : 'sem áreas';
+      row.innerHTML = '<div class="proj-info"><div class="proj-nome"></div><div class="proj-data"></div></div>'
+        + '<button class="proj-abrir">Abrir</button>'
+        + '<button class="proj-del" title="excluir projeto">' + TRASH_SVG + '</button>';
+      row.querySelector('.proj-nome').textContent = p.nome;
+      row.querySelector('.proj-data').textContent = qtd + ' · ' + d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      row.querySelector('.proj-abrir').onclick = function(){ fecharProj(); carregarProjeto(p); };
+      row.querySelector('.proj-del').onclick = function(){ if(confirm('Excluir o projeto "' + p.nome + '"?')){ excluirProjeto(p.id); renderLista(); } };
+      box.appendChild(row);
+    });
+  }
+  function abrirProj(){ renderLista(); projOv.classList.add('show'); }
+  function fecharProj(){ projOv.classList.remove('show'); }
+  document.getElementById('btnProjetos').onclick = abrirProj;
+  document.getElementById('projClose').onclick = fecharProj;
+  document.getElementById('projFechar').onclick = fecharProj;
+  document.getElementById('projNovo').onclick = function(){
+    if(confirm('Começar do zero? Alterações não salvas serão perdidas.')){
+      limparProjetoAtual();
+      if(window.MakerMap && window.MakerMap.padrao) window.MakerMap.padrao();
+      fecharProj();
+      toast('Novo projeto — comece do zero.');
+    }
+  };
+  projOv.onclick = function(e){ if(e.target === projOv) fecharProj(); };
+
+  // Esc fecha qualquer janela aberta
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Escape') return;
+    if(cfgOv.classList.contains('show')) fecharCfg();
+    if(saveOv.classList.contains('show')) fecharSave();
+    if(projOv.classList.contains('show')) fecharProj();
+  });
 })();
 </script>
 </body>
