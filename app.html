@@ -67,6 +67,8 @@
     conic-gradient(from 45deg, var(--laranja) 0 25%, var(--magenta) 0 50%, var(--azul) 0 75%, var(--ink) 0)}
   .brand-name{font-weight:800;letter-spacing:.14em;font-size:15px}
   .brand-logo{height:40px;width:auto;display:block}
+  .brand-logo-sm{height:30px;width:auto;display:block}
+  .cfg-lbl{display:block;font-size:11.5px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
   .hd-title{font-size:13px;color:var(--ink-2);border-left:1px solid var(--line);padding-left:16px}
   .hd-title b{color:var(--ink);font-weight:600}
   .hd-stats{margin-left:auto;display:flex;gap:18px;font-size:12px;color:var(--ink-2)}
@@ -333,15 +335,36 @@
 <div id="cfgOverlay" class="cfg-overlay">
   <div class="cfg-modal" role="dialog" aria-modal="true">
     <div class="cfg-head">
-      <div class="brand"><div class="brand-mark"></div><div class="brand-name">Configurações</div></div>
+      <div class="brand"><img src="logo-makermap.png" alt="" class="brand-logo-sm" onload="var m=this.parentNode.querySelector('.brand-mark'); if(m) m.style.display='none';" onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Configurações</div></div>
       <button id="cfgClose" class="cfg-x" title="fechar">×</button>
     </div>
     <div class="cfg-acct">
       <div id="cfgNome" class="cfg-nome">—</div>
       <div id="cfgEmail" class="cfg-email">—</div>
     </div>
+    <button id="cfgEditar" class="cfg-btn ghost">Editar meus dados</button>
     <p class="cfg-desc">Seus desenhos, KMZ e edições ficam guardados em <b>Meus Projetos</b> (botão no topo). Use <b>Salvar Projeto</b> no menu do mapa para criar um novo.</p>
     <button id="cfgSair" class="cfg-link">Sair da conta</button>
+  </div>
+</div>
+
+<!-- Janela: Editar dados do usuário -->
+<div id="editUserOverlay" class="cfg-overlay">
+  <div class="cfg-modal" role="dialog" aria-modal="true">
+    <div class="cfg-head">
+      <div class="brand"><img src="logo-makermap.png" alt="" class="brand-logo-sm" onload="var m=this.parentNode.querySelector('.brand-mark'); if(m) m.style.display='none';" onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Editar dados</div></div>
+      <button id="euClose" class="cfg-x" title="fechar">×</button>
+    </div>
+    <label class="cfg-lbl" for="euNome">Nome</label>
+    <input type="text" id="euNome" class="cfg-input" autocomplete="given-name">
+    <label class="cfg-lbl" for="euSobrenome">Sobrenome</label>
+    <input type="text" id="euSobrenome" class="cfg-input" autocomplete="family-name">
+    <label class="cfg-lbl" for="euTel">Telefone</label>
+    <input type="tel" id="euTel" class="cfg-input" autocomplete="tel">
+    <div id="euMsg" style="display:none;font-size:12px;line-height:1.5;margin-bottom:10px"></div>
+    <p class="cfg-desc">O e-mail de acesso não pode ser alterado por aqui.</p>
+    <button id="euSalvar" class="cfg-btn">Salvar</button>
+    <button id="euCancelar" class="cfg-link">Cancelar</button>
   </div>
 </div>
 
@@ -349,7 +372,7 @@
 <div id="saveOverlay" class="cfg-overlay">
   <div class="cfg-modal" role="dialog" aria-modal="true">
     <div class="cfg-head">
-      <div class="brand"><div class="brand-mark"></div><div class="brand-name">Salvar Projeto</div></div>
+      <div class="brand"><img src="logo-makermap.png" alt="" class="brand-logo-sm" onload="var m=this.parentNode.querySelector('.brand-mark'); if(m) m.style.display='none';" onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Salvar Projeto</div></div>
       <button id="saveClose" class="cfg-x" title="fechar">×</button>
     </div>
     <p class="cfg-desc">Dê um nome ao projeto. Serão salvos todos os desenhos, KMZ e a edição atual.</p>
@@ -363,7 +386,7 @@
 <div id="projOverlay" class="cfg-overlay">
   <div class="cfg-modal" role="dialog" aria-modal="true">
     <div class="cfg-head">
-      <div class="brand"><div class="brand-mark"></div><div class="brand-name">Meus Projetos</div></div>
+      <div class="brand"><img src="logo-makermap.png" alt="" class="brand-logo-sm" onload="var m=this.parentNode.querySelector('.brand-mark'); if(m) m.style.display='none';" onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Meus Projetos</div></div>
       <button id="projClose" class="cfg-x" title="fechar">×</button>
     </div>
     <div id="projLista" class="proj-list"></div>
@@ -1815,6 +1838,71 @@ document.getElementById('btnExport').onclick = async function(){
   cfgOv.onclick = function(e){ if(e.target === cfgOv) fecharCfg(); };
   document.getElementById('cfgSair').onclick = doLogout;
 
+  // ── Editar dados do usuário (Netlify Identity) ──
+  var IDENTITY = location.origin + '/.netlify/identity';
+  var editOv = document.getElementById('editUserOverlay');
+  function abrirEditUser(){
+    var m2 = (s && s.user && s.user.user_metadata) ? s.user.user_metadata : {};
+    document.getElementById('euNome').value = m2.first_name || '';
+    document.getElementById('euSobrenome').value = m2.last_name || '';
+    document.getElementById('euTel').value = m2.phone || '';
+    var em = document.getElementById('euMsg'); em.style.display='none';
+    fecharCfg();
+    editOv.classList.add('show');
+    setTimeout(function(){ document.getElementById('euNome').focus(); }, 60);
+  }
+  function fecharEdit(){ editOv.classList.remove('show'); }
+  function putUser(token, dados){
+    return fetch(IDENTITY + '/user', { method:'PUT', headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body: JSON.stringify(dados) });
+  }
+  function renovarToken(){
+    if(!s || !s.refresh_token) return Promise.resolve(null);
+    var body = new URLSearchParams({ grant_type:'refresh_token', refresh_token: s.refresh_token });
+    return fetch(IDENTITY + '/token', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body.toString() })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(tok){
+        if(!tok) return null;
+        s.access_token = tok.access_token;
+        s.refresh_token = tok.refresh_token || s.refresh_token;
+        s.expires_at = Date.now() + ((tok.expires_in||3600)*1000);
+        localStorage.setItem('makermap.user', JSON.stringify(s));
+        return s.access_token;
+      });
+  }
+  document.getElementById('cfgEditar').onclick = abrirEditUser;
+  document.getElementById('euClose').onclick = fecharEdit;
+  document.getElementById('euCancelar').onclick = fecharEdit;
+  editOv.onclick = function(e){ if(e.target === editOv) fecharEdit(); };
+  document.getElementById('euSalvar').onclick = function(){
+    var nome = document.getElementById('euNome').value.trim();
+    var sob  = document.getElementById('euSobrenome').value.trim();
+    var tel  = document.getElementById('euTel').value.trim();
+    var em = document.getElementById('euMsg');
+    var b = this; b.disabled = true; b.textContent = 'Salvando…';
+    function erro(txt){ em.style.display='block'; em.style.color='#D92D20'; em.textContent = txt; }
+    if(!s || !s.access_token){ erro('Sessão expirada. Saia e entre novamente.'); b.disabled=false; b.textContent='Salvar'; return; }
+    var dados = { data: { first_name:nome, last_name:sob, full_name:(nome+' '+sob).trim(), phone:tel } };
+    putUser(s.access_token, dados)
+      .then(function(res){
+        if(res.status === 401) return renovarToken().then(function(nt){ return nt ? putUser(nt, dados) : res; });
+        return res;
+      })
+      .then(function(res){
+        if(!res.ok) throw new Error('http '+res.status);
+        return res.json();
+      })
+      .then(function(user){
+        s.user = user; localStorage.setItem('makermap.user', JSON.stringify(s));
+        md = user.user_metadata || {};
+        nomeCompleto = md.first_name ? (md.first_name + (md.last_name ? ' '+md.last_name : '')) : (user.email || '');
+        if(nameEl) nameEl.textContent = nomeCompleto || 'Conta';
+        fecharEdit();
+        if(typeof toast === 'function') toast('Dados atualizados.');
+      })
+      .catch(function(e){ console.error(e); erro('Não foi possível salvar. Se persistir, saia e entre novamente.'); })
+      .then(function(){ b.disabled=false; b.textContent='Salvar'; });
+  };
+
   // ── Armazenamento de projetos (por conta, neste navegador) ──
   function projKey(){ return 'makermap.projetos.' + email; }
   function listarProjetos(){ try{ return JSON.parse(localStorage.getItem(projKey()) || '[]'); }catch(e){ return []; } }
@@ -1946,6 +2034,7 @@ document.getElementById('btnExport').onclick = async function(){
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape') return;
     if(cfgOv.classList.contains('show')) fecharCfg();
+    if(editOv.classList.contains('show')) fecharEdit();
     if(saveOv.classList.contains('show')) fecharSave();
     if(projOv.classList.contains('show')) fecharProj();
   });
