@@ -231,6 +231,20 @@
   .e-row-cont label{width:64px;flex:none;font-size:10.5px;color:var(--ink-2)}
   .e-row-cont input[type=color]{width:26px;height:22px;border:1px solid var(--line);border-radius:5px;padding:0;cursor:pointer;background:none;flex:none}
   .e-subhead{padding:8px 14px 3px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+  .grid-edit{align-items:center;gap:7px;padding:5px 14px}
+  .grid-edit input[type=range]{width:100%;min-width:0;accent-color:var(--laranja);cursor:pointer}
+  .grid-edit input[type=color]{width:24px;height:22px;border:1px solid var(--line);border-radius:5px;padding:0;cursor:pointer;background:none;justify-self:center}
+  .grid-edit label{font-size:11px;display:flex;align-items:center;gap:5px;min-width:0;margin:0;color:var(--ink)}
+  .grid-edit label span,.grid-edit>.e-nome{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .grid-vias{display:grid;grid-template-columns:70px 24px 1fr 1fr 24px 1fr}
+  .grid-rot{display:grid;grid-template-columns:58px 20px 24px 1fr 24px 1fr}
+  .grid-head{gap:7px;padding:6px 14px 2px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-2);text-align:center}
+  .grid-head>span{overflow:hidden}
+  #acimaLista .acima-row{border-radius:8px}
+  .acima-row .drag-handle{flex:none;cursor:grab;color:var(--ink-2);font-size:15px;line-height:1;padding:0 6px 0 2px;user-select:none}
+  .acima-row .drag-handle:hover{color:var(--laranja)}
+  .acima-row.dragging{opacity:.5;background:#FAF9F7}
+  .acima-row.dragover{box-shadow:inset 0 2px 0 var(--laranja)}
   .lbl-halochk{flex:none;display:flex;align-items:center;margin:0}
 
   #toast{position:absolute;z-index:1200;bottom:22px;left:50%;transform:translateX(-50%);
@@ -337,18 +351,15 @@
       <div class="e-hint">Sliders: espessura (20–300%) e opacidade. Cor vale nos dois fundos; contorno escurece automático.</div>
     </details>
     <details><summary>Sobre a máscara</summary>
-      <div class="e-row"><label><input type="checkbox" id="edViaRod"> Rodovias</label>
-        <span class="ord"><b class="on-num" data-g="rodovia"></b><button class="ob" data-g="rodovia" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="rodovia" data-d="1" title="enviar para trás">↓</button></span></div>
-      <div class="e-row"><label><input type="checkbox" id="edViaAv"> Avenidas principais</label>
-        <span class="ord"><b class="on-num" data-g="avenida"></b><button class="ob" data-g="avenida" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="avenida" data-d="1" title="enviar para trás">↓</button></span></div>
-      <div class="e-row"><label><input type="checkbox" id="edViaRua"> Ruas</label>
-        <span class="ord"><b class="on-num" data-g="rua"></b><button class="ob" data-g="rua" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="rua" data-d="1" title="enviar para trás">↓</button></span></div>
-      <div class="e-row"><label><input type="checkbox" id="edDemaisAcima"> Demais rótulos</label>
-        <span class="ord"><b class="on-num" data-g="demais"></b><button class="ob" data-g="demais" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="demais" data-d="1" title="enviar para trás">↓</button></span></div>
-      <div class="e-row"><label><input type="checkbox" id="edCidAcima"> Nomes de cidade</label>
-        <span class="ord"><b class="on-num" data-g="cidades"></b><button class="ob" data-g="cidades" data-d="-1" title="trazer para frente">↑</button><button class="ob" data-g="cidades" data-d="1" title="enviar para trás">↓</button></span></div>
+      <div id="acimaLista">
+        <div class="e-row acima-row" draggable="true" data-g="cidades"><span class="drag-handle" title="arraste para ordenar">≡</span><label><input type="checkbox" id="edCidAcima"> Nomes de cidade</label></div>
+        <div class="e-row acima-row" draggable="true" data-g="demais"><span class="drag-handle" title="arraste para ordenar">≡</span><label><input type="checkbox" id="edDemaisAcima"> Demais rótulos</label></div>
+        <div class="e-row acima-row" draggable="true" data-g="rodovia"><span class="drag-handle" title="arraste para ordenar">≡</span><label><input type="checkbox" id="edViaRod"> Rodovias</label></div>
+        <div class="e-row acima-row" draggable="true" data-g="avenida"><span class="drag-handle" title="arraste para ordenar">≡</span><label><input type="checkbox" id="edViaAv"> Avenidas principais</label></div>
+        <div class="e-row acima-row" draggable="true" data-g="rua"><span class="drag-handle" title="arraste para ordenar">≡</span><label><input type="checkbox" id="edViaRua"> Ruas</label></div>
+      </div>
       <div class="e-row"><input type="text" id="edCidSel" placeholder="quais? ex.: Campinas, Valinhos — vazio = todas" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
-      <div class="e-hint">Marcado = desenha por cima do véu. Setas ordenam a pilha (1 = topo).</div>
+      <div class="e-hint">Marcado = desenha por cima do véu. Arraste pelo <b>≡</b> para ordenar (o de cima fica mais à frente).</div>
     </details>
   </div>
 
@@ -1103,25 +1114,22 @@ function montarEditor(){
   ];
   const edRot = document.getElementById('edRotulos');
   const rotHead = document.createElement('div');
-  rotHead.className = 'vias-head-row';
-  rotHead.innerHTML = `<span class="vias-sp" style="width:64px"></span>
-    <span class="vias-sp" style="width:74px"></span>
-    <span class="vias-col">Tamanho</span>
-    <span class="vias-col">Contorno</span>`;
+  rotHead.className = 'grid-rot grid-head';
+  rotHead.innerHTML = `<span></span><span></span><span></span><span>Tamanho</span><span></span><span>Contorno</span>`;
   edRot.appendChild(rotHead);
   const lblRowRefs = {};
   lblUi.forEach(t=>{
     const c = lblCfg[t.k];
     const row = document.createElement('div');
-    row.className='e-row';
-    row.innerHTML = `<span class="e-nome" style="font-weight:600;flex:none;width:64px">${t.nome}</span>
+    row.className='grid-edit grid-rot';
+    row.innerHTML = `<span class="e-nome" style="font-weight:600">${t.nome}</span>
       <label class="lbl-halochk" title="contorno liga/desliga"><input type="checkbox" ${c.halo?'checked':''}></label>
       <input type="color" value="${c.cor || '#1C1917'}" title="cor do texto">
+      <input type="range" min="50" max="200" value="${Math.round(c.tam*100)}" title="tamanho do texto (%)">
       <input type="color" value="${c.haloCor}" title="cor do contorno">
-      <span class="vias-cell"><input type="range" min="50" max="200" value="${Math.round(c.tam*100)}" title="tamanho do texto (%)"></span>
-      <span class="vias-cell"><input type="range" min="0" max="40" value="${Math.round(c.haloW*10)}" title="espessura do contorno"></span>`;
+      <input type="range" min="0" max="40" value="${Math.round(c.haloW*10)}" title="espessura do contorno">`;
     const ins = row.querySelectorAll('input');
-    const chk=ins[0], cor=ins[1], hcor=ins[2], tam=ins[3], hw=ins[4];
+    const chk=ins[0], cor=ins[1], tam=ins[2], hcor=ins[3], hw=ins[4];
     cor.oninput  = e=>{ c.cor = e.target.value; aplicarLbl(t.k); };
     chk.onchange = e=>{ c.halo = e.target.checked; aplicarLbl(t.k); };
     hcor.oninput = e=>{ c.haloCor = e.target.value; aplicarLbl(t.k); };
@@ -1191,16 +1199,52 @@ function montarEditor(){
       ids.forEach(id=>{ if(map.getLayer(id)) map.moveLayer(id, 'raio-fill'); });
     });
   }
-  document.querySelectorAll('#editor .ob').forEach(btn=>{
-    btn.onclick = ()=>{
-      const g = btn.dataset.g, d = +btn.dataset.d;
-      const i = ordemAcima.indexOf(g), j = i + d;
-      if(j < 0 || j >= ordemAcima.length) return;
-      [ordemAcima[i], ordemAcima[j]] = [ordemAcima[j], ordemAcima[i]];
-      aplicarPilhaAcima();
-    };
-  });
-  renumerar();
+  // ── Ordenar "sobre a máscara" arrastando os itens ──
+  function reordenarDOMAcima(){
+    const lista = document.getElementById('acimaLista'); if(!lista) return;
+    ordemAcima.forEach(function(g){
+      const row = lista.querySelector('.acima-row[data-g="'+g+'"]');
+      if(row) lista.appendChild(row);
+    });
+  }
+  function sincronizarOrdemAcima(){
+    const lista = document.getElementById('acimaLista'); if(!lista) return;
+    const novos = Array.prototype.map.call(lista.querySelectorAll('.acima-row'), function(r){ return r.dataset.g; });
+    ordemAcima.length = 0; novos.forEach(function(g){ ordemAcima.push(g); });
+    aplicarPilhaAcima();
+  }
+  (function initDragAcima(){
+    const lista = document.getElementById('acimaLista'); if(!lista) return;
+    let dragEl = null;
+    lista.querySelectorAll('.acima-row').forEach(function(row){
+      row.addEventListener('dragstart', function(e){
+        dragEl = row; row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try{ e.dataTransfer.setData('text/plain', row.dataset.g); }catch(_){}
+      });
+      row.addEventListener('dragend', function(){
+        row.classList.remove('dragging');
+        dragEl = null; sincronizarOrdemAcima();
+      });
+    });
+    lista.addEventListener('dragover', function(e){
+      if(!dragEl) return;
+      e.preventDefault();
+      const after = depoisDe(e.clientY);
+      if(after == null) lista.appendChild(dragEl);
+      else lista.insertBefore(dragEl, after);
+    });
+    function depoisDe(y){
+      const els = Array.prototype.slice.call(lista.querySelectorAll('.acima-row:not(.dragging)'));
+      let melhor = null, melhorOff = -Infinity;
+      els.forEach(function(child){
+        const box = child.getBoundingClientRect();
+        const off = y - box.top - box.height/2;
+        if(off < 0 && off > melhorOff){ melhorOff = off; melhor = child; }
+      });
+      return melhor;
+    }
+  })();
 
   const LBL_PADRAO = JSON.parse(JSON.stringify(lblCfg));
   const ORDEM_PADRAO = ordemAcima.slice();
@@ -1215,7 +1259,7 @@ function montarEditor(){
     atualizarCidadesAcima();
     demaisSobreMascara(false);
     ['rodovia','avenida','rua'].forEach(t=> tierAcima(t,false));
-    ordemAcima.length = 0; ORDEM_PADRAO.forEach(g=> ordemAcima.push(g)); renumerar();
+    ordemAcima.length = 0; ORDEM_PADRAO.forEach(g=> ordemAcima.push(g)); renumerar(); reordenarDOMAcima();
     // vias
     SUBVIAS.forEach(s=> Object.assign(viaCfg[s.k], {on:s.on, cor:null, op:1, esp:1, contCor:null, contEsp:1}));
     // rótulos
@@ -1338,14 +1382,10 @@ function montarEditor(){
     {k:'rua',     nome:'Ruas'}
   ];
   const edVias = document.getElementById('edVias');
-  // cabeçalho das colunas
+  // cabeçalho das colunas (grade)
   const viasHead = document.createElement('div');
-  viasHead.className = 'vias-head-row';
-  viasHead.innerHTML = `<span class="vias-sp" style="width:70px"></span>
-    <span class="vias-sp" style="width:60px"></span>
-    <span class="vias-col">Espessura</span>
-    <span class="vias-col">Opacidade</span>
-    <span class="vias-col">Contorno</span>`;
+  viasHead.className = 'grid-vias grid-head';
+  viasHead.innerHTML = `<span></span><span></span><span>Espessura</span><span>Opacidade</span><span></span><span>Contorno</span>`;
   edVias.appendChild(viasHead);
   const viasRowRefs = {};       // sub -> campos
   const viasSubRowEls = {};     // sub -> [linha]
@@ -1359,20 +1399,20 @@ function montarEditor(){
     SUBVIAS.filter(s=> s.macro===mac.k).forEach(t=>{
       const cfg = viaCfg[t.k];
       const row = document.createElement('div');
-      row.className='e-row';
-      row.innerHTML = `<label style="width:70px;font-size:11px;flex:none"><input type="checkbox" ${cfg.on?'checked':''}>${t.curto}</label>
+      row.className='grid-edit grid-vias';
+      row.innerHTML = `<label><input type="checkbox" ${cfg.on?'checked':''}><span>${t.curto}</span></label>
         <input type="color" value="${t.cor}" title="cor da via">
+        <input type="range" min="20" max="300" value="100" title="espessura (%)">
+        <input type="range" min="0" max="100" value="100" title="opacidade (%)">
         <input type="color" value="${cfg.contCor || escurecer(t.cor, 0.45)}" title="cor do contorno">
-        <span class="vias-cell"><input type="range" min="20" max="300" value="100" title="espessura (%)"></span>
-        <span class="vias-cell"><input type="range" min="0" max="100" value="100" title="opacidade (%)"></span>
-        <span class="vias-cell"><input type="range" min="20" max="300" value="100" title="espessura do contorno (%)"></span>`;
+        <input type="range" min="20" max="300" value="100" title="espessura do contorno (%)">`;
       const ins = row.querySelectorAll('input');
-      const chk=ins[0], cor=ins[1], contCor=ins[2], esp=ins[3], op=ins[4], contEsp=ins[5];
+      const chk=ins[0], cor=ins[1], esp=ins[2], op=ins[3], contCor=ins[4], contEsp=ins[5];
       chk.onchange     = e=>{ cfg.on = e.target.checked; aplicarTierEstilo(t.k); };
       cor.oninput      = e=>{ cfg.cor = e.target.value; aplicarTierEstilo(t.k); };
-      contCor.oninput  = e=>{ cfg.contCor = e.target.value; aplicarTierEstilo(t.k); };
       esp.oninput      = e=>{ cfg.esp = (+e.target.value)/100; aplicarTierEstilo(t.k); };
       op.oninput       = e=>{ cfg.op = (+e.target.value)/100; aplicarTierEstilo(t.k); };
+      contCor.oninput  = e=>{ cfg.contCor = e.target.value; aplicarTierEstilo(t.k); };
       contEsp.oninput  = e=>{ cfg.contEsp = (+e.target.value)/100; aplicarTierEstilo(t.k); };
       edVias.appendChild(row);
       viasRowRefs[t.k] = {chk, cor, contCor, esp, op, contEsp};
@@ -1620,7 +1660,7 @@ function montarEditor(){
         tierAcima('rodovia',!!s.acima.rod);
         tierAcima('avenida',!!s.acima.av);
         tierAcima('rua',!!s.acima.rua);
-        renumerar(); aplicarPilhaAcima();
+        renumerar(); reordenarDOMAcima(); aplicarPilhaAcima();
       }
 
       // seção Mapa (cores/visibilidade do basemap)
