@@ -1329,7 +1329,8 @@ function montarEditor(){
     agua:     {on:true, cor:'#CFE0F5'},
     verde:    {on:true, cor:'#DDE8DA'},
     divisas:  {on:true, cor:'#C9C2BA'},
-    aeroporto:{on:true, cor:'#EDE8E1'}
+    aeroporto:{on:true, cor:'#EDE8E1'},
+    construcoes:{on:true, cor:'#E6E3DF'}
   };
   const MAPA_PADRAO = JSON.parse(JSON.stringify(mapaCfg));
   function ehVerde(id){ id=(id||'').toLowerCase(); return id.includes('grass')||id.includes('park')||id.includes('wood')||id.includes('forest')||id.includes('scrub'); }
@@ -1342,6 +1343,7 @@ function montarEditor(){
       if(k==='divisas')   return sl==='boundary' && t==='line';
       if(k==='aeroporto') return sl==='aeroway' && t!=='symbol';
       if(k==='urbano')    return sl==='landuse';
+      if(k==='construcoes') return sl==='building';
       if(k==='terreno')   return t==='background' || (sl==='landcover' && !ehVerde(id));
       return false;
     });
@@ -1363,7 +1365,8 @@ function montarEditor(){
     {k:'agua',     nome:'Água'},
     {k:'verde',    nome:'Áreas verdes'},
     {k:'divisas',  nome:'Divisas'},
-    {k:'aeroporto',nome:'Pistas de aeroporto'}
+    {k:'aeroporto',nome:'Pistas de aeroporto'},
+    {k:'construcoes',nome:'Construções (prédios)'}
   ];
   const edMapa = document.getElementById('edMapa');
   mapaUi.forEach(t=>{
