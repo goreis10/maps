@@ -224,6 +224,7 @@
   .e-row-cont{display:flex;align-items:center;gap:8px;padding:0 14px 7px}
   .e-row-cont label{width:64px;flex:none;font-size:10.5px;color:var(--ink-2)}
   .e-row-cont input[type=color]{width:26px;height:22px;border:1px solid var(--line);border-radius:5px;padding:0;cursor:pointer;background:none;flex:none}
+  .e-subhead{padding:8px 14px 3px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 
   #toast{position:absolute;z-index:1200;bottom:22px;left:50%;transform:translateX(-50%);
     background:var(--ink);color:#fff;font:500 12.5px 'Archivo',sans-serif;padding:10px 18px;border-radius:10px;
@@ -614,6 +615,7 @@ function montarCamadas(){
 
   drawSetup();
   classificarTiers();
+  if(window.__ajustarViasUI) window.__ajustarViasUI();   // mostra só os subníveis que existem
   refreshStats();
   // cada sessão começa do zero; projetos são abertos manualmente em "Meus Projetos"
 }
@@ -766,6 +768,28 @@ function tierDe(id){
   if (i.includes('primary') || i.includes('secondary') || i.includes('tertiary') || i.includes('major')) return 'avenida';
   return 'rua';
 }
+// subníveis das vias, agrupados sob os macros rodovia/avenida/rua
+const SUBVIAS = [
+  {k:'autoestrada', curto:'Autoestradas',  macro:'rodovia', on:true,  cor:'#F5C9B8'},
+  {k:'expressa',    curto:'Vias expressas', macro:'rodovia', on:true,  cor:'#F5C9B8'},
+  {k:'primaria',    curto:'Primárias',      macro:'avenida', on:true,  cor:'#FFFFFF'},
+  {k:'secundaria',  curto:'Secundárias',    macro:'avenida', on:true,  cor:'#FFFFFF'},
+  {k:'terciaria',   curto:'Terciárias',     macro:'avenida', on:true,  cor:'#FFFFFF'},
+  {k:'local',       curto:'Locais',         macro:'rua',     on:false, cor:'#FFFFFF'},
+  {k:'servico',     curto:'Serviço',        macro:'rua',     on:false, cor:'#FFFFFF'}
+];
+function subDe(id){
+  const i = id.toLowerCase();
+  if (i.includes('motorway') || i.includes('shield')) return 'autoestrada';
+  if (i.includes('trunk')) return 'expressa';
+  if (i.includes('primary') || i.includes('major')) return 'primaria';
+  if (i.includes('secondary')) return 'secundaria';
+  if (i.includes('tertiary')) return 'terciaria';
+  if (i.includes('service')) return 'servico';
+  return 'local';
+}
+const viasSubTiers = {};
+SUBVIAS.forEach(s=> viasSubTiers[s.k] = []);
 function ehViaLinha(l){
   if (l['source-layer'] !== 'transportation' || l.type !== 'line') return false;
   const id = l.id.toLowerCase();
@@ -783,6 +807,7 @@ function classificarTiers(){
   layers.forEach((l,i)=>{
     if (!ehElevavel(l)) return;
     (ehViaLinha(l) ? viasTiers : viasNomes)[tierDe(l.id)].push(l.id);
+    if (ehViaLinha(l)) viasSubTiers[subDe(l.id)].push(l.id);   // classificação fina para edição
     // âncora de restauro: próxima camada que NUNCA se move (nem via, nem nome de via)
     let j = i+1;
     while (j < layers.length && ehElevavel(layers[j])) j++;
@@ -791,12 +816,9 @@ function classificarTiers(){
 }
 function ehCasing(id){ const i=id.toLowerCase(); return i.includes('casing') || i.includes('outline'); }
 
-// estado editável por camada de via
-const viaCfg = {
-  rodovia: {on:true,  cor:null, op:1, esp:1, contCor:null, contEsp:1},
-  avenida: {on:true,  cor:null, op:1, esp:1, contCor:null, contEsp:1},
-  rua:     {on:false, cor:null, op:1, esp:1, contCor:null, contEsp:1}
-};
+// estado editável por subnível de via
+const viaCfg = {};
+SUBVIAS.forEach(s=> viaCfg[s.k] = {on:s.on, cor:null, op:1, esp:1, contCor:null, contEsp:1});
 const origW = {};   // id -> line-width original do estilo (fonte única da verdade)
 function origWidth(id){
   if(!(id in origW)){
@@ -808,7 +830,7 @@ function origWidth(id){
 function larguraFinal(id){
   const satOn = bS.classList.contains('on');
   const modeF = satOn ? (ehCasing(id) ? 0.62 : 0.6) : 1;
-  const cfg = viaCfg[tierDe(id)];
+  const cfg = viaCfg[subDe(id)];
   let f = modeF * cfg.esp;
   if(ehCasing(id)) f *= (cfg.contEsp || 1);   // espessura do contorno
   return Math.abs(f-1) < 1e-9 ? origWidth(id) : escalarLargura(origWidth(id), f);
@@ -818,10 +840,10 @@ function escurecer(hex, f){
   const r = Math.round(((n>>16)&255)*(1-f)), g = Math.round(((n>>8)&255)*(1-f)), b = Math.round((n&255)*(1-f));
   return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0');
 }
-function aplicarTierEstilo(tier){
-  if(!map || !viasTiers[tier]) return;
-  const cfg = viaCfg[tier];
-  viasTiers[tier].forEach(id=>{
+function aplicarTierEstilo(sub){
+  if(!map || !viasSubTiers[sub]) return;
+  const cfg = viaCfg[sub];
+  viasSubTiers[sub].forEach(id=>{
     if(!map.getLayer(id)) return;
     map.setLayoutProperty(id,'visibility', cfg.on ? 'visible' : 'none');
     map.setPaintProperty(id,'line-opacity', cfg.op);
@@ -841,7 +863,7 @@ function aplicarTierEstilo(tier){
     }
   });
 }
-function reaplicarVias(){ ['rodovia','avenida','rua'].forEach(aplicarTierEstilo); }
+function reaplicarVias(){ SUBVIAS.forEach(s=> aplicarTierEstilo(s.k)); }
 
 function tierAcima(tier, on){
   if (!map || !map.getLayer('mascara')) return;
@@ -861,7 +883,7 @@ function setSat(on){
   mapearVias();
   map.setLayoutProperty('satelite','visibility', on?'visible':'none');
   viasCasing.forEach(id=>{
-    map.setLayoutProperty(id,'visibility', viaCfg[tierDe(id)].on ? 'visible' : 'none');
+    map.setLayoutProperty(id,'visibility', viaCfg[subDe(id)].on ? 'visible' : 'none');
     if (on){
       if (!(id in viasOrigCas)) viasOrigCas[id] = {c: map.getPaintProperty(id,'line-color')};
       map.setPaintProperty(id,'line-color', tierDe(id)==='rodovia' ? COR_SAT.rodoviaBorda : COR_SAT.viaBorda);
@@ -1182,9 +1204,7 @@ function montarEditor(){
     ['rodovia','avenida','rua'].forEach(t=> tierAcima(t,false));
     ordemAcima.length = 0; ORDEM_PADRAO.forEach(g=> ordemAcima.push(g)); renumerar();
     // vias
-    Object.assign(viaCfg.rodovia,{on:true, cor:null, op:1, esp:1, contCor:null, contEsp:1});
-    Object.assign(viaCfg.avenida,{on:true, cor:null, op:1, esp:1, contCor:null, contEsp:1});
-    Object.assign(viaCfg.rua,   {on:false, cor:null, op:1, esp:1, contCor:null, contEsp:1});
+    SUBVIAS.forEach(s=> Object.assign(viaCfg[s.k], {on:s.on, cor:null, op:1, esp:1, contCor:null, contEsp:1}));
     // rótulos
     Object.keys(lblCfg).forEach(k=> Object.assign(lblCfg[k], JSON.parse(JSON.stringify(LBL_PADRAO[k]))));
     Object.keys(lblTiers).forEach(t=>{
@@ -1250,7 +1270,7 @@ function montarEditor(){
       const k = r.querySelector('input[type=checkbox]');
       if(!k.disabled) k.checked = true;
     });
-    tiersUi.forEach((t)=>{
+    SUBVIAS.forEach((t)=>{
       const ref = viasRowRefs[t.k]; if(!ref) return;
       ref.chk.checked = viaCfg[t.k].on;
       ref.cor.value = t.cor;
@@ -1300,51 +1320,74 @@ function montarEditor(){
     document.getElementById('edMaskOpV').textContent = v+'%';
     if(map && map.getLayer('mascara')) map.setPaintProperty('mascara','fill-opacity', v/100);
   };
-  // seção Vias: visível / cor / opacidade por camada
-  const tiersUi = [
-    {k:'rodovia', nome:'Rodovias', cor:'#F5C9B8'},
-    {k:'avenida', nome:'Avenidas', cor:'#FFFFFF'},
-    {k:'rua',     nome:'Ruas',     cor:'#FFFFFF'}
+  // seção Vias: macros (Rodovias/Avenidas/Ruas) com subníveis editáveis
+  const macrosUi = [
+    {k:'rodovia', nome:'Rodovias'},
+    {k:'avenida', nome:'Avenidas'},
+    {k:'rua',     nome:'Ruas'}
   ];
   const edVias = document.getElementById('edVias');
-  // cabeçalho das colunas (títulos acima dos sliders)
+  // cabeçalho das colunas
   const viasHead = document.createElement('div');
   viasHead.className = 'vias-head-row';
-  viasHead.innerHTML = `<span class="vias-sp" style="width:64px"></span>
+  viasHead.innerHTML = `<span class="vias-sp" style="width:76px"></span>
     <span class="vias-sp" style="width:26px"></span>
     <span class="vias-col">Espessura</span>
     <span class="vias-col">Opacidade</span>`;
   edVias.appendChild(viasHead);
-  const viasRowRefs = {};
-  tiersUi.forEach(t=>{
-    const cfg = viaCfg[t.k];
-    const row = document.createElement('div');
-    row.className='e-row';
-    row.innerHTML = `<label style="width:64px"><input type="checkbox" ${cfg.on?'checked':''}>${t.nome}</label>
-      <input type="color" value="${t.cor}">
-      <span class="vias-cell"><input type="range" min="20" max="300" value="100" title="espessura (%)"><span class="vias-val">100%</span></span>
-      <span class="vias-cell"><input type="range" min="0" max="100" value="100" title="opacidade (%)"><span class="vias-val">100%</span></span>`;
-    const [chk, cor, esp, op] = row.querySelectorAll('input');
-    const [espVal, opVal] = row.querySelectorAll('.vias-val');
-    chk.onchange = e=>{ cfg.on = e.target.checked; aplicarTierEstilo(t.k); };
-    cor.oninput  = e=>{ cfg.cor = e.target.value; aplicarTierEstilo(t.k); };
-    esp.oninput  = e=>{ cfg.esp = (+e.target.value)/100; espVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
-    op.oninput   = e=>{ cfg.op = (+e.target.value)/100; opVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
-    edVias.appendChild(row);
-    // linha do contorno: cor + espessura
-    const rowC = document.createElement('div');
-    rowC.className='e-row-cont';
-    rowC.innerHTML = `<label>contorno</label>
-      <input type="color" value="${cfg.contCor || escurecer(t.cor, 0.45)}" title="cor do contorno">
-      <span class="vias-cell"><input type="range" min="20" max="300" value="100" title="espessura do contorno (%)"><span class="vias-val">100%</span></span>
-      <span class="vias-sp" style="flex:1;min-width:0"></span>`;
-    const [contCor, contEsp] = rowC.querySelectorAll('input');
-    const contEspVal = rowC.querySelector('.vias-val');
-    contCor.oninput = e=>{ cfg.contCor = e.target.value; aplicarTierEstilo(t.k); };
-    contEsp.oninput = e=>{ cfg.contEsp = (+e.target.value)/100; contEspVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
-    edVias.appendChild(rowC);
-    viasRowRefs[t.k] = {chk, cor, esp, espVal, op, opVal, contCor, contEsp, contEspVal};
+  const viasRowRefs = {};       // sub -> campos
+  const viasSubRowEls = {};     // sub -> [linhaPrincipal, linhaContorno]
+  const viasMacroEls = {};      // macro -> cabeçalho
+  macrosUi.forEach(mac=>{
+    const head = document.createElement('div');
+    head.className = 'e-subhead';
+    head.textContent = mac.nome;
+    edVias.appendChild(head);
+    viasMacroEls[mac.k] = head;
+    SUBVIAS.filter(s=> s.macro===mac.k).forEach(t=>{
+      const cfg = viaCfg[t.k];
+      const row = document.createElement('div');
+      row.className='e-row';
+      row.innerHTML = `<label style="width:76px;font-size:11px"><input type="checkbox" ${cfg.on?'checked':''}>${t.curto}</label>
+        <input type="color" value="${t.cor}">
+        <span class="vias-cell"><input type="range" min="20" max="300" value="100" title="espessura (%)"><span class="vias-val">100%</span></span>
+        <span class="vias-cell"><input type="range" min="0" max="100" value="100" title="opacidade (%)"><span class="vias-val">100%</span></span>`;
+      const [chk, cor, esp, op] = row.querySelectorAll('input');
+      const [espVal, opVal] = row.querySelectorAll('.vias-val');
+      chk.onchange = e=>{ cfg.on = e.target.checked; aplicarTierEstilo(t.k); };
+      cor.oninput  = e=>{ cfg.cor = e.target.value; aplicarTierEstilo(t.k); };
+      esp.oninput  = e=>{ cfg.esp = (+e.target.value)/100; espVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
+      op.oninput   = e=>{ cfg.op = (+e.target.value)/100; opVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
+      edVias.appendChild(row);
+      // linha do contorno
+      const rowC = document.createElement('div');
+      rowC.className='e-row-cont';
+      rowC.innerHTML = `<label>contorno</label>
+        <input type="color" value="${cfg.contCor || escurecer(t.cor, 0.45)}" title="cor do contorno">
+        <span class="vias-cell"><input type="range" min="20" max="300" value="100" title="espessura do contorno (%)"><span class="vias-val">100%</span></span>
+        <span class="vias-sp" style="flex:1;min-width:0"></span>`;
+      const [contCor, contEsp] = rowC.querySelectorAll('input');
+      const contEspVal = rowC.querySelector('.vias-val');
+      contCor.oninput = e=>{ cfg.contCor = e.target.value; aplicarTierEstilo(t.k); };
+      contEsp.oninput = e=>{ cfg.contEsp = (+e.target.value)/100; contEspVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
+      edVias.appendChild(rowC);
+      viasRowRefs[t.k] = {chk, cor, esp, espVal, op, opVal, contCor, contEsp, contEspVal};
+      viasSubRowEls[t.k] = [row, rowC];
+    });
   });
+  // mostra só os subníveis que realmente existem no mapa carregado
+  function ajustarViasUI(){
+    macrosUi.forEach(function(mac){
+      let algum = false;
+      SUBVIAS.filter(function(s){ return s.macro===mac.k; }).forEach(function(t){
+        const tem = (viasSubTiers[t.k]||[]).length > 0;
+        (viasSubRowEls[t.k]||[]).forEach(function(el){ if(el) el.style.display = tem ? '' : 'none'; });
+        if(tem) algum = true;
+      });
+      if(viasMacroEls[mac.k]) viasMacroEls[mac.k].style.display = algum ? '' : 'none';
+    });
+  }
+  window.__ajustarViasUI = ajustarViasUI;
 
   document.getElementById('edViaRod').onchange = e=>{ tierAcima('rodovia', e.target.checked); aplicarPilhaAcima(); };
   document.getElementById('edViaAv').onchange  = e=>{ tierAcima('avenida', e.target.checked); aplicarPilhaAcima(); };
@@ -1461,9 +1504,9 @@ function montarEditor(){
       pickCentro=false; map.getCanvas().style.cursor='';
 
       // vias (config + fundo) e inputs da seção Vias
-      ['rodovia','avenida','rua'].forEach(function(t){ if(s.vias && s.vias[t]) Object.assign(viaCfg[t], s.vias[t]); });
+      Object.keys(viaCfg).forEach(function(k){ if(s.vias && s.vias[k]) Object.assign(viaCfg[k], s.vias[k]); });
       setSat(!!s.sat);
-      tiersUi.forEach(function(t){
+      SUBVIAS.forEach(function(t){
         var cfg=viaCfg[t.k], ref=viasRowRefs[t.k]; if(!ref) return;
         ref.chk.checked=!!cfg.on; if(cfg.cor) ref.cor.value=cfg.cor;
         ref.esp.value=Math.round((cfg.esp||1)*100); ref.espVal.textContent=ref.esp.value+'%';
