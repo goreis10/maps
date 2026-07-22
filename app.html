@@ -221,6 +221,9 @@
   .vias-head-row{display:flex;align-items:center;gap:8px;padding:6px 14px 0}
   .vias-head-row .vias-sp{flex:none}
   .vias-head-row .vias-col{flex:1;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
+  .e-row-cont{display:flex;align-items:center;gap:8px;padding:0 14px 7px}
+  .e-row-cont label{width:64px;flex:none;font-size:10.5px;color:var(--ink-2)}
+  .e-row-cont input[type=color]{width:26px;height:22px;border:1px solid var(--line);border-radius:5px;padding:0;cursor:pointer;background:none;flex:none}
 
   #toast{position:absolute;z-index:1200;bottom:22px;left:50%;transform:translateX(-50%);
     background:var(--ink);color:#fff;font:500 12.5px 'Archivo',sans-serif;padding:10px 18px;border-radius:10px;
@@ -790,9 +793,9 @@ function ehCasing(id){ const i=id.toLowerCase(); return i.includes('casing') || 
 
 // estado editável por camada de via
 const viaCfg = {
-  rodovia: {on:true,  cor:null, op:1, esp:1},
-  avenida: {on:true,  cor:null, op:1, esp:1},
-  rua:     {on:false, cor:null, op:1, esp:1}
+  rodovia: {on:true,  cor:null, op:1, esp:1, contCor:null, contEsp:1},
+  avenida: {on:true,  cor:null, op:1, esp:1, contCor:null, contEsp:1},
+  rua:     {on:false, cor:null, op:1, esp:1, contCor:null, contEsp:1}
 };
 const origW = {};   // id -> line-width original do estilo (fonte única da verdade)
 function origWidth(id){
@@ -805,7 +808,9 @@ function origWidth(id){
 function larguraFinal(id){
   const satOn = bS.classList.contains('on');
   const modeF = satOn ? (ehCasing(id) ? 0.62 : 0.6) : 1;
-  const f = modeF * viaCfg[tierDe(id)].esp;
+  const cfg = viaCfg[tierDe(id)];
+  let f = modeF * cfg.esp;
+  if(ehCasing(id)) f *= (cfg.contEsp || 1);   // espessura do contorno
   return Math.abs(f-1) < 1e-9 ? origWidth(id) : escalarLargura(origWidth(id), f);
 }
 function escurecer(hex, f){
@@ -821,10 +826,18 @@ function aplicarTierEstilo(tier){
     map.setLayoutProperty(id,'visibility', cfg.on ? 'visible' : 'none');
     map.setPaintProperty(id,'line-opacity', cfg.op);
     map.setPaintProperty(id,'line-width', larguraFinal(id));
-    if(cfg.cor){
-      if(ehCasing(id)){ if(!(id in viasOrigCas)) viasOrigCas[id] = {c: map.getPaintProperty(id,'line-color')}; }
+    const casing = ehCasing(id);
+    let novaCor = null;
+    if(casing){
+      if(cfg.contCor) novaCor = cfg.contCor;            // contorno com cor própria
+      else if(cfg.cor) novaCor = escurecer(cfg.cor, 0.45); // ou escurece a cor da via
+    } else if(cfg.cor){
+      novaCor = cfg.cor;
+    }
+    if(novaCor){
+      if(casing){ if(!(id in viasOrigCas)) viasOrigCas[id] = {c: map.getPaintProperty(id,'line-color')}; }
       else if(!(id in viasOrigCor)) viasOrigCor[id] = map.getPaintProperty(id,'line-color');
-      map.setPaintProperty(id,'line-color', ehCasing(id) ? escurecer(cfg.cor, 0.45) : cfg.cor);
+      map.setPaintProperty(id,'line-color', novaCor);
     }
   });
 }
@@ -1169,9 +1182,9 @@ function montarEditor(){
     ['rodovia','avenida','rua'].forEach(t=> tierAcima(t,false));
     ordemAcima.length = 0; ORDEM_PADRAO.forEach(g=> ordemAcima.push(g)); renumerar();
     // vias
-    Object.assign(viaCfg.rodovia,{on:true, cor:null, op:1, esp:1});
-    Object.assign(viaCfg.avenida,{on:true, cor:null, op:1, esp:1});
-    Object.assign(viaCfg.rua,   {on:false, cor:null, op:1, esp:1});
+    Object.assign(viaCfg.rodovia,{on:true, cor:null, op:1, esp:1, contCor:null, contEsp:1});
+    Object.assign(viaCfg.avenida,{on:true, cor:null, op:1, esp:1, contCor:null, contEsp:1});
+    Object.assign(viaCfg.rua,   {on:false, cor:null, op:1, esp:1, contCor:null, contEsp:1});
     // rótulos
     Object.keys(lblCfg).forEach(k=> Object.assign(lblCfg[k], JSON.parse(JSON.stringify(LBL_PADRAO[k]))));
     Object.keys(lblTiers).forEach(t=>{
@@ -1237,12 +1250,12 @@ function montarEditor(){
       const k = r.querySelector('input[type=checkbox]');
       if(!k.disabled) k.checked = true;
     });
-    document.querySelectorAll('#edVias .e-row').forEach((r,i)=>{
-      const [chk,cor,esp,op] = r.querySelectorAll('input');
-      chk.checked = viaCfg[tiersUi[i].k].on;
-      cor.value = tiersUi[i].cor;
-      esp.value = 100; op.value = 100;
-      const vv = r.querySelectorAll('.vias-val'); if(vv[0]) vv[0].textContent='100%'; if(vv[1]) vv[1].textContent='100%';
+    tiersUi.forEach((t)=>{
+      const ref = viasRowRefs[t.k]; if(!ref) return;
+      ref.chk.checked = viaCfg[t.k].on;
+      ref.cor.value = t.cor;
+      ref.esp.value = 100; ref.op.value = 100; ref.espVal.textContent='100%'; ref.opVal.textContent='100%';
+      ref.contCor.value = escurecer(t.cor, 0.45); ref.contEsp.value = 100; ref.contEspVal.textContent='100%';
     });
     const rot = document.querySelectorAll('#edRotulos .e-row');
     lblUi.forEach((t,i)=>{
@@ -1302,20 +1315,35 @@ function montarEditor(){
     <span class="vias-col">Espessura</span>
     <span class="vias-col">Opacidade</span>`;
   edVias.appendChild(viasHead);
+  const viasRowRefs = {};
   tiersUi.forEach(t=>{
+    const cfg = viaCfg[t.k];
     const row = document.createElement('div');
     row.className='e-row';
-    row.innerHTML = `<label style="width:64px"><input type="checkbox" ${viaCfg[t.k].on?'checked':''}>${t.nome}</label>
+    row.innerHTML = `<label style="width:64px"><input type="checkbox" ${cfg.on?'checked':''}>${t.nome}</label>
       <input type="color" value="${t.cor}">
       <span class="vias-cell"><input type="range" min="20" max="300" value="100" title="espessura (%)"><span class="vias-val">100%</span></span>
       <span class="vias-cell"><input type="range" min="0" max="100" value="100" title="opacidade (%)"><span class="vias-val">100%</span></span>`;
     const [chk, cor, esp, op] = row.querySelectorAll('input');
     const [espVal, opVal] = row.querySelectorAll('.vias-val');
-    chk.onchange = e=>{ viaCfg[t.k].on = e.target.checked; aplicarTierEstilo(t.k); };
-    cor.oninput  = e=>{ viaCfg[t.k].cor = e.target.value; aplicarTierEstilo(t.k); };
-    esp.oninput  = e=>{ viaCfg[t.k].esp = (+e.target.value)/100; espVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
-    op.oninput   = e=>{ viaCfg[t.k].op = (+e.target.value)/100; opVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
+    chk.onchange = e=>{ cfg.on = e.target.checked; aplicarTierEstilo(t.k); };
+    cor.oninput  = e=>{ cfg.cor = e.target.value; aplicarTierEstilo(t.k); };
+    esp.oninput  = e=>{ cfg.esp = (+e.target.value)/100; espVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
+    op.oninput   = e=>{ cfg.op = (+e.target.value)/100; opVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
     edVias.appendChild(row);
+    // linha do contorno: cor + espessura
+    const rowC = document.createElement('div');
+    rowC.className='e-row-cont';
+    rowC.innerHTML = `<label>contorno</label>
+      <input type="color" value="${cfg.contCor || escurecer(t.cor, 0.45)}" title="cor do contorno">
+      <span class="vias-cell"><input type="range" min="20" max="300" value="100" title="espessura do contorno (%)"><span class="vias-val">100%</span></span>
+      <span class="vias-sp" style="flex:1;min-width:0"></span>`;
+    const [contCor, contEsp] = rowC.querySelectorAll('input');
+    const contEspVal = rowC.querySelector('.vias-val');
+    contCor.oninput = e=>{ cfg.contCor = e.target.value; aplicarTierEstilo(t.k); };
+    contEsp.oninput = e=>{ cfg.contEsp = (+e.target.value)/100; contEspVal.textContent = e.target.value+'%'; aplicarTierEstilo(t.k); };
+    edVias.appendChild(rowC);
+    viasRowRefs[t.k] = {chk, cor, esp, espVal, op, opVal, contCor, contEsp, contEspVal};
   });
 
   document.getElementById('edViaRod').onchange = e=>{ tierAcima('rodovia', e.target.checked); aplicarPilhaAcima(); };
@@ -1435,14 +1463,13 @@ function montarEditor(){
       // vias (config + fundo) e inputs da seção Vias
       ['rodovia','avenida','rua'].forEach(function(t){ if(s.vias && s.vias[t]) Object.assign(viaCfg[t], s.vias[t]); });
       setSat(!!s.sat);
-      document.querySelectorAll('#edVias .e-row').forEach(function(r,i){
-        var cfg=viaCfg[tiersUi[i].k], ins=r.querySelectorAll('input');
-        ins[0].checked=!!cfg.on; if(cfg.cor) ins[1].value=cfg.cor;
-        ins[2].value=Math.round((cfg.esp||1)*100);
-        ins[3].value=Math.round((cfg.op!=null?cfg.op:1)*100);
-        var vv=r.querySelectorAll('.vias-val');
-        if(vv[0]) vv[0].textContent=Math.round((cfg.esp||1)*100)+'%';
-        if(vv[1]) vv[1].textContent=Math.round((cfg.op!=null?cfg.op:1)*100)+'%';
+      tiersUi.forEach(function(t){
+        var cfg=viaCfg[t.k], ref=viasRowRefs[t.k]; if(!ref) return;
+        ref.chk.checked=!!cfg.on; if(cfg.cor) ref.cor.value=cfg.cor;
+        ref.esp.value=Math.round((cfg.esp||1)*100); ref.espVal.textContent=ref.esp.value+'%';
+        ref.op.value=Math.round((cfg.op!=null?cfg.op:1)*100); ref.opVal.textContent=ref.op.value+'%';
+        ref.contCor.value = cfg.contCor || escurecer(t.cor,0.45);
+        ref.contEsp.value=Math.round((cfg.contEsp||1)*100); ref.contEspVal.textContent=ref.contEsp.value+'%';
       });
 
       // rótulos do basemap
