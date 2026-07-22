@@ -296,6 +296,8 @@
     <details open><summary>Por cidade</summary><div id="edCidades"></div>
       <div class="e-hint">Pintar a cidade sobrescreve as áreas dela.</div></details>
     <details><summary>Por área</summary><div id="edAreas"></div></details>
+    <details><summary>Mapa</summary><div id="edMapa"></div>
+      <div class="e-hint">Cores do fundo do mapa. As “quadras” das cidades correspondem às <b>áreas urbanas</b> (uso do solo). Cada item liga/desliga e muda de cor.</div></details>
     <details><summary>Rótulos</summary><div id="edRotulos"></div>
       <div class="e-hint">Por grupo: cor e tamanho do texto; contorno com liga/desliga, cor e espessura.</div>
     </details>
@@ -1250,6 +1252,10 @@ function montarEditor(){
       const d = LBL_PADRAO[t.k];
       chk.checked = d.halo; hcor.value = d.haloCor; hw.value = Math.round(d.haloW*10);
     });
+    // seção Mapa: volta às cores/visibilidade padrão
+    Object.keys(mapaCfg).forEach(function(k){ Object.assign(mapaCfg[k], MAPA_PADRAO[k]); });
+    mapaUi.forEach(function(t){ aplicarMapaCor(t.k); aplicarMapaVis(t.k); });
+    if(window.__syncMapaInputs) window.__syncMapaInputs();
     toast('Padrão Maker Map restaurado — uploads e desenhos preservados.');
   }
   document.getElementById('edReset').onclick = resetPadrao;
@@ -1316,6 +1322,69 @@ function montarEditor(){
   document.getElementById('edViaAv').onchange  = e=>{ tierAcima('avenida', e.target.checked); aplicarPilhaAcima(); };
   document.getElementById('edViaRua').onchange = e=>{ tierAcima('rua', e.target.checked); aplicarPilhaAcima(); };
 
+  // ── Seção Mapa: cores/visibilidade das camadas do basemap ──
+  const mapaCfg = {
+    terreno:  {on:true, cor:'#F6F4F1'},
+    urbano:   {on:true, cor:'#F1EEE9'},
+    agua:     {on:true, cor:'#CFE0F5'},
+    verde:    {on:true, cor:'#DDE8DA'},
+    divisas:  {on:true, cor:'#C9C2BA'},
+    aeroporto:{on:true, cor:'#EDE8E1'}
+  };
+  const MAPA_PADRAO = JSON.parse(JSON.stringify(mapaCfg));
+  function ehVerde(id){ id=(id||'').toLowerCase(); return id.includes('grass')||id.includes('park')||id.includes('wood')||id.includes('forest')||id.includes('scrub'); }
+  function camadasMapa(k){
+    if(!map) return [];
+    return map.getStyle().layers.filter(function(l){
+      const sl=(l['source-layer']||'').toLowerCase(), t=l.type, id=(l.id||'').toLowerCase();
+      if(k==='agua')      return sl==='water' || sl==='waterway';
+      if(k==='verde')     return sl==='park' || (sl==='landcover' && ehVerde(id));
+      if(k==='divisas')   return sl==='boundary' && t==='line';
+      if(k==='aeroporto') return sl==='aeroway' && t!=='symbol';
+      if(k==='urbano')    return sl==='landuse';
+      if(k==='terreno')   return t==='background' || (sl==='landcover' && !ehVerde(id));
+      return false;
+    });
+  }
+  function aplicarMapaCor(k){
+    camadasMapa(k).forEach(function(l){
+      if(!map.getLayer(l.id)) return;
+      if(l.type==='background') map.setPaintProperty(l.id,'background-color', mapaCfg[k].cor);
+      else if(l.type==='fill')  map.setPaintProperty(l.id,'fill-color', mapaCfg[k].cor);
+      else if(l.type==='line')  map.setPaintProperty(l.id,'line-color', mapaCfg[k].cor);
+    });
+  }
+  function aplicarMapaVis(k){
+    camadasMapa(k).forEach(function(l){ if(map.getLayer(l.id)) map.setLayoutProperty(l.id,'visibility', mapaCfg[k].on?'visible':'none'); });
+  }
+  const mapaUi = [
+    {k:'terreno',  nome:'Terreno / fundo'},
+    {k:'urbano',   nome:'Áreas urbanas (quadras)'},
+    {k:'agua',     nome:'Água'},
+    {k:'verde',    nome:'Áreas verdes'},
+    {k:'divisas',  nome:'Divisas'},
+    {k:'aeroporto',nome:'Pistas de aeroporto'}
+  ];
+  const edMapa = document.getElementById('edMapa');
+  mapaUi.forEach(t=>{
+    const c = mapaCfg[t.k];
+    const row = document.createElement('div'); row.className='e-row';
+    row.innerHTML = `<label style="flex:1;min-width:0"><input type="checkbox" ${c.on?'checked':''}> ${t.nome}</label>
+      <input type="color" value="${c.cor}">`;
+    const [chk, cor] = row.querySelectorAll('input');
+    chk.onchange = e=>{ c.on = e.target.checked; aplicarMapaVis(t.k); };
+    cor.oninput  = e=>{ c.cor = e.target.value; aplicarMapaCor(t.k); };
+    edMapa.appendChild(row);
+  });
+  window.__mapaCfg = mapaCfg;
+  window.__aplicarMapa = function(){ mapaUi.forEach(t=>{ aplicarMapaCor(t.k); aplicarMapaVis(t.k); }); };
+  window.__syncMapaInputs = function(){
+    document.querySelectorAll('#edMapa .e-row').forEach((r,i)=>{
+      const c = mapaCfg[mapaUi[i].k], ins = r.querySelectorAll('input');
+      ins[0].checked = c.on; ins[1].value = c.cor;
+    });
+  };
+
   // ── Salvar / restaurar as edições do usuário (localStorage por conta) ──
   function usuarioEmail(){
     try{ var s=JSON.parse(localStorage.getItem('makermap.user')||'null'); return (s&&s.user&&s.user.email)?s.user.email:''; }
@@ -1349,7 +1418,8 @@ function montarEditor(){
               av:  document.getElementById('edViaAv').checked,
               rua: document.getElementById('edViaRua').checked,
               dem: document.getElementById('edDemaisAcima').checked,
-              cid: cidadesAcima, cidSel: cidadesSel.slice() }
+              cid: cidadesAcima, cidSel: cidadesSel.slice() },
+      mapa: JSON.parse(JSON.stringify(mapaCfg))
     };
   }
 
@@ -1475,6 +1545,13 @@ function montarEditor(){
         tierAcima('avenida',!!s.acima.av);
         tierAcima('rua',!!s.acima.rua);
         renumerar(); aplicarPilhaAcima();
+      }
+
+      // seção Mapa (cores/visibilidade do basemap)
+      if(s.mapa){
+        Object.keys(mapaCfg).forEach(function(k){ if(s.mapa[k]) Object.assign(mapaCfg[k], s.mapa[k]); });
+        mapaUi.forEach(function(t){ aplicarMapaCor(t.k); aplicarMapaVis(t.k); });
+        window.__syncMapaInputs && window.__syncMapaInputs();
       }
     }catch(e){ console.error('aplicarEstado falhou', e); }
   }
