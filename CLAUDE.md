@@ -63,3 +63,13 @@ Key subsystems (all inside `app.html`):
 `coletarEstado()`/`aplicarEstado()` capture and restore the **styling** state; the **project** system (`coletarProjeto`/`carregarProjeto`/`limparProjetoAtual`) additionally snapshots the full `DATA`/`labelPts`/`grupos`/`CORES` and stores named projects per user in `localStorage['makermap.projetos.<email>']`. **Each session starts blank** — there is no auto-restore; users open a saved project manually via the "Meus Projetos" header menu. `resetPadrao()` returns everything to defaults. When a change alters the shape of a persisted structure (e.g. the roads move from 3 macros to 7 sub-tiers), older saved projects fall back to defaults for that part rather than breaking.
 
 All user data (drawings, KMZ, projects, edits) lives **only in the visitor's browser** — nothing but the Identity auth calls leaves the client.
+
+## Compact Instructions
+
+Ao resumir esta conversa, preserve com prioridade:
+1. Decisões de arquitetura e stack já definidas (as descritas acima, e qualquer nova decisão tomada durante a sessão)
+2. Estado atual da tarefa: o que já foi implementado, o que está em andamento, o que falta fazer, e PRs abertos aguardando ação
+3. Convenções de código e nomenclatura do projeto
+4. Bugs conhecidos, soluções já tentadas e o resultado de cada tentativa
+
+Descarte detalhes de exploração que não levaram a decisões finais.
