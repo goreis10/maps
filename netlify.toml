@@ -1,10 +1,23 @@
 [build]
-  # Site estático de arquivo único — sem etapa de build.
+  # Site estático de arquivo único — sem build de código.
+  # O "command" apenas REMOVE do output publicado os arquivos de
+  # documentação/notas (*.md) — eles continuam no repositório, mas não
+  # ficam acessíveis pelo site. Cobre CLAUDE.md, README.md e qualquer
+  # outro .md que exista ou venha a existir na raiz.
   publish = "."
-  command = ""
+  command = "rm -f ./*.md ./*.markdown"
 
 [[headers]]
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Bloqueio de arquivos de configuração conhecidos (retorna 404).
+# Redirects só casam caminhos exatos (não curinga por extensão), por isso
+# os .md são tratados pelo "command" acima, e os configs são listados aqui.
+[[redirects]]
+  from = "/netlify.toml"
+  to = "/404.html"
+  status = 404
+  force = true
