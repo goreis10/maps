@@ -1770,12 +1770,29 @@ var FEATURE_ELEMENTS = {
   secSobreMascara: ['#secSobreMascara']
 };
 
-// Lê o plano do usuário logado (user_metadata.plano). Fallback: 'free'.
+// Lê o plano do usuário logado. Fallback: 'free'.
+// Duas fontes (nesta ordem de prioridade):
+//   1) user_metadata.plano  — editável pelo próprio usuário (campo "plano")
+//   2) app_metadata.roles   — os "Roles" do painel do Netlify Identity, que
+//      SÓ o admin edita. Se houver um role igual a um plano (free/basic/pro/
+//      admin), usa o MAIOR deles. É a forma mais segura e a que funciona no
+//      painel novo do Netlify (onde só dá para editar "Roles").
+// Basta configurar UMA das duas — por exemplo, definir o Role "admin".
 function getUserPlano(){
   try{
     var s = JSON.parse(localStorage.getItem('makermap.user') || 'null');
-    var p = s && s.user && s.user.user_metadata && s.user.user_metadata.plano;
-    return (PLANOS.indexOf(p) >= 0) ? p : 'free';
+    var u = (s && s.user) || {};
+    // 1) user_metadata.plano
+    var p = u.user_metadata && u.user_metadata.plano;
+    if(PLANOS.indexOf(p) >= 0) return p;
+    // 2) app_metadata.roles (pega o maior plano entre os roles)
+    var roles = (u.app_metadata && u.app_metadata.roles) || [];
+    var nivel = -1;
+    for(var i=0;i<roles.length;i++){
+      var r = String(roles[i]||'').toLowerCase();
+      if(PLANOS.indexOf(r) > nivel) nivel = PLANOS.indexOf(r);
+    }
+    return nivel >= 0 ? PLANOS[nivel] : 'free';
   }catch(e){ return 'free'; }
 }
 
