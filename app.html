@@ -157,6 +157,32 @@
   .e-toggles{display:flex;flex-wrap:wrap;gap:8px;padding:8px 14px 12px;border-bottom:1px solid var(--line)}
   #editor .e-toggles .chip{box-shadow:none}
 
+  /* Gavetas laterais genéricas (Salvar, Projetos, Cores, Mapa de renda) —
+     mesmo padrão visual da gaveta de Edição, largura fixa. Uma por vez. */
+  #wrap{--side-w:360px}
+  .side-drawer{position:absolute;z-index:1050;top:0;right:0;bottom:0;width:var(--side-w);max-width:96vw;
+    background:rgba(255,255,255,.98);border-left:1px solid var(--line);
+    box-shadow:-10px 0 30px rgba(28,25,23,.16);overflow-y:auto;overflow-x:hidden;font-size:13px;
+    padding:16px 18px 22px;transform:translateX(101%);transition:transform .32s ease}
+  .side-drawer.show{transform:translateX(0)}
+  #wrap.side-open #map{right:var(--side-w)}
+  #wrap.side-open #ctrl{right:calc(var(--side-w) + 14px)}
+  .sd-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+  .sd-title{font:800 15px 'Archivo',sans-serif;color:var(--ink)}
+  .sd-desc{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-bottom:14px}
+  /* Botões de paleta de cores */
+  .pal-grid{display:flex;flex-direction:column;gap:10px}
+  .pal-btn{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer;
+    border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;
+    font:600 13px 'Archivo',sans-serif;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+  .pal-btn:hover{border-color:var(--azul)}
+  .pal-btn.active{border-color:var(--azul);box-shadow:0 0 0 3px rgba(51,127,255,.15)}
+  .pal-swatch{display:flex;border-radius:7px;overflow:hidden;border:1px solid var(--line);flex:0 0 auto}
+  .pal-swatch i{width:14px;height:26px;display:block}
+  .pal-txt small{display:block;font-weight:500;font-size:11px;color:var(--ink-2);margin-top:1px}
+  .sd-empty{border:1px dashed var(--line);border-radius:12px;padding:26px 16px;text-align:center;
+    color:var(--ink-2);font-size:12.5px;line-height:1.6}
+
   /* janela de configurações (abre ao clicar no nome) */
   .cfg-overlay{position:fixed;inset:0;z-index:2000;background:rgba(28,25,23,.38);
     display:none;align-items:center;justify-content:center;padding:20px}
@@ -187,6 +213,10 @@
   .plano-basic{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE}
   .plano-pro{background:#FFF7ED;color:#C2410C;border-color:#FED7AA}
   .plano-admin{background:#1C1917;color:#fff;border-color:#1C1917}
+  /* Recurso travado por plano: fica visível, com cadeado e esmaecido */
+  .lock-badge{margin-left:6px;font-size:11px;line-height:1;opacity:.85;pointer-events:none;vertical-align:middle}
+  .locked{opacity:.55;cursor:not-allowed}
+  details.locked > summary{cursor:not-allowed}
   .hd-btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 14px;
     font:700 12.5px 'Archivo',sans-serif;color:var(--ink);cursor:pointer}
   .hd-btn:hover{border-color:var(--laranja);color:var(--laranja)}
@@ -306,6 +336,8 @@
     <div class="chip" id="btnSalvarProj"><span class="dot" style="background:var(--laranja)"></span>Salvar Projeto</div>
     <div class="chip" id="chipDraw"><span class="dot"></span>Desenhar</div>
     <div class="chip" id="chipEdit"><span class="dot"></span>Edição</div>
+    <div class="chip" id="btnCores"><span class="dot" style="background:var(--magenta)"></span>Cores</div>
+    <div class="chip" id="btnRenda"><span class="dot" style="background:#0E9F8A"></span>Mapa de renda</div>
     <select id="expScale" title="Resolução da imagem exportada">
       <option value="2">PNG 2×</option>
       <option value="3" selected>PNG 3×</option>
@@ -410,30 +442,80 @@
   </div>
 </div>
 
-<!-- Janela: Salvar Projeto -->
-<div id="saveOverlay" class="cfg-overlay">
-  <div class="cfg-modal" role="dialog" aria-modal="true">
-    <div class="cfg-head">
-      <div class="brand"><img src="logo-makermap.png" alt="" class="brand-logo-sm" onload="var m=this.parentNode.querySelector('.brand-mark'); if(m) m.style.display='none';" onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Salvar Projeto</div></div>
-      <button id="saveClose" class="cfg-x" title="fechar">×</button>
-    </div>
-    <p class="cfg-desc">Dê um nome ao projeto. Serão salvos todos os desenhos, KMZ e a edição atual.</p>
-    <input type="text" id="saveNome" class="cfg-input" placeholder="Nome do projeto" maxlength="80">
-    <button id="saveConfirmar" class="cfg-btn">Salvar</button>
-    <button id="saveCancelar" class="cfg-link">Cancelar</button>
+<!-- Gaveta: Salvar Projeto -->
+<div id="drawerSave" class="side-drawer" role="dialog" aria-modal="true">
+  <div class="sd-head">
+    <div class="sd-title">Salvar Projeto</div>
+    <button id="saveClose" class="e-x" title="fechar">×</button>
+  </div>
+  <p class="sd-desc">Dê um nome ao projeto. Serão salvos todos os desenhos, KMZ e a edição atual.</p>
+  <input type="text" id="saveNome" class="cfg-input" placeholder="Nome do projeto" maxlength="80">
+  <button id="saveConfirmar" class="cfg-btn">Salvar</button>
+  <button id="saveCancelar" class="cfg-link">Cancelar</button>
+</div>
+
+<!-- Gaveta: Meus Projetos -->
+<div id="drawerProj" class="side-drawer" role="dialog" aria-modal="true">
+  <div class="sd-head">
+    <div class="sd-title">Meus Projetos</div>
+    <button id="projClose" class="e-x" title="fechar">×</button>
+  </div>
+  <div id="projLista" class="proj-list"></div>
+  <button id="projNovo" class="cfg-btn ghost">Começar do zero (novo)</button>
+  <button id="projFechar" class="cfg-link">Fechar</button>
+</div>
+
+<!-- Gaveta: Cores do mapa (paletas pré-definidas) -->
+<div id="drawerCores" class="side-drawer" role="dialog" aria-modal="true">
+  <div class="sd-head">
+    <div class="sd-title">Cores do mapa</div>
+    <button id="coresClose" class="e-x" title="fechar">×</button>
+  </div>
+  <p class="sd-desc">Escolha uma paleta pré-definida para o fundo do mapa. Você ainda pode ajustar cores individuais na seção <b>Mapa</b> da Edição.</p>
+  <div class="pal-grid" id="palGrid">
+    <button class="pal-btn" data-pal="padrao">
+      <span class="pal-swatch"><i style="background:#F6F4F1"></i><i style="background:#CFE0F5"></i><i style="background:#F5C9B8"></i><i style="background:#DDE8DA"></i></span>
+      <span class="pal-txt">Padrão<small>cores originais do Maker Map</small></span>
+    </button>
+    <button class="pal-btn" data-pal="pb">
+      <span class="pal-swatch"><i style="background:#FFFFFF"></i><i style="background:#E9E9E9"></i><i style="background:#111111"></i><i style="background:#F4F4F4"></i></span>
+      <span class="pal-txt">Preto e branco<small>alto contraste, sem cor</small></span>
+    </button>
+    <button class="pal-btn" data-pal="antigo">
+      <span class="pal-swatch"><i style="background:#F1E7CE"></i><i style="background:#BFD8CE"></i><i style="background:#C9A96A"></i><i style="background:#DCE0C0"></i></span>
+      <span class="pal-txt">Mapa antigo<small>tons pastéis, ar de carta antiga</small></span>
+    </button>
+    <button class="pal-btn" data-pal="cinza">
+      <span class="pal-swatch"><i style="background:#F0F0F0"></i><i style="background:#DCDCDC"></i><i style="background:#8C8C8C"></i><i style="background:#E6E6E6"></i></span>
+      <span class="pal-txt">Tons de cinza<small>escala neutra de cinzas</small></span>
+    </button>
   </div>
 </div>
 
-<!-- Janela: Meus Projetos -->
-<div id="projOverlay" class="cfg-overlay">
+<!-- Gaveta: Mapa de renda (Pro) — vazio por enquanto -->
+<div id="drawerRenda" class="side-drawer" role="dialog" aria-modal="true">
+  <div class="sd-head">
+    <div class="sd-title">Mapa de renda</div>
+    <button id="rendaClose" class="e-x" title="fechar">×</button>
+  </div>
+  <div class="sd-empty">Em breve.<br>Aqui vai entrar a camada de <b>renda</b> por região.</div>
+</div>
+
+<!-- Janela: recurso bloqueado (upgrade de plano) -->
+<div id="upgradeOverlay" class="cfg-overlay">
   <div class="cfg-modal" role="dialog" aria-modal="true">
     <div class="cfg-head">
-      <div class="brand"><img src="logo-makermap.png" alt="" class="brand-logo-sm" onload="var m=this.parentNode.querySelector('.brand-mark'); if(m) m.style.display='none';" onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Meus Projetos</div></div>
-      <button id="projClose" class="cfg-x" title="fechar">×</button>
+      <div class="brand"><div class="brand-name">🔒 Recurso bloqueado</div></div>
+      <button id="upClose" class="cfg-x" title="fechar">×</button>
     </div>
-    <div id="projLista" class="proj-list"></div>
-    <button id="projNovo" class="cfg-btn ghost">Começar do zero (novo)</button>
-    <button id="projFechar" class="cfg-link">Fechar</button>
+    <p class="cfg-desc" id="upMsg">Este recurso está disponível em um plano superior.</p>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0 16px">
+      <span style="font-size:12px;color:var(--ink-2)">Seu plano:</span>
+      <span id="upPlanoAtual" class="plano-badge plano-free">FREE</span>
+      <span style="color:var(--ink-2)">→</span>
+      <span id="upPlanoReq" class="plano-badge plano-pro">PRO</span>
+    </div>
+    <button id="upOk" class="cfg-btn">Entendi</button>
   </div>
 </div>
 
@@ -462,51 +544,106 @@ const toast = msg => {
 
 if (typeof maplibregl === 'undefined') { fail(); throw new Error('maplibre ausente'); }
 
-// ── Paleta MOSAICO aplicada ao estilo vetorial (tradução do JSON Google) ──
-function setP(l, k, v){ l.paint = Object.assign({}, l.paint, {[k]: v}); }
-function setText(l, cor){
-  l.paint = Object.assign({}, l.paint, {'text-color': cor, 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.2});
-}
-function hideL(l){ l.layout = Object.assign({}, l.layout, {visibility:'none'}); }
+// ── Paletas pré-definidas do basemap vetorial ──
+// Cada paleta é um conjunto de cores por "papel" (fundo, água, vias…). Para
+// criar/ajustar uma paleta, edite os valores abaixo. Para adicionar um botão
+// novo, inclua a paleta aqui e um <button data-pal="..."> na gaveta "Cores".
+var PALETAS = {
+  // Padrão — cores originais do Maker Map.
+  padrao: { bg:'#F6F4F1', water:'#CFE0F5', waterway:'#BBD3F0', waterText:'#7FA6D9',
+    park:'#DDE8DA', parkText:'#5F7A5C', grass:'#E7EDE2', landcover:'#EEF0E9', landuse:'#F1EEE9',
+    aeroway:'#EDE8E1', boundary:'#C9C2BA', motorway:'#F5C9B8', motorwayCasing:'#E0A98F',
+    major:'#FFFFFF', majorCasing:'#E0DAD3', roadText:'#6B6560',
+    placeCity:'#1C1917', placeOther:'#8A8F98', symbol:'#8A8F98', halo:'#FFFFFF' },
+  // Preto e branco — alto contraste, sem cor.
+  pb: { bg:'#FFFFFF', water:'#E9E9E9', waterway:'#CFCFCF', waterText:'#555555',
+    park:'#F4F4F4', parkText:'#555555', grass:'#F4F4F4', landcover:'#F7F7F7', landuse:'#F2F2F2',
+    aeroway:'#EDEDED', boundary:'#111111', motorway:'#111111', motorwayCasing:'#000000',
+    major:'#444444', majorCasing:'#000000', roadText:'#111111',
+    placeCity:'#000000', placeOther:'#444444', symbol:'#444444', halo:'#FFFFFF' },
+  // Mapa antigo — tons pastéis / pergaminho, ar de carta antiga.
+  antigo: { bg:'#F1E7CE', water:'#BFD8CE', waterway:'#A9C6BC', waterText:'#5E7D72',
+    park:'#DCE0C0', parkText:'#6B7A4E', grass:'#DFE3C4', landcover:'#EAE1C6', landuse:'#EDE3C7',
+    aeroway:'#E3D8B8', boundary:'#A98F5C', motorway:'#C9A96A', motorwayCasing:'#A9884C',
+    major:'#F4ECD6', majorCasing:'#CBB483', roadText:'#7A5C34',
+    placeCity:'#4A3A22', placeOther:'#8A7452', symbol:'#8A7452', halo:'#F6EFD8' },
+  // Tons de cinza — escala neutra.
+  cinza: { bg:'#F0F0F0', water:'#DCDCDC', waterway:'#C9C9C9', waterText:'#6E6E6E',
+    park:'#E6E6E6', parkText:'#6E6E6E', grass:'#E8E8E8', landcover:'#ECECEC', landuse:'#EAEAEA',
+    aeroway:'#E2E2E2', boundary:'#9A9A9A', motorway:'#8C8C8C', motorwayCasing:'#6E6E6E',
+    major:'#FBFBFB', majorCasing:'#C4C4C4', roadText:'#4A4A4A',
+    placeCity:'#2B2B2B', placeOther:'#7A7A7A', symbol:'#7A7A7A', halo:'#FFFFFF' }
+};
+var paletaAtual = 'padrao';
 
-function aplicarPaleta(style){
-  style.layers.forEach(l=>{
-    const id = (l.id||'').toLowerCase();
-    const sl = (l['source-layer']||'').toLowerCase();
-    if (l.type === 'background'){ setP(l,'background-color','#F6F4F1'); return; }
-    if (sl === 'water'  && l.type === 'fill'){ setP(l,'fill-color','#CFE0F5'); return; }
-    if (sl === 'waterway'){ if(l.type==='line') setP(l,'line-color','#BBD3F0'); if(l.type==='symbol') setText(l,'#7FA6D9'); return; }
-    if (sl === 'water_name'){ setText(l,'#7FA6D9'); return; }
-    if (sl === 'park'){ if(l.type==='fill') setP(l,'fill-color','#DDE8DA'); if(l.type==='symbol') setText(l,'#5F7A5C'); return; }
-    if (sl === 'landcover' && l.type === 'fill'){
-      setP(l,'fill-color', (id.includes('grass')||id.includes('park')||id.includes('wood')) ? '#E7EDE2' : '#EEF0E9'); return; }
-    if (sl === 'landuse' && l.type === 'fill'){ setP(l,'fill-color','#F1EEE9'); return; }
-    if (sl === 'aeroway' && l.type !== 'symbol'){ setP(l, l.type==='fill'?'fill-color':'line-color', '#EDE8E1'); return; }
-    if (sl === 'boundary'){ if(l.type==='line') setP(l,'line-color','#C9C2BA'); return; }
-    if (sl === 'transportation'){
-      if (id.includes('rail') || id.includes('transit') || id.includes('ferry')){ hideL(l); return; }
-      if (l.type !== 'line') return;
-      const casing = id.includes('casing') || id.includes('outline');
-      if (id.includes('motorway') || id.includes('trunk')){
-        setP(l,'line-color', casing ? '#E0A98F' : '#F5C9B8');
-      } else if (id.includes('primary') || id.includes('secondary') || id.includes('tertiary') || id.includes('major')){
-        setP(l,'line-color', casing ? '#E0DAD3' : '#FFFFFF');
-      } else {
-        hideL(l); // vias locais, serviço, trilhas: fora
-      }
-      return;
-    }
-    if (sl === 'transportation_name'){
-      if (id.includes('minor') || id.includes('path') || id.includes('service') || id.includes('track')){ hideL(l); return; }
-      setText(l,'#6B6560'); return; }
-    if (sl === 'place'){
-      const cor = (id.includes('city')||id.includes('town')||id.includes('capital')) ? '#1C1917' : '#8A8F98';
-      l.paint = Object.assign({}, l.paint, {'text-color': cor, 'text-halo-width': 0});
-      return; }
-    if (sl === 'poi' || sl === 'housenumber'){ hideL(l); return; }
-    if (l.type === 'symbol'){ setText(l,'#8A8F98'); }
+// Calcula as operações de estilo para UMA camada, dada a paleta PAL.
+// Retorna lista de {t:'p'|'l', k:prop, v:valor} — 'p'=paint, 'l'=layout.
+// Usado tanto na carga inicial (mutando o style) quanto ao trocar a paleta
+// ao vivo (setPaintProperty/setLayoutProperty).
+function paletaOps(l, PAL){
+  var ops = [];
+  // Só mexe em camadas do basemap (têm 'source-layer') ou no fundo.
+  if (l.type !== 'background' && !l['source-layer']) return ops;
+  var id = (l.id||'').toLowerCase();
+  var sl = (l['source-layer']||'').toLowerCase();
+  function P(k,v){ ops.push({t:'p',k:k,v:v}); }
+  function T(cor){ ops.push({t:'p',k:'text-color',v:cor}); ops.push({t:'p',k:'text-halo-color',v:PAL.halo}); ops.push({t:'p',k:'text-halo-width',v:1.2}); }
+  function HIDE(){ ops.push({t:'l',k:'visibility',v:'none'}); }
+  if (l.type === 'background'){ P('background-color', PAL.bg); return ops; }
+  if (sl === 'water' && l.type === 'fill'){ P('fill-color', PAL.water); return ops; }
+  if (sl === 'waterway'){ if(l.type==='line') P('line-color', PAL.waterway); if(l.type==='symbol') T(PAL.waterText); return ops; }
+  if (sl === 'water_name'){ T(PAL.waterText); return ops; }
+  if (sl === 'park'){ if(l.type==='fill') P('fill-color', PAL.park); if(l.type==='symbol') T(PAL.parkText); return ops; }
+  if (sl === 'landcover' && l.type === 'fill'){ P('fill-color', (id.includes('grass')||id.includes('park')||id.includes('wood')) ? PAL.grass : PAL.landcover); return ops; }
+  if (sl === 'landuse' && l.type === 'fill'){ P('fill-color', PAL.landuse); return ops; }
+  if (sl === 'aeroway' && l.type !== 'symbol'){ P(l.type==='fill'?'fill-color':'line-color', PAL.aeroway); return ops; }
+  if (sl === 'boundary'){ if(l.type==='line') P('line-color', PAL.boundary); return ops; }
+  if (sl === 'transportation'){
+    if (id.includes('rail') || id.includes('transit') || id.includes('ferry')){ HIDE(); return ops; }
+    if (l.type !== 'line') return ops;
+    var casing = id.includes('casing') || id.includes('outline');
+    if (id.includes('motorway') || id.includes('trunk')){ P('line-color', casing ? PAL.motorwayCasing : PAL.motorway); }
+    else if (id.includes('primary') || id.includes('secondary') || id.includes('tertiary') || id.includes('major')){ P('line-color', casing ? PAL.majorCasing : PAL.major); }
+    else { HIDE(); }
+    return ops;
+  }
+  if (sl === 'transportation_name'){
+    if (id.includes('minor') || id.includes('path') || id.includes('service') || id.includes('track')){ HIDE(); return ops; }
+    T(PAL.roadText); return ops; }
+  if (sl === 'place'){
+    var cor = (id.includes('city')||id.includes('town')||id.includes('capital')) ? PAL.placeCity : PAL.placeOther;
+    ops.push({t:'p',k:'text-color',v:cor}); ops.push({t:'p',k:'text-halo-width',v:0});
+    return ops; }
+  if (sl === 'poi' || sl === 'housenumber'){ HIDE(); return ops; }
+  if (l.type === 'symbol'){ T(PAL.symbol); }
+  return ops;
+}
+
+// Carga inicial: mutação do JSON do estilo antes de criar o mapa.
+function aplicarPaleta(style, palName){
+  var PAL = PALETAS[palName] || PALETAS.padrao;
+  style.layers.forEach(function(l){
+    paletaOps(l, PAL).forEach(function(op){
+      if(op.t === 'p') l.paint = Object.assign({}, l.paint, {[op.k]: op.v});
+      else l.layout = Object.assign({}, l.layout, {[op.k]: op.v});
+    });
   });
   return style;
+}
+
+// Troca a paleta com o mapa já carregado, camada por camada.
+function recolorLive(palName){
+  if(!map) return;
+  var PAL = PALETAS[palName] || PALETAS.padrao;
+  (map.getStyle().layers || []).forEach(function(l){
+    paletaOps(l, PAL).forEach(function(op){
+      try{
+        if(op.t === 'p') map.setPaintProperty(l.id, op.k, op.v);
+        else map.setLayoutProperty(l.id, op.k, op.v);
+      }catch(e){}
+    });
+  });
+  paletaAtual = palName;
 }
 
 // ── Dados: grupos e rótulos ──
@@ -544,13 +681,13 @@ fetch('https://tiles.openfreemap.org/styles/positron')
   .then(style=>{
     map = new maplibregl.Map({
       container:'map',
-      style: aplicarPaleta(style),
+      style: aplicarPaleta(style, paletaAtual),
       bounds: [[minX,minY],[maxX,maxY]],
       fitBoundsOptions:{padding:60},
       preserveDrawingBuffer:true,
       attributionControl:{compact:true}
     });
-    map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'bottom-right');
+    map.addControl(new maplibregl.NavigationControl({showCompass:true, visualizePitch:false}), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({unit:'metric'}), 'bottom-left');
     let ultimoErroToast = 0;
     map.on('error', e=>{
@@ -1736,6 +1873,8 @@ var FEATURE_PLANS = {
   edicao:          'free',   // abrir a aba de "Edição" (seções restritas lá)
   uploadKmz:       'basic',  // enviar arquivos KMZ/KML — Basic+ apenas
   exportar:        'free',   // exportar imagem PNG (botão + resolução)
+  cores:           'free',   // paletas de cores pré-definidas
+  mapaRenda:       'pro',    // "Mapa de renda" — Pro+ apenas
   // Seções internas do painel de "Edição"
   secCidade:       'free',   // "Por cidade" — Free+
   secArea:         'free',   // "Por área" — Free+
@@ -1760,6 +1899,8 @@ var FEATURE_ELEMENTS = {
   edicao:          ['#chipEdit'],
   uploadKmz:       ['#addKmz'],
   exportar:        ['#btnExport', '#expScale'],
+  cores:           ['#btnCores'],
+  mapaRenda:       ['#btnRenda'],
   secCidade:       ['#secCidade'],
   secArea:         ['#secArea'],
   secMapa:         ['#secMapa'],
@@ -1806,17 +1947,40 @@ function temAcesso(feature, plano){
   return nivelPlano(plano) >= nivelPlano(req);
 }
 
-// Aplica o plano à interface: mostra/esconde e habilita/desabilita os
-// elementos, e atualiza o badge do cabeçalho. Chame de novo se o plano
-// mudar (ex.: depois de editar os dados da conta).
+// Onde pendurar o cadeado: numa <details> vai no <summary>; senão no
+// próprio elemento.
+function _lockHost(elm){
+  return (elm.tagName === 'DETAILS') ? (elm.querySelector('summary') || elm) : elm;
+}
+
+// Aplica o plano à interface. TODOS os recursos continuam VISÍVEIS; os que
+// o plano não alcança ganham um cadeado e ficam "travados" (o clique abre a
+// janela de upgrade, tratado pelo interceptor global mais abaixo). Também
+// atualiza o badge do cabeçalho. Chame de novo se o plano mudar.
 function aplicarPlano(){
   var plano = getUserPlano();
   Object.keys(FEATURE_ELEMENTS).forEach(function(feature){
-    var ok = temAcesso(feature, plano);
+    var ok  = temAcesso(feature, plano);
+    var req = FEATURE_PLANS[feature] || 'free';
     FEATURE_ELEMENTS[feature].forEach(function(sel){
       document.querySelectorAll(sel).forEach(function(elm){
-        elm.style.display = ok ? '' : 'none';        // sem acesso: some
-        if('disabled' in elm) elm.disabled = !ok;    // e desabilita
+        elm.classList.toggle('locked', !ok);
+        if(!ok){
+          elm.setAttribute('data-plano-req', req);
+          elm.setAttribute('data-feature', feature);
+          if(elm.tagName === 'DETAILS') elm.open = false;   // trava fechada
+        }else{
+          elm.removeAttribute('data-plano-req');
+          elm.removeAttribute('data-feature');
+        }
+        // cadeado (marcador visual) — não em <select>/<input>
+        var host = _lockHost(elm);
+        var isForm = /^(SELECT|INPUT|TEXTAREA)$/.test(host.tagName);
+        var badge = host.querySelector ? host.querySelector(':scope > .lock-badge') : null;
+        if(!ok && !isForm){
+          if(!badge){ badge = document.createElement('span'); badge.className = 'lock-badge'; badge.textContent = '🔒'; host.appendChild(badge); }
+        }else if(badge){ badge.remove(); }
+        if(isForm){ host.disabled = !ok; }
       });
     });
   });
@@ -1827,13 +1991,31 @@ function aplicarPlano(){
     badge.title = 'Seu plano atual: ' + plano;
   }
 }
+
+// Interceptor global: clique em qualquer coisa travada (.locked) NÃO executa
+// a ação — abre a janela de upgrade. Fase de captura para rodar antes dos
+// onclick dos próprios elementos.
+document.addEventListener('click', function(e){
+  var lk = e.target.closest && e.target.closest('.locked');
+  if(!lk) return;
+  e.preventDefault(); e.stopPropagation();
+  if(typeof abrirUpgrade === 'function'){
+    abrirUpgrade(lk.getAttribute('data-plano-req') || 'basic', lk.getAttribute('data-feature') || '');
+  }
+}, true);
+
 // Expõe para uso/depuração no console e em outros trechos.
 window.MakerPlano = { get: getUserPlano, temAcesso: temAcesso, aplicar: aplicarPlano, PLANOS: PLANOS, FEATURE_PLANS: FEATURE_PLANS };
 aplicarPlano();
 
 const __wrap = document.getElementById('wrap');
+var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda'];
 function abrirEdicao(on){
   const ed = document.getElementById('editor');
+  if(on){ // abrir a Edição fecha as gavetas laterais
+    GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
+    __wrap.classList.remove('side-open');
+  }
   ed.classList.toggle('show', on);
   __wrap.classList.toggle('editing', on);
   document.getElementById('chipEdit').classList.toggle('on', on);
@@ -1844,6 +2026,49 @@ document.getElementById('chipEdit').onclick = function(){
   abrirEdicao(!document.getElementById('editor').classList.contains('show'));
 };
 document.getElementById('edFechar').onclick = function(){ abrirEdicao(false); };
+
+// ── Gavetas laterais (Salvar, Projetos, Cores, Mapa de renda) ──
+// Uma aberta por vez; abrir qualquer uma fecha a Edição e as demais.
+function abrirGaveta(id){
+  abrirEdicao(false);
+  GAVETAS_IDS.forEach(function(g){ var d=document.getElementById(g); if(d) d.classList.toggle('show', g===id); });
+  __wrap.classList.add('side-open');
+  setTimeout(function(){ if(map) map.resize(); }, 360);
+}
+function fecharGaveta(){
+  GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
+  __wrap.classList.remove('side-open');
+  setTimeout(function(){ if(map) map.resize(); }, 360);
+}
+function gavetaAberta(){ return GAVETAS_IDS.some(function(id){ var d=document.getElementById(id); return d && d.classList.contains('show'); }); }
+
+// ── Cores (paletas) ──
+function marcarPaleta(){
+  document.querySelectorAll('#palGrid .pal-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-pal')===paletaAtual); });
+}
+document.getElementById('btnCores').onclick = function(){ marcarPaleta(); abrirGaveta('drawerCores'); };
+document.getElementById('coresClose').onclick = fecharGaveta;
+document.querySelectorAll('#palGrid .pal-btn').forEach(function(b){
+  b.onclick = function(){ recolorLive(b.getAttribute('data-pal')); marcarPaleta(); toast('Paleta aplicada: ' + b.querySelector('.pal-txt').firstChild.textContent.trim()); };
+});
+
+// ── Mapa de renda (Pro) — gaveta vazia por enquanto ──
+document.getElementById('btnRenda').onclick = function(){ abrirGaveta('drawerRenda'); };
+document.getElementById('rendaClose').onclick = fecharGaveta;
+
+// ── Janela de upgrade (recurso bloqueado por plano) ──
+function abrirUpgrade(planoReq, feature){
+  var ov = document.getElementById('upgradeOverlay');
+  var atual = (typeof getUserPlano === 'function') ? getUserPlano() : 'free';
+  var ba = document.getElementById('upPlanoAtual'); ba.textContent = atual.toUpperCase(); ba.className = 'plano-badge plano-' + atual;
+  var br = document.getElementById('upPlanoReq'); br.textContent = (planoReq||'basic').toUpperCase(); br.className = 'plano-badge plano-' + (planoReq||'basic');
+  document.getElementById('upMsg').textContent = 'Este recurso está disponível a partir do plano "' + (planoReq||'basic') + '". Faça upgrade para desbloquear.';
+  ov.classList.add('show');
+}
+function fecharUpgrade(){ document.getElementById('upgradeOverlay').classList.remove('show'); }
+document.getElementById('upClose').onclick = fecharUpgrade;
+document.getElementById('upOk').onclick = fecharUpgrade;
+document.getElementById('upgradeOverlay').onclick = function(e){ if(e.target === this) fecharUpgrade(); };
 
 // ── Largura ajustável da gaveta de Edição (arrastar a alça) ──
 (function(){
@@ -2371,10 +2596,10 @@ document.getElementById('btnExport').onclick = async function(){
   }
 
   // ── Janela: Salvar Projeto ──
-  var saveOv = document.getElementById('saveOverlay');
+  var saveOv = document.getElementById('drawerSave');
   var saveNome = document.getElementById('saveNome');
-  function abrirSave(){ if(!map){ toast('Aguarde o mapa carregar.'); return; } saveNome.value=''; saveOv.classList.add('show'); setTimeout(function(){ saveNome.focus(); }, 60); }
-  function fecharSave(){ saveOv.classList.remove('show'); }
+  function abrirSave(){ if(!map){ toast('Aguarde o mapa carregar.'); return; } saveNome.value=''; abrirGaveta('drawerSave'); setTimeout(function(){ saveNome.focus(); }, 360); }
+  function fecharSave(){ fecharGaveta(); }
   function confirmarSave(){
     var nome = saveNome.value.trim();
     if(!nome){ toast('Dê um nome ao projeto.'); saveNome.focus(); return; }
@@ -2388,10 +2613,9 @@ document.getElementById('btnExport').onclick = async function(){
   document.getElementById('saveCancelar').onclick = fecharSave;
   document.getElementById('saveConfirmar').onclick = confirmarSave;
   saveNome.addEventListener('keydown', function(e){ if(e.key==='Enter') confirmarSave(); });
-  saveOv.onclick = function(e){ if(e.target === saveOv) fecharSave(); };
 
-  // ── Janela: Meus Projetos ──
-  var projOv = document.getElementById('projOverlay');
+  // ── Gaveta: Meus Projetos ──
+  var projOv = document.getElementById('drawerProj');
   function renderLista(){
     var arr = listarProjetos().sort(function(a,b){ return b.ts - a.ts; });
     var box = document.getElementById('projLista');
@@ -2411,8 +2635,8 @@ document.getElementById('btnExport').onclick = async function(){
       box.appendChild(row);
     });
   }
-  function abrirProj(){ renderLista(); projOv.classList.add('show'); }
-  function fecharProj(){ projOv.classList.remove('show'); }
+  function abrirProj(){ renderLista(); abrirGaveta('drawerProj'); }
+  function fecharProj(){ fecharGaveta(); }
   document.getElementById('btnProjetos').onclick = abrirProj;
   document.getElementById('projClose').onclick = fecharProj;
   document.getElementById('projFechar').onclick = fecharProj;
@@ -2424,15 +2648,15 @@ document.getElementById('btnExport').onclick = async function(){
       toast('Novo projeto — comece do zero.');
     }
   };
-  projOv.onclick = function(e){ if(e.target === projOv) fecharProj(); };
-
-  // Esc fecha qualquer janela aberta
+  // Esc fecha qualquer janela/gaveta aberta
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape') return;
     if(cfgOv.classList.contains('show')) fecharCfg();
     if(editOv.classList.contains('show')) fecharEdit();
-    if(saveOv.classList.contains('show')) fecharSave();
-    if(projOv.classList.contains('show')) fecharProj();
+    var up = document.getElementById('upgradeOverlay');
+    if(up && up.classList.contains('show')) fecharUpgrade();
+    if(gavetaAberta()) fecharGaveta();
+    if(document.getElementById('editor').classList.contains('show')) abrirEdicao(false);
   });
 })();
 </script>
