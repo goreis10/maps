@@ -1728,23 +1728,23 @@ var PLANOS = ['free', 'basic', 'pro', 'admin'];
 //      recurso entre planos. <<<
 var FEATURE_PLANS = {
   // Barra superior / ações principais
-  salvarProjeto:   'free',   // botão "Salvar Projeto"
-  meusProjetos:    'free',   // botão "Meus Projetos"
+  salvarProjeto:   'pro',    // botão "Salvar Projeto" — Pro+ apenas
+  meusProjetos:    'pro',    // botão "Meus Projetos" — Pro+ apenas
   editarDados:     'free',   // editar dados da conta (nome/telefone)
   satelite:        'free',   // alternar base para "Satélite"
   desenhar:        'free',   // ferramenta "Desenhar"
-  edicao:          'free',   // abrir a aba de "Edição"
-  uploadKmz:       'free',   // enviar arquivos KMZ/KML
+  edicao:          'free',   // abrir a aba de "Edição" (seções restritas lá)
+  uploadKmz:       'basic',  // enviar arquivos KMZ/KML — Basic+ apenas
   exportar:        'free',   // exportar imagem PNG (botão + resolução)
   // Seções internas do painel de "Edição"
-  secCidade:       'free',   // "Por cidade"
-  secArea:         'free',   // "Por área"
-  secMapa:         'free',   // "Mapa" (cores do fundo)
-  secRotulos:      'free',   // "Rótulos"
-  secRaio:         'free',   // "Raio"
-  secMascara:      'free',   // "Máscara"
-  secVias:         'free',   // "Vias"
-  secSobreMascara: 'free'    // "Sobre a máscara"
+  secCidade:       'free',   // "Por cidade" — Free+
+  secArea:         'free',   // "Por área" — Free+
+  secMapa:         'basic',  // "Mapa" (cores do fundo) — Basic+ apenas
+  secRotulos:      'basic',  // "Rótulos" — Basic+ apenas
+  secRaio:         'free',   // "Raio" — Free+
+  secMascara:      'free',   // "Máscara" — Free+
+  secVias:         'basic',  // "Vias" — Basic+ apenas
+  secSobreMascara: 'basic'   // "Sobre a máscara" — Basic+ apenas
 };
 
 // ── FEATURE_ELEMENTS ──────────────────────────────────────────────
