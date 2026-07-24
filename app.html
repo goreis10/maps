@@ -181,6 +181,12 @@
   .cfg-link:hover{text-decoration:underline}
   #hdUserName{cursor:pointer;font-weight:600;color:var(--ink)}
   #hdUserName:hover{text-decoration:underline}
+  /* Badge do plano do usuário (discreto, no canto do cabeçalho) */
+  .plano-badge{display:inline-block;font:700 10px 'Archivo',sans-serif;letter-spacing:.5px;padding:2px 7px;border-radius:999px;text-transform:uppercase;border:1px solid var(--line);background:#F5F5F4;color:var(--ink-2)}
+  .plano-free{background:#F5F5F4;color:#57534E;border-color:#E7E5E4}
+  .plano-basic{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE}
+  .plano-pro{background:#FFF7ED;color:#C2410C;border-color:#FED7AA}
+  .plano-admin{background:#1C1917;color:#fff;border-color:#1C1917}
   .hd-btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 14px;
     font:700 12.5px 'Archivo',sans-serif;color:var(--ink);cursor:pointer}
   .hd-btn:hover{border-color:var(--laranja);color:var(--laranja)}
@@ -267,6 +273,7 @@
       onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Maker Map</div></div>
   <button id="btnProjetos" class="hd-btn" style="margin-left:auto">Meus Projetos</button>
   <div id="hdUser" style="display:flex;align-items:center;gap:10px;margin-left:16px;padding-left:16px;border-left:1px solid var(--line);font-size:12px;color:var(--ink-2)">
+    <span id="planoBadge" class="plano-badge plano-free" title="Seu plano atual">FREE</span>
     <span id="hdUserName" title="abrir configurações"></span>
     <button id="btnLogout" style="border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font:600 12px 'Archivo',sans-serif;color:var(--ink-2);cursor:pointer">Sair</button>
   </div>
@@ -318,15 +325,15 @@
       <div class="chip" id="chipRaio"><span class="dot"></span>Raio</div>
       <div class="chip" id="chipLbl"><span class="dot"></span>Rótulos</div>
     </div>
-    <details open><summary>Por cidade</summary><div id="edCidades"></div>
+    <details id="secCidade" open><summary>Por cidade</summary><div id="edCidades"></div>
       <div class="e-hint">Pintar a cidade sobrescreve as áreas dela.</div></details>
-    <details><summary>Por área</summary><div id="edAreas"></div></details>
-    <details><summary>Mapa</summary><div id="edMapa"></div>
+    <details id="secArea"><summary>Por área</summary><div id="edAreas"></div></details>
+    <details id="secMapa"><summary>Mapa</summary><div id="edMapa"></div>
       <div class="e-hint">Cores do fundo do mapa. As “quadras” das cidades correspondem às <b>áreas urbanas</b> (uso do solo). Cada item liga/desliga e muda de cor.</div></details>
-    <details><summary>Rótulos</summary><div id="edRotulos"></div>
+    <details id="secRotulos"><summary>Rótulos</summary><div id="edRotulos"></div>
       <div class="e-hint">Por grupo: cor e tamanho do texto; contorno com liga/desliga, cor e espessura.</div>
     </details>
-    <details><summary>Raio</summary>
+    <details id="secRaio"><summary>Raio</summary>
       <div class="e-row"><label>Raio</label><input type="number" id="edRaioKm" value="100" min="1" max="2000" step="5"><label>km</label></div>
       <div class="e-row"><label>Cor</label><input type="color" id="edRaioCor" value="#337FFF"></div>
       <div class="e-row"><label><input type="checkbox" id="edRaioFill" checked> preenchimento</label></div>
@@ -341,16 +348,16 @@
         <a id="edCtSe" style="color:var(--azul);cursor:pointer">voltar ao Marco Zero</a>
       </div>
     </details>
-    <details><summary>Máscara</summary>
+    <details id="secMascara"><summary>Máscara</summary>
       <div class="e-row"><label>Cor</label><input type="color" id="edMaskCor" value="#1C1917"></div>
       <div class="e-row"><label>Opacidade</label><input type="range" id="edMaskOp" min="0" max="100" value="55"><span id="edMaskOpV" style="width:34px;text-align:right">55%</span></div>
       <div class="e-row"><label><input type="checkbox" id="edMaskCobre"> cobrir também as glebas</label></div>
       <div class="e-hint">Desmarcado = spotlight (glebas abertas).</div>
     </details>
-    <details><summary>Vias</summary><div id="edVias"></div>
+    <details id="secVias"><summary>Vias</summary><div id="edVias"></div>
       <div class="e-hint">Sliders: espessura (20–300%) e opacidade. Cor vale nos dois fundos; contorno escurece automático.</div>
     </details>
-    <details><summary>Sobre a máscara</summary>
+    <details id="secSobreMascara"><summary>Sobre a máscara</summary>
       <div id="acimaLista">
         <div class="e-row acima-row" draggable="true" data-g="cidades"><span class="drag-handle" title="arraste para ordenar">≡</span><label><input type="checkbox" id="edCidAcima"> Nomes de cidade</label></div>
         <div class="e-row acima-row" draggable="true" data-g="demais"><span class="drag-handle" title="arraste para ordenar">≡</span><label><input type="checkbox" id="edDemaisAcima"> Demais rótulos</label></div>
@@ -1693,6 +1700,120 @@ function montarEditor(){
 }
 montarEditor();
 
+// ══════════════════════════════════════════════════════════════════
+//  SISTEMA DE PLANOS  (free / basic / pro / admin)
+//  ------------------------------------------------------------------
+//  Estrutura para liberar/limitar recursos por plano. NÃO há cobrança
+//  nem pagamento aqui — apenas lê o plano do usuário e mostra/esconde
+//  itens da interface conforme ele.
+//
+//  ⚠ SEGURANÇA: o plano vem de user_metadata.plano do Netlify Identity,
+//  que é EDITÁVEL pelo próprio usuário. Isto serve só para organizar a
+//  interface (mostrar/esconder), NÃO é proteção real. Uma trava de
+//  verdade exigiria guardar o plano em app_metadata (só admin edita) e
+//  verificar no servidor — fica para quando houver back-end/cobrança.
+// ══════════════════════════════════════════════════════════════════
+
+// Ordem CRESCENTE de acesso. Um plano inclui tudo dos que vêm antes.
+var PLANOS = ['free', 'basic', 'pro', 'admin'];
+
+// ── FEATURE_PLANS ─────────────────────────────────────────────────
+// Plano MÍNIMO exigido por cada recurso. Nesta 1ª versão está TUDO em
+// 'free' (nada bloqueado). Para exigir um plano maior de um recurso,
+// troque o valor à direita para 'basic', 'pro' ou 'admin'. Exemplos:
+//     exportar: 'pro',    // exportar PNG passa a exigir plano pro ou admin
+//     secVias:  'basic',  // a seção "Vias" passa a exigir basic ou acima
+// Recurso que não esteja aqui é tratado como 'free'.
+//  >>> ESTE É O ÚNICO LUGAR QUE VOCÊ PRECISA EDITAR para mover um
+//      recurso entre planos. <<<
+var FEATURE_PLANS = {
+  // Barra superior / ações principais
+  salvarProjeto:   'free',   // botão "Salvar Projeto"
+  meusProjetos:    'free',   // botão "Meus Projetos"
+  editarDados:     'free',   // editar dados da conta (nome/telefone)
+  satelite:        'free',   // alternar base para "Satélite"
+  desenhar:        'free',   // ferramenta "Desenhar"
+  edicao:          'free',   // abrir a aba de "Edição"
+  uploadKmz:       'free',   // enviar arquivos KMZ/KML
+  exportar:        'free',   // exportar imagem PNG (botão + resolução)
+  // Seções internas do painel de "Edição"
+  secCidade:       'free',   // "Por cidade"
+  secArea:         'free',   // "Por área"
+  secMapa:         'free',   // "Mapa" (cores do fundo)
+  secRotulos:      'free',   // "Rótulos"
+  secRaio:         'free',   // "Raio"
+  secMascara:      'free',   // "Máscara"
+  secVias:         'free',   // "Vias"
+  secSobreMascara: 'free'    // "Sobre a máscara"
+};
+
+// ── FEATURE_ELEMENTS ──────────────────────────────────────────────
+// Liga cada recurso (chave do FEATURE_PLANS) aos elementos da tela
+// (seletores CSS). Se criar um recurso novo, adicione a chave nos DOIS
+// objetos: em FEATURE_PLANS (acima) e aqui.
+var FEATURE_ELEMENTS = {
+  salvarProjeto:   ['#btnSalvarProj'],
+  meusProjetos:    ['#btnProjetos'],
+  editarDados:     ['#cfgEditar'],
+  satelite:        ['#bmSat'],
+  desenhar:        ['#chipDraw'],
+  edicao:          ['#chipEdit'],
+  uploadKmz:       ['#addKmz'],
+  exportar:        ['#btnExport', '#expScale'],
+  secCidade:       ['#secCidade'],
+  secArea:         ['#secArea'],
+  secMapa:         ['#secMapa'],
+  secRotulos:      ['#secRotulos'],
+  secRaio:         ['#secRaio'],
+  secMascara:      ['#secMascara'],
+  secVias:         ['#secVias'],
+  secSobreMascara: ['#secSobreMascara']
+};
+
+// Lê o plano do usuário logado (user_metadata.plano). Fallback: 'free'.
+function getUserPlano(){
+  try{
+    var s = JSON.parse(localStorage.getItem('makermap.user') || 'null');
+    var p = s && s.user && s.user.user_metadata && s.user.user_metadata.plano;
+    return (PLANOS.indexOf(p) >= 0) ? p : 'free';
+  }catch(e){ return 'free'; }
+}
+
+// Nível numérico do plano (maior = mais acesso). -1 se inválido.
+function nivelPlano(p){ return PLANOS.indexOf(p); }
+
+// O plano informado (ou o do usuário) tem acesso a um recurso?
+function temAcesso(feature, plano){
+  plano = plano || getUserPlano();
+  var req = FEATURE_PLANS[feature] || 'free';   // não listado = free
+  return nivelPlano(plano) >= nivelPlano(req);
+}
+
+// Aplica o plano à interface: mostra/esconde e habilita/desabilita os
+// elementos, e atualiza o badge do cabeçalho. Chame de novo se o plano
+// mudar (ex.: depois de editar os dados da conta).
+function aplicarPlano(){
+  var plano = getUserPlano();
+  Object.keys(FEATURE_ELEMENTS).forEach(function(feature){
+    var ok = temAcesso(feature, plano);
+    FEATURE_ELEMENTS[feature].forEach(function(sel){
+      document.querySelectorAll(sel).forEach(function(elm){
+        elm.style.display = ok ? '' : 'none';        // sem acesso: some
+        if('disabled' in elm) elm.disabled = !ok;    // e desabilita
+      });
+    });
+  });
+  var badge = document.getElementById('planoBadge');
+  if(badge){
+    badge.textContent = plano.toUpperCase();
+    badge.className = 'plano-badge plano-' + plano;
+    badge.title = 'Seu plano atual: ' + plano;
+  }
+}
+// Expõe para uso/depuração no console e em outros trechos.
+window.MakerPlano = { get: getUserPlano, temAcesso: temAcesso, aplicar: aplicarPlano, PLANOS: PLANOS, FEATURE_PLANS: FEATURE_PLANS };
+aplicarPlano();
+
 const __wrap = document.getElementById('wrap');
 function abrirEdicao(on){
   const ed = document.getElementById('editor');
@@ -2136,7 +2257,9 @@ document.getElementById('btnExport').onclick = async function(){
     var b = this; b.disabled = true; b.textContent = 'Salvando…';
     function erro(txt){ em.style.display='block'; em.style.color='#D92D20'; em.textContent = txt; }
     if(!s || !s.access_token){ erro('Sessão expirada. Saia e entre novamente.'); b.disabled=false; b.textContent='Salvar'; return; }
-    var dados = { data: { first_name:nome, last_name:sob, full_name:(nome+' '+sob).trim(), phone:tel } };
+    // Preserva o restante do user_metadata (ex.: plano) ao editar os dados.
+    var mdAtual = (s && s.user && s.user.user_metadata) ? s.user.user_metadata : {};
+    var dados = { data: Object.assign({}, mdAtual, { first_name:nome, last_name:sob, full_name:(nome+' '+sob).trim(), phone:tel }) };
     putUser(s.access_token, dados)
       .then(function(res){
         if(res.status === 401) return renovarToken().then(function(nt){ return nt ? putUser(nt, dados) : res; });
@@ -2151,6 +2274,7 @@ document.getElementById('btnExport').onclick = async function(){
         md = user.user_metadata || {};
         nomeCompleto = md.first_name ? (md.first_name + (md.last_name ? ' '+md.last_name : '')) : (user.email || '');
         if(nameEl) nameEl.textContent = nomeCompleto || 'Conta';
+        if(window.MakerPlano) window.MakerPlano.aplicar();  // reflete plano/badge após atualizar a conta
         fecharEdit();
         if(typeof toast === 'function') toast('Dados atualizados.');
       })
