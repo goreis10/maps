@@ -111,7 +111,7 @@
   #panel .p-legend{padding:2px 14px 8px;font-size:10px;color:var(--ink-2);line-height:1.4;border-bottom:1px solid var(--line);margin-bottom:4px}
   #panel .p-foot{border-top:1px solid var(--line);padding:9px 14px;font-size:10.5px;color:var(--ink-2)}
 
-  #ctrl{position:absolute;z-index:1000;top:14px;right:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+  #ctrl{position:absolute;z-index:1100;top:14px;right:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
   .seg{display:flex;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 4px 14px rgba(28,25,23,.12)}
   .seg button{border:0;background:transparent;padding:7px 13px;font:600 12px 'Archivo',sans-serif;color:var(--ink-2);cursor:pointer}
   .seg button.on{background:var(--ink);color:#fff}
@@ -137,7 +137,7 @@
   .pp-row b{color:var(--ink);font-weight:600}
 
   #wrap{--drawer-w:340px}
-  #editor{position:absolute;z-index:1050;top:0;right:0;bottom:0;width:var(--drawer-w);max-width:96vw;
+  #editor{position:absolute;z-index:1050;top:0;right:0;bottom:0;width:var(--drawer-w);max-width:100vw;
     background:rgba(255,255,255,.98);border-left:1px solid var(--line);
     box-shadow:-10px 0 30px rgba(28,25,23,.16);overflow-y:auto;overflow-x:hidden;font-size:12px;
     transform:translateX(101%);transition:transform .32s ease}
@@ -145,7 +145,9 @@
   #map{transition:right .32s ease}
   #ctrl{transition:right .32s ease}
   #wrap.editing #map{right:var(--drawer-w)}
-  #wrap.editing #ctrl{right:calc(var(--drawer-w) + 14px)}
+  /* Empurra a barra de botões para a esquerda da gaveta, mas nunca para fora
+     da tela (em janelas estreitas ela fica por cima da gaveta, sempre visível). */
+  #wrap.editing #ctrl{right:min(calc(var(--drawer-w) + 14px), calc(100vw - 128px))}
   #edResize{position:absolute;top:0;bottom:0;width:10px;z-index:1060;cursor:ew-resize;display:none}
   #edResize::before{content:"";position:absolute;left:4px;top:50%;transform:translateY(-50%);width:2px;height:40px;border-radius:2px;background:var(--line)}
   #edResize:hover::before{background:var(--laranja)}
@@ -158,15 +160,16 @@
   #editor .e-toggles .chip{box-shadow:none}
 
   /* Gavetas laterais genéricas (Salvar, Projetos, Cores, Mapa de renda) —
-     mesmo padrão visual da gaveta de Edição, largura fixa. Uma por vez. */
-  #wrap{--side-w:360px}
-  .side-drawer{position:absolute;z-index:1050;top:0;right:0;bottom:0;width:var(--side-w);max-width:96vw;
+     mesmo padrão visual E MESMA largura da gaveta de Edição (var --drawer-w),
+     também redimensionáveis pela mesma alça. Uma por vez. */
+  .side-drawer{position:absolute;z-index:1050;top:0;right:0;bottom:0;width:var(--drawer-w);max-width:100vw;
     background:rgba(255,255,255,.98);border-left:1px solid var(--line);
     box-shadow:-10px 0 30px rgba(28,25,23,.16);overflow-y:auto;overflow-x:hidden;font-size:13px;
     padding:16px 18px 22px;transform:translateX(101%);transition:transform .32s ease}
   .side-drawer.show{transform:translateX(0)}
-  #wrap.side-open #map{right:var(--side-w)}
-  #wrap.side-open #ctrl{right:calc(var(--side-w) + 14px)}
+  #wrap.side-open #map{right:var(--drawer-w)}
+  #wrap.side-open #ctrl{right:min(calc(var(--drawer-w) + 14px), calc(100vw - 128px))}
+  #wrap.side-open #edResize{display:block;right:calc(var(--drawer-w) - 5px)}
   .sd-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
   .sd-title{font:800 15px 'Archivo',sans-serif;color:var(--ink)}
   .sd-desc{font-size:12.5px;line-height:1.55;color:var(--ink-2);margin-bottom:14px}
@@ -2070,18 +2073,22 @@ document.getElementById('upClose').onclick = fecharUpgrade;
 document.getElementById('upOk').onclick = fecharUpgrade;
 document.getElementById('upgradeOverlay').onclick = function(e){ if(e.target === this) fecharUpgrade(); };
 
-// ── Largura ajustável da gaveta de Edição (arrastar a alça) ──
+// ── Largura ajustável das gavetas (Edição e laterais) — arrastar a alça.
+//    Uma única largura (--drawer-w) vale para TODAS as gavetas. ──
 (function(){
   const handle = document.getElementById('edResize');
   const MIN = 300;
   function maxW(){ return Math.min(760, Math.round(window.innerWidth * 0.92)); }
+  function larguraAtual(){ return parseInt(getComputedStyle(__wrap).getPropertyValue('--drawer-w'),10) || 340; }
   function setW(w){
     w = Math.max(MIN, Math.min(maxW(), Math.round(w)));
     __wrap.style.setProperty('--drawer-w', w + 'px');
     return w;
   }
-  // aplica largura salva
-  try{ const sv = parseInt(localStorage.getItem('makermap.drawerW'), 10); if(sv) setW(sv); }catch(e){}
+  // aplica a largura salva (ou a atual) já encaixada na viewport
+  try{ const sv = parseInt(localStorage.getItem('makermap.drawerW'), 10); setW(sv || larguraAtual()); }catch(e){ setW(340); }
+  // ao redimensionar a janela, reencaixa a largura para não sobrar/faltar espaço
+  window.addEventListener('resize', function(){ setW(larguraAtual()); if(map) map.resize(); });
   let dragging = false;
   handle.addEventListener('pointerdown', function(e){
     dragging = true;
