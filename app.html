@@ -111,7 +111,7 @@
   #panel .p-legend{padding:2px 14px 8px;font-size:10px;color:var(--ink-2);line-height:1.4;border-bottom:1px solid var(--line);margin-bottom:4px}
   #panel .p-foot{border-top:1px solid var(--line);padding:9px 14px;font-size:10.5px;color:var(--ink-2)}
 
-  #ctrl{position:absolute;z-index:1100;top:14px;right:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+  #ctrl{position:absolute;z-index:1000;top:14px;right:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
   .seg{display:flex;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 4px 14px rgba(28,25,23,.12)}
   .seg button{border:0;background:transparent;padding:7px 13px;font:600 12px 'Archivo',sans-serif;color:var(--ink-2);cursor:pointer}
   .seg button.on{background:var(--ink);color:#fff}
@@ -145,9 +145,7 @@
   #map{transition:right .32s ease}
   #ctrl{transition:right .32s ease}
   #wrap.editing #map{right:var(--drawer-w)}
-  /* Empurra a barra de botões para a esquerda da gaveta, mas nunca para fora
-     da tela (em janelas estreitas ela fica por cima da gaveta, sempre visível). */
-  #wrap.editing #ctrl{right:min(calc(var(--drawer-w) + 14px), calc(100vw - 128px))}
+  #wrap.editing #ctrl{right:calc(var(--drawer-w) + 14px)}
   #edResize{position:absolute;top:0;bottom:0;width:10px;z-index:1060;cursor:ew-resize;display:none}
   #edResize::before{content:"";position:absolute;left:4px;top:50%;transform:translateY(-50%);width:2px;height:40px;border-radius:2px;background:var(--line)}
   #edResize:hover::before{background:var(--laranja)}
@@ -168,7 +166,7 @@
     padding:16px 18px 22px;transform:translateX(101%);transition:transform .32s ease}
   .side-drawer.show{transform:translateX(0)}
   #wrap.side-open #map{right:var(--drawer-w)}
-  #wrap.side-open #ctrl{right:min(calc(var(--drawer-w) + 14px), calc(100vw - 128px))}
+  #wrap.side-open #ctrl{right:calc(var(--drawer-w) + 14px)}
   #wrap.side-open #edResize{display:block;right:calc(var(--drawer-w) - 5px)}
   .sd-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
   .sd-title{font:800 15px 'Archivo',sans-serif;color:var(--ink)}
