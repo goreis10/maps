@@ -450,6 +450,18 @@
         <span class="pal-swatch"><i style="background:#F0F0F0"></i><i style="background:#DCDCDC"></i><i style="background:#8C8C8C"></i><i style="background:#E6E6E6"></i></span>
         <span class="pal-txt">Tons de cinza<small>escala neutra de cinzas</small></span>
       </button>
+      <button class="pal-btn" data-pal="zoneamento">
+        <span class="pal-swatch"><i style="background:#F4F1EA"></i><i style="background:#7B9C7A"></i><i style="background:#E8A365"></i><i style="background:#2B3A42"></i></span>
+        <span class="pal-txt">Zoneamento urbano<small>terroso, aspecto de papel</small></span>
+      </button>
+      <button class="pal-btn" data-pal="contraste">
+        <span class="pal-swatch"><i style="background:#FAFAFA"></i><i style="background:#E63946"></i><i style="background:#457B9D"></i><i style="background:#2A9D8F"></i></span>
+        <span class="pal-txt">Contraste categórico<small>base clara para marcadores</small></span>
+      </button>
+      <button class="pal-btn" data-pal="dark">
+        <span class="pal-swatch"><i style="background:#1E1E24"></i><i style="background:#44444C"></i><i style="background:#00B4D8"></i><i style="background:#FF007F"></i></span>
+        <span class="pal-txt">Dark mode<small>fundo escuro, destaques vibrantes</small></span>
+      </button>
     </div>
   </div>
 
@@ -573,7 +585,27 @@ var PALETAS = {
     park:'#E6E6E6', parkText:'#6E6E6E', grass:'#E8E8E8', landcover:'#ECECEC', landuse:'#EAEAEA',
     aeroway:'#E2E2E2', boundary:'#9A9A9A', motorway:'#8C8C8C', motorwayCasing:'#6E6E6E',
     major:'#FBFBFB', majorCasing:'#C4C4C4', roadText:'#4A4A4A',
-    placeCity:'#2B2B2B', placeOther:'#7A7A7A', symbol:'#7A7A7A', halo:'#FFFFFF' }
+    placeCity:'#2B2B2B', placeOther:'#7A7A7A', symbol:'#7A7A7A', halo:'#FFFFFF' },
+  // Zoneamento urbano — terroso, aspecto de papel. Rodovias em laranja
+  // queimado como destaque; ruas em cinza neutro; bordas em azul petróleo.
+  zoneamento: { bg:'#F4F1EA', water:'#C9D8DA', waterway:'#B4C7CA', waterText:'#5E7378',
+    park:'#7B9C7A', parkText:'#3F5A3E', grass:'#8FAE8D', landcover:'#E7E2D4', landuse:'#EEE8DA',
+    aeroway:'#E4DECF', boundary:'#2B3A42', motorway:'#E8A365', motorwayCasing:'#C9853F',
+    major:'#FFFFFF', majorCasing:'#CCCCCC', roadText:'#2B3A42',
+    placeCity:'#2B3A42', placeOther:'#6B7A80', symbol:'#6B7A80', halo:'#F4F1EA' },
+  // Contraste categórico — base clara e asséptica para destacar marcadores.
+  // Rodovias em ocre, água/azul-aço e verde-esmeralda suaves.
+  contraste: { bg:'#FAFAFA', water:'#D8E6EE', waterway:'#C3D8E3', waterText:'#457B9D',
+    park:'#D8ECE7', parkText:'#2A9D8F', grass:'#DFEFE9', landcover:'#F0F0F0', landuse:'#F3F3F3',
+    aeroway:'#EAEAEA', boundary:'#457B9D', motorway:'#F4A261', motorwayCasing:'#D98C43',
+    major:'#FFFFFF', majorCasing:'#E2E2E2', roadText:'#3A4A52',
+    placeCity:'#1D2A33', placeOther:'#7A8A92', symbol:'#7A8A92', halo:'#FFFFFF' },
+  // Dark mode — fundo chumbo; rodovias em ciano, bordas em magenta, texto gelo.
+  dark: { bg:'#1E1E24', water:'#15303A', waterway:'#1C3E4A', waterText:'#5FB7CE',
+    park:'#243027', parkText:'#7FB69A', grass:'#26302A', landcover:'#22222A', landuse:'#25252D',
+    aeroway:'#2A2A32', boundary:'#FF007F', motorway:'#00B4D8', motorwayCasing:'#0784A0',
+    major:'#44444C', majorCasing:'#33333A', roadText:'#F8F9FA',
+    placeCity:'#F8F9FA', placeOther:'#B8BCC4', symbol:'#B8BCC4', halo:'#1E1E24' }
 };
 var paletaAtual = 'padrao';
 
