@@ -403,6 +403,65 @@
     </details>
   </div>
 
+  <!-- Gaveta: Salvar Projeto -->
+  <div id="drawerSave" class="side-drawer" role="dialog" aria-modal="true">
+    <div class="sd-head">
+      <div class="sd-title">Salvar Projeto</div>
+      <button id="saveClose" class="e-x" title="fechar">×</button>
+    </div>
+    <p class="sd-desc">Dê um nome ao projeto. Serão salvos todos os desenhos, KMZ e a edição atual.</p>
+    <input type="text" id="saveNome" class="cfg-input" placeholder="Nome do projeto" maxlength="80">
+    <button id="saveConfirmar" class="cfg-btn">Salvar</button>
+    <button id="saveCancelar" class="cfg-link">Cancelar</button>
+  </div>
+
+  <!-- Gaveta: Meus Projetos -->
+  <div id="drawerProj" class="side-drawer" role="dialog" aria-modal="true">
+    <div class="sd-head">
+      <div class="sd-title">Meus Projetos</div>
+      <button id="projClose" class="e-x" title="fechar">×</button>
+    </div>
+    <div id="projLista" class="proj-list"></div>
+    <button id="projNovo" class="cfg-btn ghost">Começar do zero (novo)</button>
+    <button id="projFechar" class="cfg-link">Fechar</button>
+  </div>
+
+  <!-- Gaveta: Cores do mapa (paletas pré-definidas) -->
+  <div id="drawerCores" class="side-drawer" role="dialog" aria-modal="true">
+    <div class="sd-head">
+      <div class="sd-title">Cores do mapa</div>
+      <button id="coresClose" class="e-x" title="fechar">×</button>
+    </div>
+    <p class="sd-desc">Escolha uma paleta pré-definida para o fundo do mapa. Você ainda pode ajustar cores individuais na seção <b>Mapa</b> da Edição.</p>
+    <div class="pal-grid" id="palGrid">
+      <button class="pal-btn" data-pal="padrao">
+        <span class="pal-swatch"><i style="background:#F6F4F1"></i><i style="background:#CFE0F5"></i><i style="background:#F5C9B8"></i><i style="background:#DDE8DA"></i></span>
+        <span class="pal-txt">Padrão<small>cores originais do Maker Map</small></span>
+      </button>
+      <button class="pal-btn" data-pal="pb">
+        <span class="pal-swatch"><i style="background:#FFFFFF"></i><i style="background:#E9E9E9"></i><i style="background:#111111"></i><i style="background:#F4F4F4"></i></span>
+        <span class="pal-txt">Preto e branco<small>alto contraste, sem cor</small></span>
+      </button>
+      <button class="pal-btn" data-pal="antigo">
+        <span class="pal-swatch"><i style="background:#F1E7CE"></i><i style="background:#BFD8CE"></i><i style="background:#C9A96A"></i><i style="background:#DCE0C0"></i></span>
+        <span class="pal-txt">Mapa antigo<small>tons pastéis, ar de carta antiga</small></span>
+      </button>
+      <button class="pal-btn" data-pal="cinza">
+        <span class="pal-swatch"><i style="background:#F0F0F0"></i><i style="background:#DCDCDC"></i><i style="background:#8C8C8C"></i><i style="background:#E6E6E6"></i></span>
+        <span class="pal-txt">Tons de cinza<small>escala neutra de cinzas</small></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Gaveta: Mapa de renda (Pro) — vazio por enquanto -->
+  <div id="drawerRenda" class="side-drawer" role="dialog" aria-modal="true">
+    <div class="sd-head">
+      <div class="sd-title">Mapa de renda</div>
+      <button id="rendaClose" class="e-x" title="fechar">×</button>
+    </div>
+    <div class="sd-empty">Em breve.<br>Aqui vai entrar a camada de <b>renda</b> por região.</div>
+  </div>
+
   <div id="edResize" title="arraste para ajustar a largura"></div>
   <div id="toast"></div>
 </div>
@@ -441,65 +500,6 @@
     <button id="euSalvar" class="cfg-btn">Salvar</button>
     <button id="euCancelar" class="cfg-link">Cancelar</button>
   </div>
-</div>
-
-<!-- Gaveta: Salvar Projeto -->
-<div id="drawerSave" class="side-drawer" role="dialog" aria-modal="true">
-  <div class="sd-head">
-    <div class="sd-title">Salvar Projeto</div>
-    <button id="saveClose" class="e-x" title="fechar">×</button>
-  </div>
-  <p class="sd-desc">Dê um nome ao projeto. Serão salvos todos os desenhos, KMZ e a edição atual.</p>
-  <input type="text" id="saveNome" class="cfg-input" placeholder="Nome do projeto" maxlength="80">
-  <button id="saveConfirmar" class="cfg-btn">Salvar</button>
-  <button id="saveCancelar" class="cfg-link">Cancelar</button>
-</div>
-
-<!-- Gaveta: Meus Projetos -->
-<div id="drawerProj" class="side-drawer" role="dialog" aria-modal="true">
-  <div class="sd-head">
-    <div class="sd-title">Meus Projetos</div>
-    <button id="projClose" class="e-x" title="fechar">×</button>
-  </div>
-  <div id="projLista" class="proj-list"></div>
-  <button id="projNovo" class="cfg-btn ghost">Começar do zero (novo)</button>
-  <button id="projFechar" class="cfg-link">Fechar</button>
-</div>
-
-<!-- Gaveta: Cores do mapa (paletas pré-definidas) -->
-<div id="drawerCores" class="side-drawer" role="dialog" aria-modal="true">
-  <div class="sd-head">
-    <div class="sd-title">Cores do mapa</div>
-    <button id="coresClose" class="e-x" title="fechar">×</button>
-  </div>
-  <p class="sd-desc">Escolha uma paleta pré-definida para o fundo do mapa. Você ainda pode ajustar cores individuais na seção <b>Mapa</b> da Edição.</p>
-  <div class="pal-grid" id="palGrid">
-    <button class="pal-btn" data-pal="padrao">
-      <span class="pal-swatch"><i style="background:#F6F4F1"></i><i style="background:#CFE0F5"></i><i style="background:#F5C9B8"></i><i style="background:#DDE8DA"></i></span>
-      <span class="pal-txt">Padrão<small>cores originais do Maker Map</small></span>
-    </button>
-    <button class="pal-btn" data-pal="pb">
-      <span class="pal-swatch"><i style="background:#FFFFFF"></i><i style="background:#E9E9E9"></i><i style="background:#111111"></i><i style="background:#F4F4F4"></i></span>
-      <span class="pal-txt">Preto e branco<small>alto contraste, sem cor</small></span>
-    </button>
-    <button class="pal-btn" data-pal="antigo">
-      <span class="pal-swatch"><i style="background:#F1E7CE"></i><i style="background:#BFD8CE"></i><i style="background:#C9A96A"></i><i style="background:#DCE0C0"></i></span>
-      <span class="pal-txt">Mapa antigo<small>tons pastéis, ar de carta antiga</small></span>
-    </button>
-    <button class="pal-btn" data-pal="cinza">
-      <span class="pal-swatch"><i style="background:#F0F0F0"></i><i style="background:#DCDCDC"></i><i style="background:#8C8C8C"></i><i style="background:#E6E6E6"></i></span>
-      <span class="pal-txt">Tons de cinza<small>escala neutra de cinzas</small></span>
-    </button>
-  </div>
-</div>
-
-<!-- Gaveta: Mapa de renda (Pro) — vazio por enquanto -->
-<div id="drawerRenda" class="side-drawer" role="dialog" aria-modal="true">
-  <div class="sd-head">
-    <div class="sd-title">Mapa de renda</div>
-    <button id="rendaClose" class="e-x" title="fechar">×</button>
-  </div>
-  <div class="sd-empty">Em breve.<br>Aqui vai entrar a camada de <b>renda</b> por região.</div>
 </div>
 
 <!-- Janela: recurso bloqueado (upgrade de plano) -->
