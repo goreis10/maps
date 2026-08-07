@@ -5,9 +5,32 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 1.2 — Perfil de renda dentro do raio
+## Maker Map 1.3 — Pontos do Censo no mapa
 
 _Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- Novo botão **Pontos no mapa**, no Mapa de renda: desenha um ponto por setor
+  censitário dentro do raio, colorido pela faixa de renda — do amarelo claro
+  (faixas menores) ao marrom escuro (maiores).
+- Clicar em um ponto abre os dados daquele setor: domicílios, moradores por
+  domicílio e renda média e mediana.
+- O gráfico de distribuição por faixa de renda passou a usar as mesmas cores dos
+  pontos, servindo de legenda.
+- A escala de cores foi escolhida para continuar legível impressa em preto e
+  branco e para quem tem daltonismo.
+- Setores sem informação de renda não aparecem como pontos, do mesmo jeito que já
+  ficavam fora do cálculo da renda.
+
+> A legenda das cores fica na janela do Mapa de renda e **não** sai na imagem
+> exportada. Uma legenda dentro do mapa ainda está por fazer.
+
+---
+
+## Maker Map 1.2 — Perfil de renda dentro do raio
+
+_No ar em maker-map.netlify.app._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 

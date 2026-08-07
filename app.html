@@ -27,7 +27,9 @@
                           aplicarRaioRenda() — círculo próprio da gaveta
   • Censo IBGE 2022 ..... carregarCenso() (lazy, sp_census_2022.json),
                           censoConsulta() (agrega no raio + margem de
-                          borda), renderRenda() (painel da gaveta)
+                          borda), renderRenda() (painel da gaveta),
+                          censoPts() (camada censo-pts: 1 ponto por
+                          setor, cor por faixa — CENSO_FAIXAS)
   • Upload KMZ/KML ...... kmlParaFeats(), integrarFeats()
   • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
   • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
@@ -211,7 +213,9 @@
   .rd-fx{display:grid;grid-template-columns:1fr 46px;gap:4px 8px;align-items:center;font-size:10.5px}
   .rd-fx>i{display:block;height:5px;border-radius:3px;background:#0E9F8A;min-width:1px}
   .rd-fx>u{text-decoration:none;color:var(--ink-2);font-size:10px;font-variant-numeric:tabular-nums;text-align:right}
-  .rd-fxr{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rd-fxr{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:center;gap:5px}
+  .rd-fxr b{flex:none;width:9px;height:9px;border-radius:50%;border:1px solid rgba(28,25,23,.25)}
   .rd-msg{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:11px;line-height:1.5;
     color:var(--ink-2);margin:12px 0 0}
   .rd-msg.warn{border-color:#E8A365;background:#FFF7EF;color:#8A4B12}
@@ -523,6 +527,7 @@
     </div>
     <div class="sd-toggles">
       <div class="chip" id="chipRaioRenda"><span class="dot"></span>Raio</div>
+      <div class="chip" id="chipCensoPts" title="um ponto por setor censitário, colorido pela faixa de renda"><span class="dot"></span>Pontos no mapa</div>
     </div>
     <div class="sd-sec">
       <div class="e-row"><label>Raio</label><input type="number" id="rdRaioKm" value="10" min="1" max="2000" step="1"><label>km</label></div>
@@ -852,6 +857,22 @@ function montarCamadas(){
       'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
     paint:{'text-color':'#1D4FA8', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
 
+  // pontos do Censo (um por setor censitário dentro do raio de renda).
+  // Fica ACIMA do véu e ABAIXO do círculo do raio, para o traçado tracejado
+  // e a legenda do raio continuarem legíveis sobre a nuvem de pontos.
+  map.addSource('censo', {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+  map.addLayer({id:'censo-pts', type:'circle', source:'censo', layout:{visibility:'none'},
+    paint:{
+      'circle-color':['step',['get','renda'],
+        CENSO_FAIXAS[0].cor,  1500, CENSO_FAIXAS[1].cor,  3000, CENSO_FAIXAS[2].cor,
+        5000, CENSO_FAIXAS[3].cor, 8000, CENSO_FAIXAS[4].cor, 15000, CENSO_FAIXAS[5].cor,
+        30000, CENSO_FAIXAS[6].cor],
+      'circle-radius':['interpolate',['linear'],['zoom'], 7,1.6, 10,3, 13,5, 16,9, 18,14],
+      'circle-opacity':0.85,
+      'circle-stroke-color':'#FFFFFF',
+      'circle-stroke-width':['interpolate',['linear'],['zoom'], 12,0, 15,0.7]
+    }});
+
   // raio próprio do Mapa de renda (mesma estrutura, fonte e camadas separadas)
   map.addSource('raio-renda', {type:'geojson', data:RAIO_RENDA});
   map.addLayer({id:'raior-fill', type:'fill', source:'raio-renda',
@@ -905,6 +926,26 @@ function montarCamadas(){
     map.on('mouseenter', id, ()=> map.getCanvas().style.cursor='pointer');
     map.on('mouseleave', id, ()=> map.getCanvas().style.cursor='');
   });
+
+  // popup de um setor censitário
+  map.on('click','censo-pts', e=>{
+    if(drawing || pickCentro || pickCentroRenda) return;
+    const p=e.features[0].properties;
+    const n=(v,d)=>Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});
+    new maplibregl.Popup({closeButton:true, maxWidth:'260px'})
+      .setLngLat(e.features[0].geometry.coordinates)
+      .setHTML(`
+        <div class="pp-eyebrow" style="color:#8C2D04">${p.mun||'Setor censitário'}</div>
+        <div class="pp-name">Setor censitário</div>
+        <div class="pp-row"><span>Domicílios</span><b>${n(p.dom)}</b></div>
+        <div class="pp-row"><span>Moradores/domicílio</span><b>${n(p.mor,2)}</b></div>
+        <div class="pp-row"><span>Renda média</span><b>R$ ${n(p.renda)}</b></div>
+        <div class="pp-row"><span>Renda mediana</span><b>R$ ${n(p.mdn)}</b></div>
+        <div class="pp-row"><span>Referência</span><b>jul/2022 · responsável</b></div>`)
+      .addTo(map);
+  });
+  map.on('mouseenter','censo-pts', ()=> map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','censo-pts', ()=> map.getCanvas().style.cursor='');
 
   drawSetup();
   classificarTiers();
@@ -1227,6 +1268,7 @@ function gerarCirculo(km, centro){
 // ── Raio do Mapa de renda (independente do raio da Edição) ──
 // Mora na gaveta "Mapa de renda"; as futuras análises de renda usam este círculo.
 const RENDA_PADRAO = {on:false, km:10, centro:CENTRO_SE.slice(), cor:'#0E9F8A', fill:true,
+  pts:false,   // pontos do Censo no mapa (um por setor, colorido por faixa de renda)
   lbl:{on:true, texto:'', cor:'#0A6E60', tam:1, halo:true, haloCor:'#FFFFFF', haloW:1.6}};
 let rendaRaio = JSON.parse(JSON.stringify(RENDA_PADRAO));
 let pickCentroRenda = false;
@@ -1251,6 +1293,8 @@ function atualizarRaioRenda(){
 function aplicarRaioRenda(){
   const chip = document.getElementById('chipRaioRenda');
   if(chip) chip.classList.toggle('on', rendaRaio.on);
+  const chipP = document.getElementById('chipCensoPts');
+  if(chipP) chipP.classList.toggle('on', rendaRaio.on && rendaRaio.pts);
   if(!map || !map.getLayer('raior-borda')) return;
   const L = rendaRaio.lbl;
   ['raior-fill','raior-borda','raior-centro'].forEach(id=>
@@ -1996,6 +2040,8 @@ function montarEditor(){
       }
       syncRaioRendaInputs();
       atualizarRaioRenda();
+      // projeto salvo com o raio de renda ligado quer a análise de volta
+      if(rendaRaio.on && censoStatus==='vazio') carregarCenso();
 
       // glebas: cores + preenchimento
       if(s.areas){
@@ -2316,6 +2362,14 @@ document.getElementById('chipRaioRenda').onclick = function(){
   if(rendaRaio.on && censoStatus==='vazio') carregarCenso();
   else renderRenda();
 };
+document.getElementById('chipCensoPts').onclick = function(){
+  if(!map || !map.getLayer('censo-pts')){ toast('Aguarde o mapa carregar.'); return; }
+  if(!rendaRaio.on){ toast('Ligue o Raio primeiro — os pontos são os setores dentro dele.'); return; }
+  rendaRaio.pts = !rendaRaio.pts;
+  aplicarRaioRenda();
+  if(rendaRaio.pts && censoStatus==='vazio') carregarCenso();
+  else renderRenda();
+};
 document.getElementById('rdRaioKm').onchange = function(e){
   var km = Math.max(1, Math.min(2000, parseFloat(e.target.value)||10));
   e.target.value = km; rendaRaio.km = km;
@@ -2384,14 +2438,18 @@ var censoStatus = 'vazio';    // vazio | carregando | ok | erro
 var censoDist = null;         // Float32Array de distâncias (reaproveitado)
 var censoCache = {chave:null, res:null};
 
+// Faixas de renda. As cores são a rampa sequencial YlOrBr (ColorBrewer):
+// clara -> escura de forma monotônica, então funciona em preto e branco e
+// para daltônicos. As MESMAS cores pintam os pontos no mapa e as barras da
+// distribuição — assim o gráfico da gaveta serve de legenda dos pontos.
 var CENSO_FAIXAS = [
-  {rot:'Até R$ 1.500',        max:1500},
-  {rot:'R$ 1.500 a 3.000',    max:3000},
-  {rot:'R$ 3.000 a 5.000',    max:5000},
-  {rot:'R$ 5.000 a 8.000',    max:8000},
-  {rot:'R$ 8.000 a 15.000',   max:15000},
-  {rot:'R$ 15.000 a 30.000',  max:30000},
-  {rot:'Acima de R$ 30.000',  max:Infinity}
+  {rot:'Até R$ 1.500',        max:1500,     cor:'#FFF7BC'},
+  {rot:'R$ 1.500 a 3.000',    max:3000,     cor:'#FEE391'},
+  {rot:'R$ 3.000 a 5.000',    max:5000,     cor:'#FEC44F'},
+  {rot:'R$ 5.000 a 8.000',    max:8000,     cor:'#FB9A29'},
+  {rot:'R$ 8.000 a 15.000',   max:15000,    cor:'#EC7014'},
+  {rot:'R$ 15.000 a 30.000',  max:30000,    cor:'#CC4C02'},
+  {rot:'Acima de R$ 30.000',  max:Infinity, cor:'#8C2D04'}
 ];
 function censoFaixaIdx(v){
   for(var i=0;i<CENSO_FAIXAS.length;i++) if(v < CENSO_FAIXAS[i].max) return i;
@@ -2421,7 +2479,7 @@ function censoConsulta(lat, lon, raioKm){
   var S=CENSO.s, n=S.length, D=censoDist;
   var Rt=6371.0088, rad=Math.PI/180, cos1=Math.cos(lat*rad);
   var dentro=0, dom=0, pes=0, wMed=0, wMdn=0, domRenda=0;
-  var muns={}, faixas=[0,0,0,0,0,0,0], faixaTot=0;
+  var muns={}, faixas=[0,0,0,0,0,0,0], faixaTot=0, idx=[];
   for(var i=0;i<n;i++){
     var r=S[i];
     var sla=Math.sin((r[0]-lat)*rad/2), slo=Math.sin((r[1]-lon)*rad/2);
@@ -2429,7 +2487,7 @@ function censoConsulta(lat, lon, raioKm){
     var d=Rt*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     D[i]=d;
     if(d>raioKm) continue;
-    dentro++;
+    dentro++; idx.push(i);
     dom+=r[3]; pes+=r[3]*r[4];
     muns[r[2]]=(muns[r[2]]||0)+r[3];
     if(r[5]>0){
@@ -2437,7 +2495,7 @@ function censoConsulta(lat, lon, raioKm){
       faixas[censoFaixaIdx(r[5])]+=r[3]; faixaTot+=r[3];
     }
   }
-  if(!dentro) return {vazio:true};
+  if(!dentro) return {vazio:true, idx:[]};
 
   // Margem de borda: domicílios que moram a menos de um "raio de setor"
   // da linha do círculo — ou seja, os que entram/saem por acaso do
@@ -2458,8 +2516,32 @@ function censoConsulta(lat, lon, raioKm){
     margem: dom>0 ? domBorda/dom*100 : 100,
     setorMedioM: rs*1000,
     muns:lista, munNomes:lista.slice(0,3).map(function(c){ return CENSO.mun[c]||c; }),
-    faixas:faixas, faixaTot:faixaTot
+    faixas:faixas, faixaTot:faixaTot, idx:idx
   };
+}
+
+// Pontos no mapa: um círculo por setor censitário dentro do raio, colorido
+// pela faixa de renda. Setores sem informação de renda ficam de fora — a
+// mesma regra do cálculo agregado, para o mapa não contradizer o painel.
+// Passe q=null para apagar a camada.
+function censoPts(q){
+  if(!map || !map.getLayer('censo-pts')) return;
+  var mostrar = !!(q && !q.vazio && rendaRaio.on && rendaRaio.pts);
+  if(!mostrar){
+    map.setLayoutProperty('censo-pts','visibility','none');
+    map.getSource('censo').setData({type:'FeatureCollection', features:[]});
+    return;
+  }
+  var S=CENSO.s, idx=q.idx, feats=[];
+  for(var i=0;i<idx.length;i++){
+    var r=S[idx[i]];
+    if(!(r[5]>0)) continue;
+    feats.push({type:'Feature',
+      properties:{renda:r[5], mdn:r[6], dom:r[3], mor:r[4], mun:CENSO.mun[r[2]]||''},
+      geometry:{type:'Point', coordinates:[r[1], r[0]]}});
+  }
+  map.getSource('censo').setData({type:'FeatureCollection', features:feats});
+  map.setLayoutProperty('censo-pts','visibility','visible');
 }
 
 function renderRenda(){
@@ -2468,20 +2550,24 @@ function renderRenda(){
   var nf=function(v,d){ return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); };
 
   if(!rendaRaio.on){
+    censoPts(null);
     box.innerHTML='<div class="rd-msg">Ligue o <b>Raio</b> acima para ver o perfil de domicílios e renda dentro dele.</div>';
     return;
   }
   if(censoStatus==='vazio'){
+    censoPts(null);
     box.innerHTML='<button class="rd-load" id="rdCarregar">Carregar dados do Censo (1,2 MB)</button>'+
       '<div class="rd-foot">Baixado uma vez por sessão, só quando você pede.</div>';
     document.getElementById('rdCarregar').onclick=carregarCenso;
     return;
   }
   if(censoStatus==='carregando'){
+    censoPts(null);
     box.innerHTML='<div class="rd-msg">Carregando os 90.789 setores censitários…</div>';
     return;
   }
   if(censoStatus==='erro'){
+    censoPts(null);
     box.innerHTML='<div class="rd-msg bad">Não foi possível carregar <b>sp_census_2022.json</b>. '+
       'Verifique se o arquivo está publicado no site.</div>'+
       '<button class="rd-load" id="rdCarregar" style="margin-top:8px">Tentar de novo</button>';
@@ -2495,6 +2581,7 @@ function renderRenda(){
     censoCache.chave=chave;
   }
   var q=censoCache.res;
+  censoPts(q);
 
   if(q.vazio){
     box.innerHTML='<div class="rd-h">Dentro do raio</div>'+
@@ -2520,9 +2607,10 @@ function renderRenda(){
   var maxFx=Math.max.apply(null, q.faixas)||1;
   var faixasHtml=q.faixas.map(function(v,i){
     var pct=q.faixaTot>0 ? v/q.faixaTot*100 : 0;
-    return '<span class="rd-fxr" title="'+CENSO_FAIXAS[i].rot+'">'+CENSO_FAIXAS[i].rot+'</span>'+
+    return '<span class="rd-fxr" title="'+CENSO_FAIXAS[i].rot+'">'+
+             '<b style="background:'+CENSO_FAIXAS[i].cor+'"></b>'+CENSO_FAIXAS[i].rot+'</span>'+
            '<u>'+nf(pct,1)+'%</u>'+
-           '<i style="width:'+(v/maxFx*100).toFixed(1)+'%"></i><u></u>';
+           '<i style="width:'+(v/maxFx*100).toFixed(1)+'%;background:'+CENSO_FAIXAS[i].cor+'"></i><u></u>';
   }).join('');
 
   var munTxt=q.muns.length===1 ? q.munNomes[0]
@@ -2541,7 +2629,8 @@ function renderRenda(){
     '<div class="rd-stat"><span>Setores censitários</span><b>'+nf(q.setores)+'</b></div>'+
     '<div class="rd-stat"><span>Municípios ('+q.muns.length+')</span><b style="font-weight:600;font-size:10.5px">'+munTxt+'</b></div>'+
     aviso+
-    '<div class="rd-sub">Domicílios por faixa de renda</div>'+
+    '<div class="rd-sub">Domicílios por faixa de renda'+
+      (rendaRaio.pts ? ' <em style="font-weight:600;text-transform:none;letter-spacing:0">· cores dos pontos no mapa</em>' : '')+'</div>'+
     '<div class="rd-fx">'+faixasHtml+'</div>'+
     (q.domSemRenda>0 ? '<div class="rd-foot">'+nf(q.domSemRenda)+' domicílios ficam fora do cálculo de renda '+
       '(setor sem informação de rendimento).</div>' : '')+
