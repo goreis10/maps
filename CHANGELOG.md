@@ -11,10 +11,15 @@ _Aguardando publicação._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
-- O raio do Mapa de renda agora mostra o perfil da população que mora dentro
-  dele, com dados do Censo Demográfico 2022 do IBGE: domicílios ocupados,
-  pessoas estimadas, moradores por domicílio, renda média e mediana do
-  responsável, classe socioeconômica, densidade e municípios abrangidos.
+**Mapa de renda**
+
+- O Mapa de renda ganhou um raio próprio, com centro, distância, cor e legenda
+  independentes do raio da Edição. O centro pode ser definido por coordenadas,
+  por endereço ou clicando no mapa.
+- Esse raio agora mostra o perfil de quem mora dentro dele, com dados do Censo
+  Demográfico 2022 do IBGE: domicílios ocupados, pessoas estimadas, moradores
+  por domicílio, renda média e mediana do responsável, classe socioeconômica,
+  densidade e municípios abrangidos.
 - Novo gráfico de distribuição dos domicílios por faixa de renda.
 - Os números consideram apenas os setores censitários cujo centro cai dentro do
   raio. Quando o raio é pequeno demais para a densidade da região, um aviso
@@ -25,13 +30,7 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 - Cobertura: Estado de São Paulo. Um centro fora do estado avisa que não há
   dados disponíveis.
 
----
-
-## Maker Map 1.1 — Legenda do raio e Raio do Mapa de renda
-
-_Aguardando publicação._
-
-Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+**Legenda do raio (Edição)**
 
 - A legenda que aparece junto ao raio agora pode ser editada: escreva o texto
   que quiser ou deixe em branco para usar o texto automático
@@ -39,9 +38,10 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 - A legenda ganhou cor, tamanho e contorno próprios, ajustáveis como os demais
   rótulos do mapa.
 - A legenda pode ser desligada sem desligar o círculo do raio.
-- O Mapa de renda ganhou um raio próprio, com centro, distância, cor e legenda
-  independentes do raio da Edição. O centro pode ser definido por coordenadas,
-  por endereço ou clicando no mapa.
+
+> Nota de numeração: os itens de “Legenda do raio” chegaram a ser preparados
+> como 1.1, mas foram publicados junto com o Mapa de renda. A versão 1.1 nunca
+> foi ao ar — a próxima depois da 1.0 é esta.
 
 ---
 
