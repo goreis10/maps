@@ -27,8 +27,12 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 - O gráfico de distribuição por faixa de renda passou a usar as mesmas cores dos
   pontos e do calor de renda, servindo de legenda. No modo densidade aparece a
   escala de cores própria.
-- A escala de cores da renda foi escolhida para continuar legível impressa em
-  preto e branco e para quem tem daltonismo.
+- **A cor de cada faixa de renda pode ser trocada**: clique na bolinha ao lado da
+  faixa no gráfico e escolha a cor. Vale para os pontos e para o calor de renda,
+  e fica salva no projeto.
+- Duas escalas prontas: **semáforo** (vermelho na renda baixa, ciano na alta — o
+  padrão) e **tons de âmbar** (claro a escuro, a única que continua legível
+  impressa em preto e branco e para quem tem daltonismo).
 - Setores sem informação de renda não entram nessas camadas, do mesmo jeito que já
   ficavam fora do cálculo da renda.
 
