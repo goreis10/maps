@@ -5,6 +5,28 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 1.2 — Perfil de renda dentro do raio
+
+_Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- O raio do Mapa de renda agora mostra o perfil da população que mora dentro
+  dele, com dados do Censo Demográfico 2022 do IBGE: domicílios ocupados,
+  pessoas estimadas, moradores por domicílio, renda média e mediana do
+  responsável, classe socioeconômica, densidade e municípios abrangidos.
+- Novo gráfico de distribuição dos domicílios por faixa de renda.
+- Os números consideram apenas os setores censitários cujo centro cai dentro do
+  raio. Quando o raio é pequeno demais para a densidade da região, um aviso
+  informa a margem de erro da borda e recomenda aumentá-lo — em raio muito
+  pequeno o resultado depende mais do acaso do que dos dados.
+- Os dados do Censo são baixados apenas na primeira vez que o raio é ligado,
+  então quem não usa o Mapa de renda não paga esse tempo de carregamento.
+- Cobertura: Estado de São Paulo. Um centro fora do estado avisa que não há
+  dados disponíveis.
+
+---
+
 ## Maker Map 1.1 — Legenda do raio e Raio do Mapa de renda
 
 _Aguardando publicação._

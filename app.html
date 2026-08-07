@@ -25,6 +25,9 @@
                           raioLbl + aplicarRaioLbl() (legenda editável)
   • Raio do Mapa renda .. rendaRaio, atualizarRaioRenda(),
                           aplicarRaioRenda() — círculo próprio da gaveta
+  • Censo IBGE 2022 ..... carregarCenso() (lazy, sp_census_2022.json),
+                          censoConsulta() (agrega no raio + margem de
+                          borda), renderRenda() (painel da gaveta)
   • Upload KMZ/KML ...... kmlParaFeats(), integrarFeats()
   • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
   • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
@@ -191,6 +194,33 @@
   .sd-toggles{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:12px;margin-bottom:6px;border-bottom:1px solid var(--line)}
   .sd-toggles .chip{box-shadow:none}
   .sd-sec .e-row,.sd-sec .grid-edit,.sd-sec .grid-head,.sd-sec .e-hint{padding-left:0;padding-right:0}
+
+  /* Análise do Censo dentro do raio do Mapa de renda */
+  .rd-box{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .rd-h{font:800 10px 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink);margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .rd-h em{font-style:normal;font-weight:600;font-size:10px;color:var(--ink-2);letter-spacing:0;text-transform:none}
+  .rd-stat{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:3px 0;font-size:11.5px}
+  .rd-stat span{color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rd-stat b{font-weight:700;color:var(--ink);flex:none;font-variant-numeric:tabular-nums}
+  .rd-stat.big b{font-size:14px}
+  .rd-cls{display:inline-flex;align-items:center;justify-content:center;min-width:26px;padding:1px 6px;
+    border-radius:6px;background:#0E9F8A;color:#fff;font:800 11px 'Archivo',sans-serif}
+  .rd-sub{font:800 9.5px 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-2);margin:13px 0 6px}
+  .rd-fx{display:grid;grid-template-columns:1fr 46px;gap:4px 8px;align-items:center;font-size:10.5px}
+  .rd-fx>i{display:block;height:5px;border-radius:3px;background:#0E9F8A;min-width:1px}
+  .rd-fx>u{text-decoration:none;color:var(--ink-2);font-size:10px;font-variant-numeric:tabular-nums;text-align:right}
+  .rd-fxr{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rd-msg{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:11px;line-height:1.5;
+    color:var(--ink-2);margin:12px 0 0}
+  .rd-msg.warn{border-color:#E8A365;background:#FFF7EF;color:#8A4B12}
+  .rd-msg.bad{border-color:#E63946;background:#FDF0F1;color:#A11B26}
+  .rd-msg b{color:inherit}
+  .rd-foot{margin-top:11px;font-size:9.5px;line-height:1.5;color:var(--ink-2)}
+  .rd-load{border:0;border-radius:9px;padding:9px 12px;width:100%;cursor:pointer;background:var(--ink);
+    color:#fff;font:700 12px 'Archivo',sans-serif}
+  .rd-load:disabled{opacity:.6;cursor:wait}
 
   /* janela de configurações (abre ao clicar no nome) */
   .cfg-overlay{position:fixed;inset:0;z-index:2000;background:rgba(28,25,23,.38);
@@ -519,8 +549,9 @@
         <a id="rdCtMapa" style="color:var(--azul);cursor:pointer">escolher no mapa</a>
         <a id="rdCtSe" style="color:var(--azul);cursor:pointer">voltar ao Marco Zero</a>
       </div>
-      <div class="e-hint">Raio próprio do Mapa de renda, independente do raio da Edição. As análises de renda dentro dele entram aqui.</div>
+      <div class="e-hint">Raio próprio do Mapa de renda, independente do raio da Edição.</div>
     </div>
+    <div id="rendaAnalise" class="rd-box"></div>
   </div>
 
   <div id="edResize" title="arraste para ajustar a largura"></div>
@@ -1215,6 +1246,7 @@ function atualizarRaioRenda(){
   if(la) la.value = rendaRaio.centro[1].toFixed(5);
   if(lo) lo.value = rendaRaio.centro[0].toFixed(5);
   aplicarRaioRenda();
+  renderRenda();          // raio ou centro mudou: refaz a análise do Censo
 }
 function aplicarRaioRenda(){
   const chip = document.getElementById('chipRaioRenda');
@@ -2269,13 +2301,20 @@ document.querySelectorAll('#palGrid .pal-btn').forEach(function(b){
 });
 
 // ── Mapa de renda (Pro) — gaveta com raio próprio ──
-document.getElementById('btnRenda').onclick = function(){ syncRaioRendaInputs(); abrirGaveta('drawerRenda'); };
+document.getElementById('btnRenda').onclick = function(){
+  syncRaioRendaInputs();
+  renderRenda();
+  abrirGaveta('drawerRenda');
+};
 document.getElementById('rendaClose').onclick = fecharGaveta;
 
 document.getElementById('chipRaioRenda').onclick = function(){
   if(!map || !map.getLayer('raior-borda')){ toast('Aguarde o mapa carregar.'); return; }
   rendaRaio.on = !rendaRaio.on;
   aplicarRaioRenda();
+  // primeiro "ligar" puxa o dataset do Censo; depois é só recalcular
+  if(rendaRaio.on && censoStatus==='vazio') carregarCenso();
+  else renderRenda();
 };
 document.getElementById('rdRaioKm').onchange = function(e){
   var km = Math.max(1, Math.min(2000, parseFloat(e.target.value)||10));
@@ -2326,6 +2365,191 @@ document.getElementById('rdCtSe').onclick = function(){
   atualizarRaioRenda();
   toast('Centro restaurado: Marco Zero, Praça da Sé.');
 };
+
+// ══════════════════════════════════════════════════════════════════
+//  CENSO IBGE 2022 — análise dentro do raio do Mapa de renda
+//
+//  Dados: sp_census_2022.json (90.789 setores censitários de SP).
+//  Carregado SOB DEMANDA — só quando o raio de renda é ligado — para
+//  não cobrar ~1,2 MB de quem nunca abre o Mapa de renda.
+//
+//  O corte é por CENTROIDE do setor: setor com centroide dentro conta
+//  inteiro, setor com centroide fora não conta. Os dois erros se
+//  compensam em parte, mas sobra uma margem na borda que é medida e
+//  informada (censoConsulta -> margem), porque em raio pequeno ela
+//  domina o resultado.
+// ══════════════════════════════════════════════════════════════════
+var CENSO = null;             // {meta, mun:{cod:nome}, s:[[lat,lon,cd_mun,dom,mor,rmed,rmdn]]}
+var censoStatus = 'vazio';    // vazio | carregando | ok | erro
+var censoDist = null;         // Float32Array de distâncias (reaproveitado)
+var censoCache = {chave:null, res:null};
+
+var CENSO_FAIXAS = [
+  {rot:'Até R$ 1.500',        max:1500},
+  {rot:'R$ 1.500 a 3.000',    max:3000},
+  {rot:'R$ 3.000 a 5.000',    max:5000},
+  {rot:'R$ 5.000 a 8.000',    max:8000},
+  {rot:'R$ 8.000 a 15.000',   max:15000},
+  {rot:'R$ 15.000 a 30.000',  max:30000},
+  {rot:'Acima de R$ 30.000',  max:Infinity}
+];
+function censoFaixaIdx(v){
+  for(var i=0;i<CENSO_FAIXAS.length;i++) if(v < CENSO_FAIXAS[i].max) return i;
+  return CENSO_FAIXAS.length-1;
+}
+function censoClasse(v){
+  if(v>=25000) return 'A';  if(v>=12000) return 'B+'; if(v>=6000) return 'B';
+  if(v>=3000)  return 'C';  if(v>=1500)  return 'D';  return 'E';
+}
+
+function carregarCenso(){
+  if(censoStatus==='ok' || censoStatus==='carregando') return;
+  censoStatus='carregando'; renderRenda();
+  fetch('sp_census_2022.json')
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(js){
+      if(!js || !js.s || !js.s.length) throw new Error('arquivo vazio');
+      CENSO=js; censoDist=new Float32Array(js.s.length);
+      censoStatus='ok'; censoCache.chave=null; renderRenda();
+    })
+    .catch(function(e){ console.error('censo', e); censoStatus='erro'; renderRenda(); });
+}
+
+// Agregação dentro do raio. Ponderação por domicílios é obrigatória:
+// média simples entre setores faria um setor de 10 pesar igual a um de 500.
+function censoConsulta(lat, lon, raioKm){
+  var S=CENSO.s, n=S.length, D=censoDist;
+  var Rt=6371.0088, rad=Math.PI/180, cos1=Math.cos(lat*rad);
+  var dentro=0, dom=0, pes=0, wMed=0, wMdn=0, domRenda=0;
+  var muns={}, faixas=[0,0,0,0,0,0,0], faixaTot=0;
+  for(var i=0;i<n;i++){
+    var r=S[i];
+    var sla=Math.sin((r[0]-lat)*rad/2), slo=Math.sin((r[1]-lon)*rad/2);
+    var a=sla*sla + cos1*Math.cos(r[0]*rad)*slo*slo;
+    var d=Rt*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    D[i]=d;
+    if(d>raioKm) continue;
+    dentro++;
+    dom+=r[3]; pes+=r[3]*r[4];
+    muns[r[2]]=(muns[r[2]]||0)+r[3];
+    if(r[5]>0){
+      wMed+=r[5]*r[3]; wMdn+=r[6]*r[3]; domRenda+=r[3];
+      faixas[censoFaixaIdx(r[5])]+=r[3]; faixaTot+=r[3];
+    }
+  }
+  if(!dentro) return {vazio:true};
+
+  // Margem de borda: domicílios que moram a menos de um "raio de setor"
+  // da linha do círculo — ou seja, os que entram/saem por acaso do
+  // centroide. rs = R/raiz(n) vem de área_do_setor = pi*R^2 / n.
+  var rs = raioKm/Math.sqrt(dentro), domBorda=0;
+  for(var j=0;j<n;j++){ var dd=D[j]; if(dd>=raioKm-rs && dd<=raioKm+rs) domBorda+=S[j][3]; }
+
+  var area=Math.PI*raioKm*raioKm;
+  var lista=Object.keys(muns).sort(function(a,b){ return muns[b]-muns[a]; });
+  return {
+    vazio:false, setores:dentro, dom:dom,
+    pes:Math.round(pes),
+    morDom: dom>0 ? pes/dom : 0,
+    rendaMedia:   domRenda>0 ? wMed/domRenda : 0,
+    rendaMediana: domRenda>0 ? wMdn/domRenda : 0,
+    domSemRenda: dom-domRenda,
+    densDom: dom/area, densPes: pes/area, area:area,
+    margem: dom>0 ? domBorda/dom*100 : 100,
+    setorMedioM: rs*1000,
+    muns:lista, munNomes:lista.slice(0,3).map(function(c){ return CENSO.mun[c]||c; }),
+    faixas:faixas, faixaTot:faixaTot
+  };
+}
+
+function renderRenda(){
+  var box=document.getElementById('rendaAnalise');
+  if(!box) return;
+  var nf=function(v,d){ return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); };
+
+  if(!rendaRaio.on){
+    box.innerHTML='<div class="rd-msg">Ligue o <b>Raio</b> acima para ver o perfil de domicílios e renda dentro dele.</div>';
+    return;
+  }
+  if(censoStatus==='vazio'){
+    box.innerHTML='<button class="rd-load" id="rdCarregar">Carregar dados do Censo (1,2 MB)</button>'+
+      '<div class="rd-foot">Baixado uma vez por sessão, só quando você pede.</div>';
+    document.getElementById('rdCarregar').onclick=carregarCenso;
+    return;
+  }
+  if(censoStatus==='carregando'){
+    box.innerHTML='<div class="rd-msg">Carregando os 90.789 setores censitários…</div>';
+    return;
+  }
+  if(censoStatus==='erro'){
+    box.innerHTML='<div class="rd-msg bad">Não foi possível carregar <b>sp_census_2022.json</b>. '+
+      'Verifique se o arquivo está publicado no site.</div>'+
+      '<button class="rd-load" id="rdCarregar" style="margin-top:8px">Tentar de novo</button>';
+    document.getElementById('rdCarregar').onclick=function(){ censoStatus='vazio'; carregarCenso(); };
+    return;
+  }
+
+  var chave=rendaRaio.km+'|'+rendaRaio.centro[0]+'|'+rendaRaio.centro[1];
+  if(censoCache.chave!==chave){
+    censoCache.res=censoConsulta(rendaRaio.centro[1], rendaRaio.centro[0], rendaRaio.km);
+    censoCache.chave=chave;
+  }
+  var q=censoCache.res;
+
+  if(q.vazio){
+    box.innerHTML='<div class="rd-h">Dentro do raio</div>'+
+      '<div class="rd-msg warn">Nenhum setor censitário neste raio. A base cobre <b>apenas o Estado de '+
+      'São Paulo</b> — um centro em outro estado não retorna dados.</div>';
+    return;
+  }
+
+  // Confiabilidade: em raio pequeno a margem de borda domina o resultado.
+  var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
+  var aviso='';
+  if(nivel==='bad'){
+    aviso='<div class="rd-msg bad">Raio pequeno demais para a densidade local. '+
+      (q.setores<30 ? 'São apenas <b>'+q.setores+' setores</b> no raio. ' : '')+
+      '<b>'+nf(q.margem)+'%</b> dos domicílios estão na faixa de incerteza da borda, '+
+      'onde entrar ou sair do total depende de onde caiu o centroide do setor '+
+      '(setor médio aqui: '+nf(q.setorMedioM)+' m). Aumente o raio antes de usar estes números.</div>';
+  } else if(nivel==='warn'){
+    aviso='<div class="rd-msg warn">Margem de borda de <b>'+nf(q.margem)+'%</b> dos domicílios — '+
+      'suficiente para leitura de tendência, apertado para número fechado.</div>';
+  }
+
+  var maxFx=Math.max.apply(null, q.faixas)||1;
+  var faixasHtml=q.faixas.map(function(v,i){
+    var pct=q.faixaTot>0 ? v/q.faixaTot*100 : 0;
+    return '<span class="rd-fxr" title="'+CENSO_FAIXAS[i].rot+'">'+CENSO_FAIXAS[i].rot+'</span>'+
+           '<u>'+nf(pct,1)+'%</u>'+
+           '<i style="width:'+(v/maxFx*100).toFixed(1)+'%"></i><u></u>';
+  }).join('');
+
+  var munTxt=q.muns.length===1 ? q.munNomes[0]
+    : q.munNomes.join(', ')+(q.muns.length>3 ? ' +'+(q.muns.length-3) : '');
+
+  box.innerHTML=
+    '<div class="rd-h">Dentro do raio <em>'+nf(rendaRaio.km)+' km · '+nf(q.area)+' km²</em></div>'+
+    '<div class="rd-stat big"><span>Domicílios ocupados</span><b>'+nf(q.dom)+'</b></div>'+
+    '<div class="rd-stat big"><span>Pessoas (estimativa)</span><b>'+nf(q.pes)+'</b></div>'+
+    '<div class="rd-stat"><span>Moradores por domicílio</span><b>'+nf(q.morDom,2)+'</b></div>'+
+    '<div class="rd-stat"><span>Renda média do responsável</span><b>R$ '+nf(q.rendaMedia)+'</b></div>'+
+    '<div class="rd-stat"><span>Renda mediana do responsável</span><b>R$ '+nf(q.rendaMediana)+'</b></div>'+
+    '<div class="rd-stat"><span>Classe socioeconômica</span><b><span class="rd-cls">'+censoClasse(q.rendaMedia)+'</span></b></div>'+
+    '<div class="rd-stat"><span>Densidade</span><b>'+nf(q.densDom)+' dom/km²</b></div>'+
+    '<div class="rd-stat"><span>Densidade</span><b>'+nf(q.densPes)+' pess/km²</b></div>'+
+    '<div class="rd-stat"><span>Setores censitários</span><b>'+nf(q.setores)+'</b></div>'+
+    '<div class="rd-stat"><span>Municípios ('+q.muns.length+')</span><b style="font-weight:600;font-size:10.5px">'+munTxt+'</b></div>'+
+    aviso+
+    '<div class="rd-sub">Domicílios por faixa de renda</div>'+
+    '<div class="rd-fx">'+faixasHtml+'</div>'+
+    (q.domSemRenda>0 ? '<div class="rd-foot">'+nf(q.domSemRenda)+' domicílios ficam fora do cálculo de renda '+
+      '(setor sem informação de rendimento).</div>' : '')+
+    '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022).<br>'+
+    '<b>Renda é do responsável pelo domicílio</b>, não a renda familiar total — a familiar costuma ser '+
+    '1,5 a 2× maior. Valores em <b>R$ nominais de julho/2022</b>, sem correção de inflação. '+
+    'Média condicional: responsáveis sem rendimento não entram. Corte por centroide do setor.</div>';
+}
 
 // ── Janela de upgrade (recurso bloqueado por plano) ──
 function abrirUpgrade(planoReq, feature){
