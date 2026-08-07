@@ -5,7 +5,7 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 1.3 — Pontos do Censo no mapa
+## Maker Map 1.3 — Pontos e mapa de calor do Censo
 
 _Aguardando publicação._
 
@@ -16,14 +16,23 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   (faixas menores) ao marrom escuro (maiores).
 - Clicar em um ponto abre os dados daquele setor: domicílios, moradores por
   domicílio e renda média e mediana.
+- Novo botão **Mapa de calor**, com duas leituras à escolha:
+  - **Renda** — mancha suave nas cores das faixas de renda, mostrando as regiões
+    mais e menos ricas dentro do raio.
+  - **Densidade** — concentração de domicílios por área, do azul (pouco) ao
+    vermelho (muito), mostrando onde está a população.
+- Controle de **suavização** para deixar a mancha mais fechada ou mais espalhada,
+  já que o ponto certo muda conforme o tamanho do raio e a densidade da região.
+- Pontos e mapa de calor podem ficar ligados ao mesmo tempo.
 - O gráfico de distribuição por faixa de renda passou a usar as mesmas cores dos
-  pontos, servindo de legenda.
-- A escala de cores foi escolhida para continuar legível impressa em preto e
-  branco e para quem tem daltonismo.
-- Setores sem informação de renda não aparecem como pontos, do mesmo jeito que já
+  pontos e do calor de renda, servindo de legenda. No modo densidade aparece a
+  escala de cores própria.
+- A escala de cores da renda foi escolhida para continuar legível impressa em
+  preto e branco e para quem tem daltonismo.
+- Setores sem informação de renda não entram nessas camadas, do mesmo jeito que já
   ficavam fora do cálculo da renda.
 
-> A legenda das cores fica na janela do Mapa de renda e **não** sai na imagem
+> As legendas ficam na janela do Mapa de renda e **não** saem na imagem
 > exportada. Uma legenda dentro do mapa ainda está por fazer.
 
 ---
