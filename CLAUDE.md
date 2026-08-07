@@ -13,6 +13,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Deployed to Netlify (project **maker-map**, `maker-map.netlify.app`) with continuous deployment from `main`: **merging to `main` publishes the live site automatically** (~1 min). There is no other release process.
 
+## Versioning — iOS-style
+
+Releases are numbered and named the way Apple names iOS updates: `MAJOR.MINOR.PATCH`, where the third number exists **only** when the release is fixes-only.
+
+| Form | When | Example |
+|---|---|---|
+| `X.0` | Big release: redesign, new subsystem, breaking change to saved projects | `2.0` |
+| `X.Y` | New features / visible improvements — the normal case | `1.1`, `1.2` |
+| `X.Y.Z` | **Only** bug fixes, no new features (Apple never adds features in a patch) | `1.1.1` |
+
+Rules, all mirroring Apple's practice:
+
+- **Never write `1.0.0`** — a release with no patch component is just `1.0`. The `.0` patch is implicit.
+- **A patch never introduces a feature.** If a "fix" adds a control, a section, or a new behavior the user can reach, it is a `X.Y`, not a `X.Y.Z`.
+- **Numbers only, no codenames.** iOS has no "Sequoia"; neither do we.
+- Each release gets a **short title** in the release notes, plus the standard Apple opener: *"Esta atualização inclui os seguintes aprimoramentos e correções de erros:"* followed by bullets written for the user, not for a developer.
+
+Where the version shows up:
+
+- **PR title** — `Maker Map 1.1 — Legenda do raio e Raio do Mapa de renda`
+- **`CHANGELOG.md`** — one section per version, newest first. Written in Portuguese, user-facing. Netlify strips `*.md` from the published output, so it never leaks to the site.
+- **Git tag on `main` after the merge** — `git tag v1.1 && git push origin v1.1`
+- Commit messages inside the branch stay descriptive as usual; the version lives on the release, not on every commit.
+
+Decide the number **when opening the PR**: look at `CHANGELOG.md` for the last shipped version and bump according to the table above.
+
 ## Working on the code
 
 Since it's a single-file app, use `Grep`/`Read` to navigate `app.html`. The file opens with a comment block (the "ÍNDICE DO ARQUIVO") that maps every subsystem to its function names — read it first; search by the term to jump to a section.
