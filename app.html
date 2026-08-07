@@ -21,7 +21,10 @@
   • Pilha sobre o véu ... tierAcima(), aplicarPilhaAcima(), ordemAcima
   • Editor .............. montarEditor()   — todas as seções da UI
   • Rótulos ............. lblCfg, classificarRotulos(), aplicarLbl()
-  • Raio ................ gerarCirculo(), atualizarRaio(), centroRaio
+  • Raio ................ gerarCirculo(), atualizarRaio(), centroRaio,
+                          raioLbl + aplicarRaioLbl() (legenda editável)
+  • Raio do Mapa renda .. rendaRaio, atualizarRaioRenda(),
+                          aplicarRaioRenda() — círculo próprio da gaveta
   • Upload KMZ/KML ...... kmlParaFeats(), integrarFeats()
   • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
   • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
@@ -183,6 +186,11 @@
   .pal-txt small{display:block;font-weight:500;font-size:11px;color:var(--ink-2);margin-top:1px}
   .sd-empty{border:1px dashed var(--line);border-radius:12px;padding:26px 16px;text-align:center;
     color:var(--ink-2);font-size:12.5px;line-height:1.6}
+  /* Controles de editor dentro de uma gaveta lateral (ex.: Raio do Mapa de renda).
+     A gaveta já tem padding lateral, então zeramos o das linhas do editor. */
+  .sd-toggles{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:12px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+  .sd-toggles .chip{box-shadow:none}
+  .sd-sec .e-row,.sd-sec .grid-edit,.sd-sec .grid-head,.sd-sec .e-hint{padding-left:0;padding-right:0}
 
   /* janela de configurações (abre ao clicar no nome) */
   .cfg-overlay{position:fixed;inset:0;z-index:2000;background:rgba(28,25,23,.38);
@@ -370,6 +378,18 @@
       <div class="e-row"><label>Raio</label><input type="number" id="edRaioKm" value="100" min="1" max="2000" step="5"><label>km</label></div>
       <div class="e-row"><label>Cor</label><input type="color" id="edRaioCor" value="#337FFF"></div>
       <div class="e-row"><label><input type="checkbox" id="edRaioFill" checked> preenchimento</label></div>
+      <div class="e-row"><label><input type="checkbox" id="edRaioLblOn" checked> legenda</label>
+        <input type="text" id="edRaioLblTxt" placeholder="texto automático" title="deixe vazio para usar o texto automático" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
+      <div class="grid-rot grid-head"><span></span><span></span><span></span><span>Tamanho</span><span></span><span>Contorno</span></div>
+      <div class="grid-edit grid-rot">
+        <span class="e-nome" style="font-weight:600">Legenda</span>
+        <label class="lbl-halochk" title="contorno liga/desliga"><input type="checkbox" id="edRaioLblHalo" checked></label>
+        <input type="color" id="edRaioLblCor" value="#1D4FA8" title="cor do texto">
+        <input type="range" id="edRaioLblTam" min="60" max="240" value="100" title="tamanho do texto (%)">
+        <input type="color" id="edRaioLblHaloCor" value="#FFFFFF" title="cor do contorno">
+        <input type="range" id="edRaioLblHaloW" min="0" max="40" value="16" title="espessura do contorno">
+      </div>
+      <div class="e-hint">Legenda vazia = texto automático (“Marco Zero · raio 100 km”). Cor, tamanho e contorno são próprios da legenda.</div>
       <div class="e-row"><label>Centro</label><input type="number" id="edCtLat" step="0.0001" value="-23.5505" title="latitude"><input type="number" id="edCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
       <div class="e-row"><input type="text" id="edCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
       <div class="e-row" style="gap:12px;font-size:11px">
@@ -465,13 +485,42 @@
     </div>
   </div>
 
-  <!-- Gaveta: Mapa de renda (Pro) — vazio por enquanto -->
+  <!-- Gaveta: Mapa de renda (Pro) — raio próprio; a camada de renda entra depois -->
   <div id="drawerRenda" class="side-drawer" role="dialog" aria-modal="true">
     <div class="sd-head">
       <div class="sd-title">Mapa de renda</div>
       <button id="rendaClose" class="e-x" title="fechar">×</button>
     </div>
-    <div class="sd-empty">Em breve.<br>Aqui vai entrar a camada de <b>renda</b> por região.</div>
+    <div class="sd-toggles">
+      <div class="chip" id="chipRaioRenda"><span class="dot"></span>Raio</div>
+    </div>
+    <div class="sd-sec">
+      <div class="e-row"><label>Raio</label><input type="number" id="rdRaioKm" value="10" min="1" max="2000" step="1"><label>km</label></div>
+      <div class="e-row"><label>Cor</label><input type="color" id="rdRaioCor" value="#0E9F8A"></div>
+      <div class="e-row"><label><input type="checkbox" id="rdRaioFill" checked> preenchimento</label></div>
+      <div class="e-row"><label><input type="checkbox" id="rdLblOn" checked> legenda</label>
+        <input type="text" id="rdLblTxt" placeholder="texto automático" title="deixe vazio para usar o texto automático" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
+      <div class="grid-rot grid-head"><span></span><span></span><span></span><span>Tamanho</span><span></span><span>Contorno</span></div>
+      <div class="grid-edit grid-rot">
+        <span class="e-nome" style="font-weight:600">Legenda</span>
+        <label class="lbl-halochk" title="contorno liga/desliga"><input type="checkbox" id="rdLblHalo" checked></label>
+        <input type="color" id="rdLblCor" value="#0A6E60" title="cor do texto">
+        <input type="range" id="rdLblTam" min="60" max="240" value="100" title="tamanho do texto (%)">
+        <input type="color" id="rdLblHaloCor" value="#FFFFFF" title="cor do contorno">
+        <input type="range" id="rdLblHaloW" min="0" max="40" value="16" title="espessura do contorno">
+      </div>
+      <div class="e-row"><label>Centro</label><input type="number" id="rdCtLat" step="0.0001" value="-23.5505" title="latitude"><input type="number" id="rdCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
+      <div class="e-row"><input type="text" id="rdCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
+      <div class="e-row" style="gap:12px;font-size:11px">
+        <a id="rdCtAplicar" style="color:var(--azul);cursor:pointer">aplicar coords</a>
+        <a id="rdCtBuscar" style="color:var(--azul);cursor:pointer">buscar endereço</a>
+      </div>
+      <div class="e-row" style="gap:12px;font-size:11px">
+        <a id="rdCtMapa" style="color:var(--azul);cursor:pointer">escolher no mapa</a>
+        <a id="rdCtSe" style="color:var(--azul);cursor:pointer">voltar ao Marco Zero</a>
+      </div>
+      <div class="e-hint">Raio próprio do Mapa de renda, independente do raio da Edição. As análises de renda dentro dele entram aqui.</div>
+    </div>
   </div>
 
   <div id="edResize" title="arraste para ajustar a largura"></div>
@@ -772,6 +821,23 @@ function montarCamadas(){
       'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
     paint:{'text-color':'#1D4FA8', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
 
+  // raio próprio do Mapa de renda (mesma estrutura, fonte e camadas separadas)
+  map.addSource('raio-renda', {type:'geojson', data:RAIO_RENDA});
+  map.addLayer({id:'raior-fill', type:'fill', source:'raio-renda',
+    filter:['==',['geometry-type'],'Polygon'], layout:{visibility:'none'},
+    paint:{'fill-color':'#0E9F8A', 'fill-opacity':0.05}});
+  map.addLayer({id:'raior-borda', type:'line', source:'raio-renda',
+    filter:['==',['geometry-type'],'Polygon'], layout:{visibility:'none'},
+    paint:{'line-color':'#0E9F8A', 'line-width':2, 'line-dasharray':[3,2]}});
+  map.addLayer({id:'raior-centro', type:'circle', source:'raio-renda',
+    filter:['==',['geometry-type'],'Point'], layout:{visibility:'none'},
+    paint:{'circle-radius':5, 'circle-color':'#0E9F8A', 'circle-stroke-color':'#FFFFFF', 'circle-stroke-width':2}});
+  map.addLayer({id:'raior-rotulo', type:'symbol', source:'raio-renda',
+    filter:['==',['geometry-type'],'Point'],
+    layout:{visibility:'none', 'text-field':'Renda · raio 10 km', 'text-font':['Noto Sans Regular'],
+      'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
+    paint:{'text-color':'#0A6E60', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
+
   map.addSource('glebas', {type:'geojson', data:DATA});
   map.addSource('glebas-pts', {type:'geojson', data:labelPts});
 
@@ -792,7 +858,7 @@ function montarCamadas(){
 
   ['gleba-fill','gleba-linha','gleba-ponto'].forEach(id=>{
     map.on('click', id, e=>{
-      if (drawing || pickCentro) return;
+      if (drawing || pickCentro || pickCentroRenda) return;
       const p = e.features[0].properties;
       new maplibregl.Popup({closeButton:true, maxWidth:'280px'})
         .setLngLat(e.lngLat)
@@ -812,6 +878,8 @@ function montarCamadas(){
   drawSetup();
   classificarTiers();
   if(window.__ajustarViasUI) window.__ajustarViasUI();   // mostra só os subníveis que existem
+  atualizarRaioRenda();          // desenha o círculo do Mapa de renda (nasce oculto)
+  if(window.__aplicarRaioLbl) window.__aplicarRaioLbl();
   refreshStats();
   // cada sessão começa do zero; projetos são abertos manualmente em "Meus Projetos"
 }
@@ -1110,9 +1178,10 @@ let centroRaio = CENTRO_SE.slice();
 let pickCentro = false;
 function centroEhSe(){ return Math.abs(centroRaio[0]-CENTRO_SE[0])<1e-6 && Math.abs(centroRaio[1]-CENTRO_SE[1])<1e-6; }
 
-function gerarCirculo(km){
+function gerarCirculo(km, centro){
+  const c = centro || centroRaio;
   const R = 6371.0088, d = km/R;
-  const lat1 = centroRaio[1]*Math.PI/180, lon1 = centroRaio[0]*Math.PI/180;
+  const lat1 = c[1]*Math.PI/180, lon1 = c[0]*Math.PI/180;
   const ring = [];
   for(let i=0;i<=180;i++){
     const brg = i*2*Math.PI/180;
@@ -1122,6 +1191,64 @@ function gerarCirculo(km){
     ring.push([+(lon2*180/Math.PI).toFixed(5), +(lat2*180/Math.PI).toFixed(5)]);
   }
   return ring;
+}
+
+// ── Raio do Mapa de renda (independente do raio da Edição) ──
+// Mora na gaveta "Mapa de renda"; as futuras análises de renda usam este círculo.
+const RENDA_PADRAO = {on:false, km:10, centro:CENTRO_SE.slice(), cor:'#0E9F8A', fill:true,
+  lbl:{on:true, texto:'', cor:'#0A6E60', tam:1, halo:true, haloCor:'#FFFFFF', haloW:1.6}};
+let rendaRaio = JSON.parse(JSON.stringify(RENDA_PADRAO));
+let pickCentroRenda = false;
+const RAIO_RENDA = {type:'FeatureCollection', features:[
+  {type:'Feature', properties:{}, geometry:{type:'Polygon', coordinates:[[]]}},
+  {type:'Feature', properties:{}, geometry:{type:'Point', coordinates:CENTRO_SE.slice()}}
+]};
+function rendaCentroEhSe(){
+  return Math.abs(rendaRaio.centro[0]-CENTRO_SE[0])<1e-6 && Math.abs(rendaRaio.centro[1]-CENTRO_SE[1])<1e-6;
+}
+function textoRendaAuto(){ return 'Renda · raio '+rendaRaio.km+' km'; }
+function atualizarRaioRenda(){
+  RAIO_RENDA.features[0].geometry.coordinates = [gerarCirculo(rendaRaio.km, rendaRaio.centro)];
+  RAIO_RENDA.features[1].geometry.coordinates = rendaRaio.centro.slice();
+  if(map && map.getSource('raio-renda')) map.getSource('raio-renda').setData(RAIO_RENDA);
+  const la = document.getElementById('rdCtLat'), lo = document.getElementById('rdCtLon');
+  if(la) la.value = rendaRaio.centro[1].toFixed(5);
+  if(lo) lo.value = rendaRaio.centro[0].toFixed(5);
+  aplicarRaioRenda();
+}
+function aplicarRaioRenda(){
+  const chip = document.getElementById('chipRaioRenda');
+  if(chip) chip.classList.toggle('on', rendaRaio.on);
+  if(!map || !map.getLayer('raior-borda')) return;
+  const L = rendaRaio.lbl;
+  ['raior-fill','raior-borda','raior-centro'].forEach(id=>
+    map.setLayoutProperty(id,'visibility', rendaRaio.on ? 'visible' : 'none'));
+  map.setLayoutProperty('raior-rotulo','visibility', (rendaRaio.on && L.on) ? 'visible' : 'none');
+  map.setPaintProperty('raior-borda','line-color', rendaRaio.cor);
+  map.setPaintProperty('raior-fill','fill-color', rendaRaio.cor);
+  map.setPaintProperty('raior-fill','fill-opacity', rendaRaio.fill ? 0.05 : 0);
+  map.setPaintProperty('raior-centro','circle-color', rendaRaio.cor);
+  map.setLayoutProperty('raior-rotulo','text-field', L.texto.trim() || textoRendaAuto());
+  map.setLayoutProperty('raior-rotulo','text-size', 11.5*L.tam);
+  map.setPaintProperty('raior-rotulo','text-color', L.cor);
+  map.setPaintProperty('raior-rotulo','text-halo-color', L.haloCor);
+  map.setPaintProperty('raior-rotulo','text-halo-width', L.halo ? L.haloW : 0);
+}
+function syncRaioRendaInputs(){
+  const L = rendaRaio.lbl, g = id=> document.getElementById(id);
+  if(!g('rdRaioKm')) return;
+  g('rdRaioKm').value = rendaRaio.km;
+  g('rdRaioCor').value = rendaRaio.cor;
+  g('rdRaioFill').checked = rendaRaio.fill;
+  g('rdLblOn').checked = L.on;
+  g('rdLblTxt').value = L.texto;
+  g('rdLblCor').value = L.cor;
+  g('rdLblTam').value = Math.round(L.tam*100);
+  g('rdLblHalo').checked = L.halo;
+  g('rdLblHaloCor').value = L.haloCor;
+  g('rdLblHaloW').value = Math.round(L.haloW*10);
+  g('rdCtLat').value = rendaRaio.centro[1].toFixed(5);
+  g('rdCtLon').value = rendaRaio.centro[0].toFixed(5);
 }
 
 function refreshGlebas(){
@@ -1170,6 +1297,38 @@ function montarEditor(){
     edA.appendChild(row);
   });
 
+  // legenda do raio: texto livre (vazio = automático), cor, tamanho e contorno próprios
+  const RAIO_LBL_PADRAO = {on:true, texto:'', cor:'#1D4FA8', tam:1, halo:true, haloCor:'#FFFFFF', haloW:1.6};
+  const raioLbl = JSON.parse(JSON.stringify(RAIO_LBL_PADRAO));
+  function textoRaioAuto(){ return `${centroEhSe() ? 'Marco Zero' : 'Centro'} · raio ${raioKm} km`; }
+  function aplicarRaioLbl(){
+    if(!map || !map.getLayer('raio-rotulo')) return;
+    const grupoOn = map.getLayoutProperty('raio-borda','visibility') !== 'none';
+    map.setLayoutProperty('raio-rotulo','visibility', (grupoOn && raioLbl.on) ? 'visible' : 'none');
+    map.setLayoutProperty('raio-rotulo','text-field', raioLbl.texto.trim() || textoRaioAuto());
+    map.setLayoutProperty('raio-rotulo','text-size', 11.5*raioLbl.tam);
+    map.setPaintProperty('raio-rotulo','text-color', raioLbl.cor);
+    map.setPaintProperty('raio-rotulo','text-halo-color', raioLbl.haloCor);
+    map.setPaintProperty('raio-rotulo','text-halo-width', raioLbl.halo ? raioLbl.haloW : 0);
+  }
+  function syncRaioLblInputs(){
+    const g = id=> document.getElementById(id);
+    g('edRaioLblOn').checked      = raioLbl.on;
+    g('edRaioLblTxt').value       = raioLbl.texto;
+    g('edRaioLblCor').value       = raioLbl.cor;
+    g('edRaioLblTam').value       = Math.round(raioLbl.tam*100);
+    g('edRaioLblHalo').checked    = raioLbl.halo;
+    g('edRaioLblHaloCor').value   = raioLbl.haloCor;
+    g('edRaioLblHaloW').value     = Math.round(raioLbl.haloW*10);
+  }
+  document.getElementById('edRaioLblOn').onchange    = e=>{ raioLbl.on = e.target.checked; aplicarRaioLbl(); };
+  document.getElementById('edRaioLblTxt').oninput    = e=>{ raioLbl.texto = e.target.value; aplicarRaioLbl(); };
+  document.getElementById('edRaioLblCor').oninput    = e=>{ raioLbl.cor = e.target.value; aplicarRaioLbl(); };
+  document.getElementById('edRaioLblTam').oninput    = e=>{ raioLbl.tam = (+e.target.value)/100; aplicarRaioLbl(); };
+  document.getElementById('edRaioLblHalo').onchange  = e=>{ raioLbl.halo = e.target.checked; aplicarRaioLbl(); };
+  document.getElementById('edRaioLblHaloCor').oninput= e=>{ raioLbl.haloCor = e.target.value; aplicarRaioLbl(); };
+  document.getElementById('edRaioLblHaloW').oninput  = e=>{ raioLbl.haloW = (+e.target.value)/10; if(raioLbl.halo) aplicarRaioLbl(); };
+
   function atualizarRaio(){
     RAIO.features[0].geometry.coordinates = [gerarCirculo(raioKm)];
     RAIO.features[1].geometry.coordinates = centroRaio.slice();
@@ -1178,8 +1337,7 @@ function montarEditor(){
     if(map && map.getSource('raio')){
       map.getSource('raio').setData(RAIO);
       if(map.getSource('glebas')) map.getSource('glebas').setData(DATA);
-      map.setLayoutProperty('raio-rotulo','text-field',
-        `${centroEhSe() ? 'Marco Zero' : 'Centro'} · raio ${raioKm} km`);
+      aplicarRaioLbl();
     }
     document.getElementById('edCtLat').value = centroRaio[1].toFixed(5);
     document.getElementById('edCtLon').value = centroRaio[0].toFixed(5);
@@ -1215,6 +1373,7 @@ function montarEditor(){
   };
   document.getElementById('edCtMapa').onclick = ()=>{
     if(drawing) drawSetMode(false);
+    pickCentroRenda = false;
     pickCentro = true;
     if(map) map.getCanvas().style.cursor = 'crosshair';
     toast('Clique no mapa para definir o centro do raio.');
@@ -1230,13 +1389,13 @@ function montarEditor(){
     map.setPaintProperty('raio-borda','line-color', c);
     map.setPaintProperty('raio-fill','fill-color', c);
     map.setPaintProperty('raio-centro','circle-color', c);
-    map.setPaintProperty('raio-rotulo','text-color', c);
   };
   document.getElementById('edRaioFill').onchange = e=>{
     if(map && map.getLayer('raio-fill'))
       map.setPaintProperty('raio-fill','fill-opacity', e.target.checked ? 0.05 : 0);
   };
   window.__atualizarRaio = atualizarRaio;
+  window.__aplicarRaioLbl = aplicarRaioLbl;
 
   // seção Rótulos: grupos de labels do basemap
   const lblCfg = {
@@ -1466,16 +1625,24 @@ function montarEditor(){
     document.getElementById('edRaioCor').value = '#337FFF';
     document.getElementById('edRaioFill').checked = true;
     document.getElementById('edCtEnd').value = '';
+    Object.assign(raioLbl, JSON.parse(JSON.stringify(RAIO_LBL_PADRAO)));
+    syncRaioLblInputs();
     atualizarRaio();
     if(map.getLayer('raio-borda')){
       map.setPaintProperty('raio-borda','line-color','#337FFF');
       map.setPaintProperty('raio-fill','fill-color','#337FFF');
       map.setPaintProperty('raio-fill','fill-opacity',0.05);
       map.setPaintProperty('raio-centro','circle-color','#337FFF');
-      map.setPaintProperty('raio-rotulo','text-color','#337FFF');
-      ['raio-fill','raio-borda','raio-centro','raio-rotulo'].forEach(id=> map.setLayoutProperty(id,'visibility','none'));
+      ['raio-fill','raio-borda','raio-centro'].forEach(id=> map.setLayoutProperty(id,'visibility','none'));
+      aplicarRaioLbl();
     }
     document.getElementById('chipRaio').classList.remove('on');
+    // raio do Mapa de renda
+    pickCentroRenda = false;
+    rendaRaio = JSON.parse(JSON.stringify(RENDA_PADRAO));
+    document.getElementById('rdCtEnd').value = '';
+    syncRaioRendaInputs();
+    atualizarRaioRenda();
     // glebas: cores de grupo, preenchimento, filtros e rótulos
     DATA.features.forEach(f=>{
       f.properties.cor_final = CORES[f.properties.municipio] || '#8A8F98';
@@ -1702,7 +1869,9 @@ function montarEditor(){
       areas: DATA.features.map(function(f){ return {idx:f.properties.idx, cor:f.properties.cor_final, fill:f.properties.fill_on}; }),
       raio:{ km: raioKm, centro: centroRaio.slice(),
              cor: document.getElementById('edRaioCor').value,
-             fill: document.getElementById('edRaioFill').checked },
+             fill: document.getElementById('edRaioFill').checked,
+             lbl: JSON.parse(JSON.stringify(raioLbl)) },
+      renda: JSON.parse(JSON.stringify(rendaRaio)),
       mask:{ cor: document.getElementById('edMaskCor').value,
              op: +document.getElementById('edMaskOp').value,
              cobre: maskCobreGlebas },
@@ -1768,6 +1937,9 @@ function montarEditor(){
         document.getElementById('edRaioKm').value=raioKm;
         document.getElementById('edRaioCor').value=s.raio.cor||'#337FFF';
         document.getElementById('edRaioFill').checked=s.raio.fill!==false;
+        // legenda do raio (projetos antigos não têm: caem no padrão)
+        Object.assign(raioLbl, JSON.parse(JSON.stringify(RAIO_LBL_PADRAO)), s.raio.lbl||{});
+        syncRaioLblInputs();
         atualizarRaio();
         if(map.getLayer('raio-borda')){
           var rc=s.raio.cor||'#337FFF';
@@ -1775,12 +1947,23 @@ function montarEditor(){
           map.setPaintProperty('raio-fill','fill-color',rc);
           map.setPaintProperty('raio-fill','fill-opacity',s.raio.fill===false?0:0.05);
           map.setPaintProperty('raio-centro','circle-color',rc);
-          map.setPaintProperty('raio-rotulo','text-color',rc);
           var raioOn=!s.chips || s.chips.raio!==false;
-          ['raio-fill','raio-borda','raio-centro','raio-rotulo'].forEach(function(id){ map.setLayoutProperty(id,'visibility',raioOn?'visible':'none'); });
+          ['raio-fill','raio-borda','raio-centro'].forEach(function(id){ map.setLayoutProperty(id,'visibility',raioOn?'visible':'none'); });
           document.getElementById('chipRaio').classList.toggle('on',raioOn);
+          aplicarRaioLbl();
         }
       }
+
+      // raio do Mapa de renda (projetos antigos não têm: cai no padrão)
+      pickCentroRenda=false;
+      rendaRaio=JSON.parse(JSON.stringify(RENDA_PADRAO));
+      if(s.renda){
+        Object.assign(rendaRaio, s.renda);
+        rendaRaio.lbl=Object.assign(JSON.parse(JSON.stringify(RENDA_PADRAO.lbl)), s.renda.lbl||{});
+        rendaRaio.centro=(s.renda.centro&&s.renda.centro.length===2)?s.renda.centro.slice():CENTRO_SE.slice();
+      }
+      syncRaioRendaInputs();
+      atualizarRaioRenda();
 
       // glebas: cores + preenchimento
       if(s.areas){
@@ -2085,9 +2268,64 @@ document.querySelectorAll('#palGrid .pal-btn').forEach(function(b){
   b.onclick = function(){ recolorLive(b.getAttribute('data-pal')); marcarPaleta(); toast('Paleta aplicada: ' + b.querySelector('.pal-txt').firstChild.textContent.trim()); };
 });
 
-// ── Mapa de renda (Pro) — gaveta vazia por enquanto ──
-document.getElementById('btnRenda').onclick = function(){ abrirGaveta('drawerRenda'); };
+// ── Mapa de renda (Pro) — gaveta com raio próprio ──
+document.getElementById('btnRenda').onclick = function(){ syncRaioRendaInputs(); abrirGaveta('drawerRenda'); };
 document.getElementById('rendaClose').onclick = fecharGaveta;
+
+document.getElementById('chipRaioRenda').onclick = function(){
+  if(!map || !map.getLayer('raior-borda')){ toast('Aguarde o mapa carregar.'); return; }
+  rendaRaio.on = !rendaRaio.on;
+  aplicarRaioRenda();
+};
+document.getElementById('rdRaioKm').onchange = function(e){
+  var km = Math.max(1, Math.min(2000, parseFloat(e.target.value)||10));
+  e.target.value = km; rendaRaio.km = km;
+  atualizarRaioRenda();
+};
+document.getElementById('rdRaioCor').oninput   = function(e){ rendaRaio.cor = e.target.value; aplicarRaioRenda(); };
+document.getElementById('rdRaioFill').onchange = function(e){ rendaRaio.fill = e.target.checked; aplicarRaioRenda(); };
+document.getElementById('rdLblOn').onchange    = function(e){ rendaRaio.lbl.on = e.target.checked; aplicarRaioRenda(); };
+document.getElementById('rdLblTxt').oninput    = function(e){ rendaRaio.lbl.texto = e.target.value; aplicarRaioRenda(); };
+document.getElementById('rdLblCor').oninput    = function(e){ rendaRaio.lbl.cor = e.target.value; aplicarRaioRenda(); };
+document.getElementById('rdLblTam').oninput    = function(e){ rendaRaio.lbl.tam = (+e.target.value)/100; aplicarRaioRenda(); };
+document.getElementById('rdLblHalo').onchange  = function(e){ rendaRaio.lbl.halo = e.target.checked; aplicarRaioRenda(); };
+document.getElementById('rdLblHaloCor').oninput= function(e){ rendaRaio.lbl.haloCor = e.target.value; aplicarRaioRenda(); };
+document.getElementById('rdLblHaloW').oninput  = function(e){ rendaRaio.lbl.haloW = (+e.target.value)/10; if(rendaRaio.lbl.halo) aplicarRaioRenda(); };
+document.getElementById('rdCtAplicar').onclick = function(){
+  var lat = parseFloat(document.getElementById('rdCtLat').value);
+  var lon = parseFloat(document.getElementById('rdCtLon').value);
+  if(!isFinite(lat) || !isFinite(lon) || lat<-90 || lat>90 || lon<-180 || lon>180){
+    toast('Coordenadas inválidas (lat -90..90, lon -180..180).'); return;
+  }
+  rendaRaio.centro = [lon, lat];
+  atualizarRaioRenda();
+  if(map) map.flyTo({center:rendaRaio.centro, zoom:Math.max(map.getZoom(), 8)});
+};
+document.getElementById('rdCtBuscar').onclick = async function(){
+  var q = document.getElementById('rdCtEnd').value.trim();
+  if(!q){ toast('Digite um endereço ou cidade.'); return; }
+  try{
+    var r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q='+encodeURIComponent(q));
+    var js = await r.json();
+    if(!js.length){ toast('Endereço não encontrado.'); return; }
+    rendaRaio.centro = [parseFloat(js[0].lon), parseFloat(js[0].lat)];
+    atualizarRaioRenda();
+    if(map) map.flyTo({center:rendaRaio.centro, zoom:Math.max(map.getZoom(), 9)});
+    toast('Centro do raio de renda: '+js[0].display_name.split(',').slice(0,3).join(','));
+  }catch(err){ console.error(err); toast('Falha na busca (rede bloqueando nominatim.openstreetmap.org?).'); }
+};
+document.getElementById('rdCtMapa').onclick = function(){
+  if(drawing) drawSetMode(false);
+  pickCentro = false;
+  pickCentroRenda = true;
+  if(map) map.getCanvas().style.cursor = 'crosshair';
+  toast('Clique no mapa para definir o centro do raio de renda.');
+};
+document.getElementById('rdCtSe').onclick = function(){
+  rendaRaio.centro = CENTRO_SE.slice();
+  atualizarRaioRenda();
+  toast('Centro restaurado: Marco Zero, Praça da Sé.');
+};
 
 // ── Janela de upgrade (recurso bloqueado por plano) ──
 function abrirUpgrade(planoReq, feature){
@@ -2365,6 +2603,14 @@ function drawSetup(){
       toast('Centro do raio definido.');
       return;
     }
+    if(pickCentroRenda){
+      pickCentroRenda = false;
+      rendaRaio.centro = [+e.lngLat.lng.toFixed(5), +e.lngLat.lat.toFixed(5)];
+      map.getCanvas().style.cursor = '';
+      atualizarRaioRenda();
+      toast('Centro do raio de renda definido.');
+      return;
+    }
     if(!drawing) return;
     drawPts.push([+e.lngLat.lng.toFixed(6), +e.lngLat.lat.toFixed(6)]);
     drawRefresh();
@@ -2403,7 +2649,11 @@ document.getElementById('chipDraw').onclick = ()=>{
 window.addEventListener('keydown', e=>{
   if(e.key !== 'Escape') return;
   if(drawing) drawSetMode(false);
-  if(pickCentro){ pickCentro = false; if(map) map.getCanvas().style.cursor=''; toast('Seleção de centro cancelada.'); }
+  if(pickCentro || pickCentroRenda){
+    pickCentro = false; pickCentroRenda = false;
+    if(map) map.getCanvas().style.cursor='';
+    toast('Seleção de centro cancelada.');
+  }
 });
 
 // ── Máscara spotlight ──
@@ -2418,9 +2668,11 @@ document.getElementById('chipMask').onclick = function(){
 document.getElementById('chipRaio').onclick = function(){
   if(!map || !map.getLayer('raio-borda')) return;
   const on = map.getLayoutProperty('raio-borda','visibility') === 'none';
-  ['raio-fill','raio-borda','raio-centro','raio-rotulo'].forEach(id=>
+  ['raio-fill','raio-borda','raio-centro'].forEach(id=>
     map.setLayoutProperty(id,'visibility', on?'visible':'none'));
   this.classList.toggle('on', on);
+  // a legenda só acende se ela própria estiver ligada
+  if(window.__aplicarRaioLbl) window.__aplicarRaioLbl();
 };
 
 // ── Rótulos ──
