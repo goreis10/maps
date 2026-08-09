@@ -266,6 +266,21 @@
   .plano-basic{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE}
   .plano-pro{background:#FFF7ED;color:#C2410C;border-color:#FED7AA}
   .plano-admin{background:#1C1917;color:#fff;border-color:#1C1917}
+  #planoBadge{cursor:pointer}
+  #planoBadge:hover{border-color:var(--laranja);color:var(--laranja)}
+  /* Janela de Planos */
+  .cfg-modal.tall{max-width:420px;max-height:86vh;overflow-y:auto}
+  .pl-card{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:10px;background:#fff}
+  .pl-card.atual{border-color:var(--laranja);box-shadow:0 0 0 3px rgba(224,64,16,.13)}
+  .pl-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .pl-tag{font:700 9px 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--laranja);border:1px solid var(--laranja);border-radius:999px;padding:1px 6px}
+  .pl-desc{font-size:11.5px;color:var(--ink-2);line-height:1.45;margin-bottom:8px}
+  .pl-inc{font:700 9.5px 'Archivo',sans-serif;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--ink-2);margin-bottom:5px}
+  .pl-list{list-style:none;margin:0;padding:0}
+  .pl-list li{font-size:11.5px;color:var(--ink);line-height:1.5;padding-left:16px;position:relative}
+  .pl-list li::before{content:'✓';position:absolute;left:0;color:#0E9F8A;font-weight:700}
   /* Recurso travado por plano: fica visível, com cadeado e esmaecido */
   .lock-badge{margin-left:6px;font-size:11px;line-height:1;opacity:.85;pointer-events:none;vertical-align:middle}
   .locked{opacity:.55;cursor:not-allowed}
@@ -598,8 +613,23 @@
       <div id="cfgEmail" class="cfg-email">—</div>
     </div>
     <button id="cfgEditar" class="cfg-btn ghost">Editar meus dados</button>
+    <button id="cfgPlanos" class="cfg-btn ghost">Planos</button>
     <p class="cfg-desc">Seus desenhos, KMZ e edições ficam guardados em <b>Meus Projetos</b> (botão no topo). Use <b>Salvar Projeto</b> no menu do mapa para criar um novo.</p>
     <button id="cfgSair" class="cfg-link">Sair da conta</button>
+  </div>
+</div>
+
+<!-- Janela: Planos e o que cada um inclui (gerada de FEATURE_PLANS) -->
+<div id="planosOverlay" class="cfg-overlay">
+  <div class="cfg-modal tall" role="dialog" aria-modal="true">
+    <div class="cfg-head">
+      <div class="brand"><img src="logo-makermap.png" alt="" class="brand-logo-sm" onload="var m=this.parentNode.querySelector('.brand-mark'); if(m) m.style.display='none';" onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Planos</div></div>
+      <button id="planosClose" class="cfg-x" title="fechar">×</button>
+    </div>
+    <p class="cfg-desc" style="margin-bottom:12px">Seu plano é <span id="planosAtual" class="plano-badge plano-free">FREE</span>. Cada plano inclui tudo do anterior.</p>
+    <div id="planosLista"></div>
+    <p class="cfg-desc" style="margin:14px 0 10px">Para mudar de plano, fale com a equipe do Maker Map.</p>
+    <button id="planosOk" class="cfg-link">Fechar</button>
   </div>
 </div>
 
@@ -637,7 +667,8 @@
       <span style="color:var(--ink-2)">→</span>
       <span id="upPlanoReq" class="plano-badge plano-pro">PRO</span>
     </div>
-    <button id="upOk" class="cfg-btn">Entendi</button>
+    <button id="upVerPlanos" class="cfg-btn">Ver planos</button>
+    <button id="upOk" class="cfg-link">Entendi</button>
   </div>
 </div>
 
@@ -2252,6 +2283,40 @@ var FEATURE_PLANS = {
   secSobreMascara: 'basic'   // "Sobre a máscara" — Basic+ apenas
 };
 
+// ── FEATURE_ROTULOS ───────────────────────────────────────────────
+// Nome de cada recurso como o usuário o vê. Serve para a janela de
+// Planos, que é GERADA a partir do FEATURE_PLANS — assim mover um
+// recurso de plano atualiza a janela sozinho, sem lista paralela para
+// esquecer de mexer. Recurso sem rótulo aqui não aparece na janela.
+var FEATURE_ROTULOS = {
+  desenhar:        'Desenhar áreas no mapa',
+  edicao:          'Painel de Edição',
+  secCidade:       'Cores por cidade',
+  secArea:         'Cores por área',
+  secRaio:         'Raio, com legenda editável',
+  secMascara:      'Máscara de destaque (spotlight)',
+  cores:           'Paletas de cores do mapa',
+  satelite:        'Fundo de satélite',
+  exportar:        'Exportar imagem PNG (até 4×)',
+  editarDados:     'Editar os dados da conta',
+  uploadKmz:       'Importar arquivos KMZ/KML',
+  secMapa:         'Cores do fundo do mapa',
+  secRotulos:      'Estilo dos rótulos do mapa',
+  secVias:         'Estilo das vias, por subnível',
+  secSobreMascara: 'Escolher o que fica sobre a máscara',
+  salvarProjeto:   'Salvar projetos',
+  meusProjetos:    'Abrir e gerenciar projetos salvos',
+  mapaRenda:       'Mapa de renda: raio, Censo IBGE 2022, pontos e mapa de calor'
+};
+
+// Nome e chamada de cada plano na janela de Planos.
+var PLANO_INFO = {
+  free:  {nome:'Free',  desc:'Para conhecer a ferramenta: desenhe áreas, destaque com a máscara e exporte a imagem.'},
+  basic: {nome:'Basic', desc:'Para quem traz os próprios arquivos e quer controle fino da aparência do mapa.'},
+  pro:   {nome:'Pro',   desc:'Para trabalho recorrente: projetos salvos e a análise de renda do Censo.'},
+  admin: {nome:'Admin', desc:'Acesso completo, incluindo recursos internos e em teste.'}
+};
+
 // ── FEATURE_ELEMENTS ──────────────────────────────────────────────
 // Liga cada recurso (chave do FEATURE_PLANS) aos elementos da tela
 // (seletores CSS). Se criar um recurso novo, adicione a chave nos DOIS
@@ -2354,7 +2419,7 @@ function aplicarPlano(){
   if(badge){
     badge.textContent = plano.toUpperCase();
     badge.className = 'plano-badge plano-' + plano;
-    badge.title = 'Seu plano atual: ' + plano;
+    badge.title = 'Seu plano atual: ' + plano + ' — clique para ver os planos';
   }
 }
 
@@ -2802,6 +2867,47 @@ function renderRenda(){
   if(seg) seg.onclick=function(){ rendaRaio.cores=CENSO_CORES_SEGURA.slice(); censoCamadas(censoCache.res); renderRenda(); };
 }
 
+// ── Janela de Planos ──────────────────────────────────────────────
+// O conteúdo é GERADO a partir do FEATURE_PLANS: cada plano lista os
+// recursos que ele destrava, e os anteriores vêm por herança ("inclui
+// tudo do X"). Assim mover um recurso de plano atualiza esta janela
+// sozinho — não existe lista paralela para sair de sincronia.
+function recursosQueDestravam(plano){
+  return Object.keys(FEATURE_PLANS)
+    .filter(function(k){ return FEATURE_PLANS[k]===plano && FEATURE_ROTULOS[k]; })
+    .map(function(k){ return FEATURE_ROTULOS[k]; });
+}
+function abrirPlanos(){
+  var atual = (typeof getUserPlano === 'function') ? getUserPlano() : 'free';
+  var ba = document.getElementById('planosAtual');
+  ba.textContent = atual.toUpperCase();
+  ba.className = 'plano-badge plano-' + atual;
+
+  var html = '';
+  PLANOS.forEach(function(p, i){
+    var info = PLANO_INFO[p] || {nome:p, desc:''};
+    var novos = recursosQueDestravam(p);
+    var ehAtual = (p === atual);
+    html += '<div class="pl-card'+(ehAtual?' atual':'')+'">'+
+      '<div class="pl-top"><span class="plano-badge plano-'+p+'">'+info.nome+'</span>'+
+        (ehAtual ? '<span class="pl-tag">seu plano</span>' : '')+'</div>'+
+      '<div class="pl-desc">'+info.desc+'</div>'+
+      '<div class="pl-inc">'+(i===0 ? 'Inclui' : 'Tudo do '+PLANO_INFO[PLANOS[i-1]].nome+', mais')+'</div>'+
+      (novos.length
+        ? '<ul class="pl-list">'+novos.map(function(r){ return '<li>'+r+'</li>'; }).join('')+'</ul>'
+        : '<div class="pl-desc" style="margin:0">Nenhum recurso exclusivo por enquanto.</div>')+
+      '</div>';
+  });
+  document.getElementById('planosLista').innerHTML = html;
+  document.getElementById('planosOverlay').classList.add('show');
+}
+function fecharPlanos(){ document.getElementById('planosOverlay').classList.remove('show'); }
+document.getElementById('planosClose').onclick = fecharPlanos;
+document.getElementById('planosOk').onclick = fecharPlanos;
+document.getElementById('planosOverlay').onclick = function(e){ if(e.target === this) fecharPlanos(); };
+// atalho: clicar no selo do plano na barra superior abre a janela
+document.getElementById('planoBadge').onclick = abrirPlanos;
+
 // ── Janela de upgrade (recurso bloqueado por plano) ──
 function abrirUpgrade(planoReq, feature){
   var ov = document.getElementById('upgradeOverlay');
@@ -2814,6 +2920,7 @@ function abrirUpgrade(planoReq, feature){
 function fecharUpgrade(){ document.getElementById('upgradeOverlay').classList.remove('show'); }
 document.getElementById('upClose').onclick = fecharUpgrade;
 document.getElementById('upOk').onclick = fecharUpgrade;
+document.getElementById('upVerPlanos').onclick = function(){ fecharUpgrade(); abrirPlanos(); };
 document.getElementById('upgradeOverlay').onclick = function(e){ if(e.target === this) fecharUpgrade(); };
 
 // ── Largura ajustável das gavetas (Edição e laterais) — arrastar a alça.
@@ -3219,6 +3326,7 @@ document.getElementById('btnExport').onclick = async function(){
   document.getElementById('cfgClose').onclick = fecharCfg;
   cfgOv.onclick = function(e){ if(e.target === cfgOv) fecharCfg(); };
   document.getElementById('cfgSair').onclick = doLogout;
+  document.getElementById('cfgPlanos').onclick = function(){ fecharCfg(); abrirPlanos(); };
 
   // ── Editar dados do usuário (Netlify Identity) ──
   var IDENTITY = location.origin + '/.netlify/identity';
@@ -3419,6 +3527,8 @@ document.getElementById('btnExport').onclick = async function(){
     if(editOv.classList.contains('show')) fecharEdit();
     var up = document.getElementById('upgradeOverlay');
     if(up && up.classList.contains('show')) fecharUpgrade();
+    var pl = document.getElementById('planosOverlay');
+    if(pl && pl.classList.contains('show')) fecharPlanos();
     if(gavetaAberta()) fecharGaveta();
     if(document.getElementById('editor').classList.contains('show')) abrirEdicao(false);
   });

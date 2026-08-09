@@ -5,11 +5,22 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 1.3 — Pontos e mapa de calor do Censo
+## Maker Map 1.3 — Pontos, mapa de calor e janela de Planos
 
 _Aguardando publicação._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+**Planos**
+
+- Nova janela de **Planos**, mostrando os quatro planos e o que cada um inclui.
+  Seu plano atual aparece destacado.
+- A janela abre pelo botão **Planos**, nas Configurações, ou clicando direto no
+  selo do seu plano na barra superior.
+- Quando um recurso bloqueado é clicado, a janela de aviso passa a ter um botão
+  **Ver planos**.
+
+**Mapa de renda**
 
 - Novo botão **Pontos no mapa**, no Mapa de renda: desenha um ponto por setor
   censitário dentro do raio, colorido pela faixa de renda — do amarelo claro
