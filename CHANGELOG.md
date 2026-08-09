@@ -5,11 +5,39 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 1.3 — Pontos e mapa de calor do Censo
+## Maker Map 1.3 — Renda corrigida, pontos, mapa de calor e Planos
 
 _Aguardando publicação._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+**Planos**
+
+- Nova janela de **Planos**, mostrando os quatro planos e o que cada um inclui.
+  Seu plano atual aparece destacado.
+- A janela abre pelo botão **Planos**, nas Configurações, ou clicando direto no
+  selo do seu plano na barra superior.
+- Quando um recurso bloqueado é clicado, a janela de aviso passa a ter um botão
+  **Ver planos**.
+
+**Mapa de renda — ajuste dos valores**
+
+- Novo campo **corrigir pelo IPCA**: a renda do Censo, que é de julho de 2022,
+  passa a ser atualizada automaticamente até dois meses antes de hoje. O período
+  e o percentual acumulado aparecem ao lado. Ligado por padrão.
+- Novo campo **demais moradores**: o Censo informa a renda apenas do responsável
+  pelo domicílio, e este percentual estima quanto os outros moradores somam a
+  ela. O valor base é **50%**, ou seja, renda domiciliar de 1,5× a do
+  responsável. Use 0% para ver somente o responsável.
+- Os dois ajustes valem para tudo: totais, distribuição por faixa, classe
+  socioeconômica e as cores dos pontos e do mapa de calor.
+- O painel sempre diz em que moeda os valores estão (“R$ de jun/2026”, por
+  exemplo) e lembra que a renda dos demais moradores é uma estimativa sua, não
+  um dado do Censo.
+- Se não for possível obter o IPCA, o painel avisa e mostra os valores de julho
+  de 2022 sem correção, em vez de aplicar um índice qualquer.
+
+**Mapa de renda — camadas no mapa**
 
 - Novo botão **Pontos no mapa**, no Mapa de renda: desenha um ponto por setor
   censitário dentro do raio, colorido pela faixa de renda — do amarelo claro
