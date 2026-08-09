@@ -31,13 +31,15 @@
                           censoCamadas() — censo-pts (1 ponto por setor,
                           cor por faixa: CENSO_FAIXAS), censo-surf
                           (calor de renda) e censo-heat (densidade)
+  • Correção monetária .. carregarIPCA() (BCB SGS 433), fatorRenda()
+                          — IPCA jul/2022→hoje-2m × demais moradores
   • Upload KMZ/KML ...... kmlParaFeats(), integrarFeats()
   • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
   • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
   • Exportar PNG ........ btnExport (devicePixelRatio × escala)
 
   Requisitos de rede do visitante: cdnjs.cloudflare.com,
-  tiles.openfreemap.org, server.arcgisonline.com,
+  tiles.openfreemap.org, server.arcgisonline.com, api.bcb.gov.br,
   fonts.googleapis.com e (busca de endereço) nominatim.openstreetmap.org
 ═══════════════════════════════════════════════════════════════════
 -->
@@ -222,6 +224,10 @@
   .rd-sw::-webkit-color-swatch-wrapper{padding:0}
   .rd-sw::-webkit-color-swatch{border:0;border-radius:50%}
   .rd-sw::-moz-color-swatch{border:0;border-radius:50%}
+  .rd-mini{font-size:10px;font-weight:600;color:var(--ink-2);margin-left:auto;text-align:right;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rd-mini.ok{color:#0A6E60}
+  .rd-mini.err{color:#A11B26}
   .rd-corlinks{margin-top:7px;font-size:9.5px;color:var(--ink-2)}
   .rd-corlinks a{color:var(--azul);cursor:pointer;font-weight:600}
   .rd-msg{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:11px;line-height:1.5;
@@ -569,6 +575,14 @@
       <div class="e-hint" id="heatHint"></div>
     </div>
     <div class="sd-sec">
+      <div class="e-subhead" style="padding-top:2px">Ajuste dos valores</div>
+      <div class="e-row"><label><input type="checkbox" id="rdIpca" checked> corrigir pelo IPCA</label>
+        <span id="rdIpcaInfo" class="rd-mini">—</span></div>
+      <div class="e-row"><label>Demais moradores</label>
+        <input type="number" id="rdOutros" value="50" min="0" max="300" step="5"><label>%</label>
+        <span id="rdOutrosInfo" class="rd-mini"></span></div>
+      <div class="e-hint">O Censo informa a renda <b>só do responsável</b> pelo domicílio. Este percentual estima quanto os <b>demais moradores</b> somam a ela: 50% significa renda domiciliar 1,5× a do responsável. Use 0% para ver apenas o responsável.</div>
+      <div class="e-subhead">Raio</div>
       <div class="e-row"><label>Raio</label><input type="number" id="rdRaioKm" value="10" min="1" max="2000" step="1"><label>km</label></div>
       <div class="e-row"><label>Cor</label><input type="color" id="rdRaioCor" value="#0E9F8A"></div>
       <div class="e-row"><label><input type="checkbox" id="rdRaioFill" checked> preenchimento</label></div>
@@ -1349,6 +1363,8 @@ function gerarCirculo(km, centro){
 const RENDA_PADRAO = {on:false, km:10, centro:CENTRO_SE.slice(), cor:'#0E9F8A', fill:true,
   pts:false,            // pontos do Censo (um por setor, colorido por faixa de renda)
   cores:null,           // cor por faixa de renda; null = CENSO_CORES_PADRAO
+  ipca:true,            // corrigir a renda de jul/2022 até 2 meses atrás
+  outros:50,            // % que os demais moradores somam à renda do responsável
   heat:false,           // mapa de calor
   heatModo:'renda',     // 'renda' = superfície suavizada de renda | 'dens' = densidade de domicílios
   heatSuav:1,           // fator de suavização (0,5 a 2,5) do raio do borrão
@@ -1426,6 +1442,28 @@ function syncRaioRendaInputs(){
   g('rdCtLon').value = rendaRaio.centro[0].toFixed(5);
   g('heatSuav').value = Math.round((rendaRaio.heatSuav||1)*100);
   g('heatSuavV').textContent = Math.round((rendaRaio.heatSuav||1)*100)+'%';
+  g('rdIpca').checked = !!rendaRaio.ipca;
+  g('rdOutros').value = (+rendaRaio.outros||0);
+  syncAjusteInfo();
+}
+
+// Estado dos dois campos de ajuste, mostrado ao lado deles.
+function syncAjusteInfo(){
+  var ii=document.getElementById('rdIpcaInfo'), oi=document.getElementById('rdOutrosInfo');
+  if(!ii) return;
+  var txt='—', cls='rd-mini';
+  if(!rendaRaio.ipca)                    txt='desligada';
+  else if(IPCA.status==='carregando')    txt='buscando…';
+  else if(IPCA.status==='erro')        { txt='indisponível'; cls='rd-mini err'; }
+  else if(IPCA.status==='ok')          { txt='→ '+ipcaRotulo(IPCA.ate)+'  +'+
+                                          ((IPCA.fator-1)*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
+                                         cls='rd-mini ok'; }
+  ii.textContent=txt; ii.className=cls;
+  if(oi){
+    var f=1+(+rendaRaio.outros||0)/100;
+    oi.textContent = f===1 ? 'só o responsável'
+      : f.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'× a do responsável';
+  }
 }
 
 function refreshGlebas(){
@@ -2140,6 +2178,9 @@ function montarEditor(){
         rendaRaio.centro=(s.renda.centro&&s.renda.centro.length===2)?s.renda.centro.slice():CENTRO_SE.slice();
         // cores das faixas: projeto antigo (sem o campo) cai no padrão
         rendaRaio.cores=(s.renda.cores&&s.renda.cores.length===CENSO_FAIXAS.length)?s.renda.cores.slice():null;
+        // projeto antigo não tem os ajustes: cai no padrão (IPCA ligado, 50%)
+        if(typeof s.renda.ipca!=='boolean') rendaRaio.ipca=RENDA_PADRAO.ipca;
+        if(!isFinite(+s.renda.outros))      rendaRaio.outros=RENDA_PADRAO.outros;
       }
       syncRaioRendaInputs();
       atualizarRaioRenda();
@@ -2532,6 +2573,17 @@ document.getElementById('rdRaioKm').onchange = function(e){
   e.target.value = km; rendaRaio.km = km;
   atualizarRaioRenda();
 };
+document.getElementById('rdIpca').onchange = function(e){
+  rendaRaio.ipca = e.target.checked;
+  if(rendaRaio.ipca && IPCA.status==='vazio') carregarIPCA();
+  else renderRenda();
+};
+document.getElementById('rdOutros').onchange = function(e){
+  var v = Math.max(0, Math.min(300, parseFloat(e.target.value)));
+  if(!isFinite(v)) v = 0;
+  e.target.value = v; rendaRaio.outros = v;
+  renderRenda();
+};
 document.getElementById('rdRaioCor').oninput   = function(e){ rendaRaio.cor = e.target.value; aplicarRaioRenda(); };
 document.getElementById('rdRaioFill').onchange = function(e){ rendaRaio.fill = e.target.checked; aplicarRaioRenda(); };
 document.getElementById('rdLblOn').onchange    = function(e){ rendaRaio.lbl.on = e.target.checked; aplicarRaioRenda(); };
@@ -2590,6 +2642,64 @@ document.getElementById('rdCtSe').onclick = function(){
 //  informada (censoConsulta -> margem), porque em raio pequeno ela
 //  domina o resultado.
 // ══════════════════════════════════════════════════════════════════
+// ── Correção monetária pelo IPCA ──────────────────────────────────
+// O Censo traz renda em R$ nominais de julho/2022. Para o número fazer
+// sentido hoje, corrigimos até 2 meses atrás — o IPCA de um mês sai por
+// volta do dia 10 do mês seguinte, então 2 meses de folga garante que o
+// alvo já foi publicado.
+//
+// A série vem da API do Banco Central (SGS 433 = IPCA % ao mês) NO
+// NAVEGADOR DO USUÁRIO. Não há tabela embutida de reserva de propósito:
+// chutar índices de inflação produziria valores em reais confiantes e
+// errados. Se a busca falhar, o painel mostra o valor nominal de 2022 e
+// diz isso — errar para o lado do dado verificável.
+var IPCA = {status:'vazio', fator:1, ate:null, meses:0};   // vazio|carregando|ok|erro
+var MES_ABREV = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+function ipcaAlvo(){
+  var d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth()-2);
+  return {a:d.getFullYear(), m:d.getMonth()+1};
+}
+function ipcaRotulo(x){ return x ? MES_ABREV[x.m-1]+'/'+x.a : '—'; }
+
+function carregarIPCA(){
+  if(IPCA.status==='ok' || IPCA.status==='carregando') return;
+  IPCA.status='carregando'; renderRenda();
+  // a partir de AGOSTO/2022: o IPCA de julho mede a alta ocorrida dentro
+  // de julho, que já está embutida no valor de referência (31/07/2022).
+  fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/08/2022')
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(js){
+      if(!Array.isArray(js) || !js.length) throw new Error('série vazia');
+      var alvo=ipcaAlvo(), f=1, n=0, ate=null;
+      js.forEach(function(o){
+        var p=String(o.data||'').split('/');           // dd/mm/aaaa
+        var m=+p[1], a=+p[2];
+        if(!m || !a) return;
+        if(a>alvo.a || (a===alvo.a && m>alvo.m)) return;   // não passa do mês alvo
+        var v=parseFloat(String(o.valor).replace(',','.'));
+        if(!isFinite(v)) return;
+        f*=1+v/100; n++; ate={a:a, m:m};
+      });
+      if(!n) throw new Error('nenhum mês utilizável');
+      IPCA={status:'ok', fator:f, ate:ate, meses:n};
+      censoCache.chave=null;                            // fator mudou: refaz a conta
+      renderRenda();
+    })
+    .catch(function(e){ console.error('ipca', e); IPCA.status='erro'; renderRenda(); });
+}
+
+// Fator único aplicado à renda de cada setor antes de qualquer conta:
+// correção monetária × acréscimo dos demais moradores.
+function fatorRenda(){
+  var f = 1;
+  if(rendaRaio.ipca && IPCA.status==='ok') f *= IPCA.fator;
+  f *= 1 + (+rendaRaio.outros || 0)/100;
+  return f;
+}
+
 var CENSO = null;             // {meta, mun:{cod:nome}, s:[[lat,lon,cd_mun,dom,mor,rmed,rmdn]]}
 var censoStatus = 'vazio';    // vazio | carregando | ok | erro
 var censoDist = null;         // Float32Array de distâncias (reaproveitado)
@@ -2636,6 +2746,9 @@ function censoClasse(v){
 }
 
 function carregarCenso(){
+  // a correção monetária é buscada junto: sem ela o painel abre com
+  // valores de 2022 e teria de se recalcular logo em seguida
+  if(rendaRaio.ipca) carregarIPCA();
   if(censoStatus==='ok' || censoStatus==='carregando') return;
   censoStatus='carregando'; renderRenda();
   fetch('sp_census_2022.json')
@@ -2652,6 +2765,7 @@ function carregarCenso(){
 // média simples entre setores faria um setor de 10 pesar igual a um de 500.
 function censoConsulta(lat, lon, raioKm){
   var S=CENSO.s, n=S.length, D=censoDist;
+  var fat=fatorRenda();       // correção IPCA × demais moradores
   var Rt=6371.0088, rad=Math.PI/180, cos1=Math.cos(lat*rad);
   var dentro=0, dom=0, pes=0, wMed=0, wMdn=0, domRenda=0;
   var muns={}, faixas=[0,0,0,0,0,0,0], faixaTot=0, idx=[];
@@ -2666,8 +2780,9 @@ function censoConsulta(lat, lon, raioKm){
     dom+=r[3]; pes+=r[3]*r[4];
     muns[r[2]]=(muns[r[2]]||0)+r[3];
     if(r[5]>0){
-      wMed+=r[5]*r[3]; wMdn+=r[6]*r[3]; domRenda+=r[3];
-      faixas[censoFaixaIdx(r[5])]+=r[3]; faixaTot+=r[3];
+      var rm=r[5]*fat, rd=r[6]*fat;
+      wMed+=rm*r[3]; wMdn+=rd*r[3]; domRenda+=r[3];
+      faixas[censoFaixaIdx(rm)]+=r[3]; faixaTot+=r[3];
     }
   }
   if(!dentro) return {vazio:true, idx:[]};
@@ -2728,12 +2843,15 @@ function censoCamadas(q){
   map.setPaintProperty('censo-heat','heatmap-radius',
     ['interpolate',['linear'],['zoom'], 7,10*s, 11,20*s, 14,32*s, 17,55*s]);
 
+  // mesma renda ajustada do painel, para a cor no mapa bater com a faixa
+  var fat=fatorRenda();
   var S=CENSO.s, idx=q.idx, feats=[];
   for(var i=0;i<idx.length;i++){
     var r=S[idx[i]];
     if(!(r[5]>0)) continue;
     feats.push({type:'Feature',
-      properties:{renda:r[5], mdn:r[6], dom:r[3], mor:r[4], mun:CENSO.mun[r[2]]||''},
+      properties:{renda:Math.round(r[5]*fat), mdn:Math.round(r[6]*fat),
+                  dom:r[3], mor:r[4], mun:CENSO.mun[r[2]]||''},
       geometry:{type:'Point', coordinates:[r[1], r[0]]}});
   }
   map.getSource('censo').setData({type:'FeatureCollection', features:feats});
@@ -2742,6 +2860,7 @@ function censoCamadas(q){
 function renderRenda(){
   var box=document.getElementById('rendaAnalise');
   if(!box) return;
+  syncAjusteInfo();
   var nf=function(v,d){ return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); };
 
   if(!rendaRaio.on){
@@ -2770,7 +2889,8 @@ function renderRenda(){
     return;
   }
 
-  var chave=rendaRaio.km+'|'+rendaRaio.centro[0]+'|'+rendaRaio.centro[1];
+  // o fator entra na chave: mudar IPCA ou % dos demais refaz a conta
+  var chave=rendaRaio.km+'|'+rendaRaio.centro[0]+'|'+rendaRaio.centro[1]+'|'+fatorRenda().toFixed(6);
   if(censoCache.chave!==chave){
     censoCache.res=censoConsulta(rendaRaio.centro[1], rendaRaio.centro[0], rendaRaio.km);
     censoCache.chave=chave;
@@ -2822,13 +2942,20 @@ function renderRenda(){
   var munTxt=q.muns.length===1 ? q.munNomes[0]
     : q.munNomes.join(', ')+(q.muns.length>3 ? ' +'+(q.muns.length-3) : '');
 
+  // O que exatamente o número representa, depois dos dois ajustes.
+  var corrigido = rendaRaio.ipca && IPCA.status==='ok';
+  var comOutros = (+rendaRaio.outros||0) > 0;
+  var quemRenda = comOutros ? 'domiciliar (estimada)' : 'do responsável';
+  var baseTxt   = 'R$ de '+(corrigido ? ipcaRotulo(IPCA.ate) : 'jul/2022');
+
   box.innerHTML=
     '<div class="rd-h">Dentro do raio <em>'+nf(rendaRaio.km)+' km · '+nf(q.area)+' km²</em></div>'+
     '<div class="rd-stat big"><span>Domicílios ocupados</span><b>'+nf(q.dom)+'</b></div>'+
     '<div class="rd-stat big"><span>Pessoas (estimativa)</span><b>'+nf(q.pes)+'</b></div>'+
     '<div class="rd-stat"><span>Moradores por domicílio</span><b>'+nf(q.morDom,2)+'</b></div>'+
-    '<div class="rd-stat"><span>Renda média do responsável</span><b>R$ '+nf(q.rendaMedia)+'</b></div>'+
-    '<div class="rd-stat"><span>Renda mediana do responsável</span><b>R$ '+nf(q.rendaMediana)+'</b></div>'+
+    '<div class="rd-stat"><span>Renda média '+quemRenda+'</span><b>R$ '+nf(q.rendaMedia)+'</b></div>'+
+    '<div class="rd-stat"><span>Renda mediana '+quemRenda+'</span><b>R$ '+nf(q.rendaMediana)+'</b></div>'+
+    '<div class="rd-stat"><span>Base dos valores</span><b style="font-weight:600;font-size:10.5px">'+baseTxt+'</b></div>'+
     '<div class="rd-stat"><span>Classe socioeconômica</span><b><span class="rd-cls">'+censoClasse(q.rendaMedia)+'</span></b></div>'+
     '<div class="rd-stat"><span>Densidade</span><b>'+nf(q.densDom)+' dom/km²</b></div>'+
     '<div class="rd-stat"><span>Densidade</span><b>'+nf(q.densPes)+' pess/km²</b></div>'+
@@ -2843,9 +2970,18 @@ function renderRenda(){
     legendaDens+
     (q.domSemRenda>0 ? '<div class="rd-foot">'+nf(q.domSemRenda)+' domicílios ficam fora do cálculo de renda '+
       '(setor sem informação de rendimento).</div>' : '')+
-    '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022).<br>'+
-    '<b>Renda é do responsável pelo domicílio</b>, não a renda familiar total — a familiar costuma ser '+
-    '1,5 a 2× maior. Valores em <b>R$ nominais de julho/2022</b>, sem correção de inflação. '+
+    '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
+    'O Censo mede a renda <b>do responsável pelo domicílio</b>.<br>'+
+    (corrigido
+      ? '<b>Corrigido pelo IPCA</b> de jul/2022 a '+ipcaRotulo(IPCA.ate)+' (+'+
+        nf((IPCA.fator-1)*100,1)+'%, '+IPCA.meses+' meses), série do Banco Central.'
+      : (rendaRaio.ipca
+          ? '<b>Sem correção monetária</b> — não foi possível obter o IPCA. Os valores estão em R$ de julho/2022.'
+          : '<b>Correção pelo IPCA desligada</b> — valores em R$ de julho/2022.'))+'<br>'+
+    (comOutros
+      ? '<b>Renda domiciliar estimada</b>: a do responsável mais '+nf(+rendaRaio.outros)+'% atribuídos aos '+
+        'demais moradores. É uma <b>estimativa sua</b>, não um dado do Censo.'
+      : 'Mostrando apenas a renda do responsável. A renda domiciliar costuma ser 1,5 a 2× maior.')+'<br>'+
     'Média condicional: responsáveis sem rendimento não entram. Corte por centroide do setor.</div>';
 
   // Edição das cores das faixas. NÃO chama renderRenda() no oninput: refazer o
