@@ -71,6 +71,28 @@ Auth is **Netlify Identity**, called directly over REST (`fetch` to `/.netlify/i
 - `app.html` has a guard in `<head>` that redirects back to `index.html` if `makermap.user` is absent. This is a client-side gate, not edge security.
 - **Identity must be enabled in the Netlify dashboard** and only works on the published site — `/.netlify/identity` does not exist when opening the file locally (`file://`) or on other hosts. Editing the user's own data uses `PUT /.netlify/identity/user` with the bearer token (with a refresh-token retry on 401).
 
+## Two screens, one file
+
+A left drawer (`#nav`, toggled by `#navBtn`, `body.nav-open`) switches between two screens, both living in `app.html`:
+
+- **Mapa** — `#wrap`, everything described below.
+- **Novos Negócios** — `#viewNeg`, a kanban of the areas.
+
+`irPara(view)` flips `body.view-neg`, which `display:none`s the other screen. **Returning to Mapa must call `map.resize()`** (it does, twice — immediately and after the 280 ms nav transition), or MapLibre paints a blank canvas at the stale size.
+
+They are one file, not two pages, because the kanban's cards *are* the features in `DATA` — separate pages would mean serializing the whole dataset across a navigation.
+
+### Novos Negócios (kanban)
+
+One card per feature in `DATA` — i.e. per area imported from a KMZ or drawn — not per KMZ file. A KMZ carrying ten plots yields ten cards, since the plot is what gets offered and contracted.
+
+- `NEG_COLUNAS` is the column list (`ofertada` / `negociacao` / `contratada`); add to it and the board grows a column.
+- The stage lives in `properties.neg_status` and the deal fields in `properties.neg` (`{valor, contato, obs}`). Because `coletarProjeto()` deep-copies `DATA.features`, **both persist with the project for free** — no serializer to update. `negStatus()` falls back to the first column, so areas saved before this existed simply show up in Ofertada.
+- `negCampos()` deliberately does **not** create `properties.neg` on read; only saving from the detail window writes it, so untouched areas don't bloat the saved project.
+- `renderKanban()` rebuilds the board and must be called after any mutation of `DATA` — `integrarFeats`, `excluirGrupo`, `limparProjetoAtual`, `carregarProjeto` all do.
+- Card fields come from KMZ files, so `esc()` escapes them before `innerHTML`. (The map popups still interpolate raw — pre-existing, worth fixing.)
+- Pro-gated as `novosNegocios`; the nav item itself is the gated element.
+
 ## app.html architecture (the map)
 
 `DATA` (a GeoJSON FeatureCollection of "glebas"/areas) **starts empty**; areas come only from KMZ upload or drawing. The map style is the OpenFreeMap **positron** vector style, recolored at load by `aplicarPaleta(style)`. `montarCamadas()` runs on the map `load` event and adds all custom sources/layers (`mascara`, `raio`, `glebas`, `satelite`) plus popups.

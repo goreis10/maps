@@ -37,6 +37,9 @@
   • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
   • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
   • Exportar PNG ........ btnExport (devicePixelRatio × escala)
+  • Telas / menu ........ irPara('mapa'|'negocios'), #nav, #navBtn
+  • Novos Negócios ...... NEG_COLUNAS, negStatus(), renderKanban(),
+                          wireKanban() (arrastar), abrirNeg() (detalhe)
 
   Requisitos de rede do visitante: cdnjs.cloudflare.com,
   tiles.openfreemap.org, server.arcgisonline.com, api.bcb.gov.br,
@@ -66,6 +69,7 @@
   :root{
     --laranja:#E04010; --magenta:#E00070; --azul:#337FFF;
     --ink:#1C1917; --ink-2:#57534E; --paper:#FFFFFF; --line:#E7E5E4;
+    --nav-w:224px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%}
@@ -85,6 +89,68 @@
   .hd-stats{margin-left:auto;display:flex;gap:18px;font-size:12px;color:var(--ink-2)}
   .hd-stats b{display:block;font-size:16px;font-weight:700;color:var(--ink);line-height:1.1}
   .hd-stats .st:first-child b{color:var(--laranja)}
+
+  /* ── Navegação lateral esquerda: Mapa | Novos Negócios ───────────
+     Duas telas dentro do mesmo arquivo, e não duas páginas, porque o
+     kanban vive dos MESMOS dados do mapa (DATA/grupos). Separar em
+     páginas exigiria serializar tudo entre elas. */
+  #navBtn{flex:none;width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:9px;
+    cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3.5px;padding:0}
+  #navBtn i{display:block;width:15px;height:1.8px;background:var(--ink);border-radius:2px}
+  #navBtn:hover{border-color:var(--laranja)}
+  #navBtn:hover i{background:var(--laranja)}
+  #nav{position:absolute;z-index:1080;top:56px;left:0;bottom:0;width:var(--nav-w);
+    background:var(--paper);border-right:1px solid var(--line);padding:14px 12px;
+    display:flex;flex-direction:column;gap:4px;
+    transform:translateX(-101%);transition:transform .28s ease}
+  body.nav-open #nav{transform:translateX(0)}
+  .nv-tt{font:800 9.5px 'Archivo',sans-serif;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-2);padding:2px 9px 8px}
+  .nv-item{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;cursor:pointer;
+    border:1px solid transparent;border-radius:11px;padding:10px 11px;background:none;
+    font:700 13px 'Archivo',sans-serif;color:var(--ink)}
+  .nv-item:hover{background:#F6F4F1}
+  .nv-item.on{background:#F6F4F1;border-color:var(--line)}
+  .nv-item.on .nv-ic{background:var(--laranja);color:#fff}
+  .nv-ic{flex:none;width:27px;height:27px;border-radius:8px;background:#EFEDEA;
+    display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1}
+  .nv-tx{min-width:0}
+  .nv-sub{display:block;font-weight:500;font-size:10.5px;color:var(--ink-2);margin-top:2px;line-height:1.35}
+  #wrap,#viewNeg{transition:left .28s ease}
+  body.nav-open #wrap,body.nav-open #viewNeg{left:var(--nav-w)}
+  #viewNeg{position:absolute;inset:56px 0 0 0;background:#FAF9F7;overflow:auto;display:none}
+  body.view-neg #wrap{display:none}
+  body.view-neg #viewNeg{display:block}
+
+  /* ── Kanban de Novos Negócios ── */
+  .kb-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:20px 22px 14px}
+  .kb-head h2{font:800 20px 'Archivo',sans-serif}
+  .kb-head p{font-size:12.5px;color:var(--ink-2);margin-top:4px;max-width:600px;line-height:1.55}
+  .kb-resumo{flex:none;display:flex;gap:16px;text-align:right}
+  .kb-resumo div{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
+  .kb-resumo b{display:block;font:800 17px 'Archivo',sans-serif;color:var(--ink);letter-spacing:0;text-transform:none}
+  .kb-board{display:flex;gap:14px;padding:0 22px 24px;align-items:flex-start}
+  .kb-col{flex:1 1 0;min-width:225px;background:#F1EFEC;border:1px solid var(--line);border-radius:14px;padding:10px}
+  .kb-col.over{border-color:var(--laranja);background:#FDF3EF}
+  .kb-ch{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:2px 4px 4px}
+  .kb-ch b{font:800 12px 'Archivo',sans-serif}
+  .kb-ch span{font-size:10px;font-weight:700;color:var(--ink-2);white-space:nowrap}
+  .kb-cv{font:700 11px 'Archivo',sans-serif;color:#0A6E60;padding:0 4px 8px}
+  .kb-cards{display:flex;flex-direction:column;gap:8px;min-height:56px}
+  .kb-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:10px 11px;cursor:grab;
+    box-shadow:0 1px 3px rgba(28,25,23,.06)}
+  .kb-card:hover{border-color:var(--azul)}
+  .kb-card.dragging{opacity:.4}
+  .kb-nome{font:700 12.5px 'Archivo',sans-serif;display:flex;align-items:center;gap:6px}
+  .kb-nome span.kb-tx{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kb-cor{flex:none;width:9px;height:9px;border-radius:50%;border:1px solid rgba(28,25,23,.2)}
+  .kb-meta{font-size:10.5px;color:var(--ink-2);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kb-val{font:700 11.5px 'Archivo',sans-serif;color:#0A6E60;margin-top:5px}
+  .kb-vazio{font-size:10.5px;color:var(--ink-2);text-align:center;padding:13px 6px;
+    border:1px dashed var(--line);border-radius:10px}
+  .kb-empty{margin:0 22px 22px;border:1px dashed var(--line);border-radius:14px;padding:40px 20px;
+    text-align:center;color:var(--ink-2);font-size:13px;line-height:1.65}
+  textarea.cfg-input{resize:vertical;font-family:inherit;line-height:1.45}
 
   #wrap{position:absolute;inset:56px 0 0 0}
   #map{position:absolute;inset:0;background:#F6F4F1}
@@ -372,6 +438,7 @@
 <body>
 
 <header>
+  <button id="navBtn" title="abrir e fechar o menu"><i></i><i></i><i></i></button>
   <div class="brand"><img src="logo-makermap.png" alt="Maker Map" class="brand-logo"
       onload="this.parentNode.querySelectorAll('.brand-mark,.brand-name').forEach(function(e){e.style.display='none'});"
       onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Maker Map</div></div>
@@ -382,6 +449,32 @@
     <button id="btnLogout" style="border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font:600 12px 'Archivo',sans-serif;color:var(--ink-2);cursor:pointer">Sair</button>
   </div>
 </header>
+
+<nav id="nav">
+  <div class="nv-tt">Menu</div>
+  <button class="nv-item on" data-view="mapa" type="button">
+    <span class="nv-ic">🗺</span>
+    <span class="nv-tx">Mapa<span class="nv-sub">Áreas, edição e exportação</span></span>
+  </button>
+  <button class="nv-item" data-view="negocios" type="button">
+    <span class="nv-ic">📋</span>
+    <span class="nv-tx">Novos Negócios<span class="nv-sub">Quadro das áreas por etapa</span></span>
+  </button>
+</nav>
+
+<div id="viewNeg">
+  <div class="kb-head">
+    <div>
+      <h2>Novos Negócios</h2>
+      <p>Cada área importada por KMZ ou desenhada no mapa é um cartão. Arraste entre as colunas para mudar a etapa, e clique para preencher valor, contato e observações.</p>
+    </div>
+    <div class="kb-resumo" id="kbResumo"></div>
+  </div>
+  <div class="kb-empty" id="kbVazio">
+    Nenhuma área ainda.<br>Vá para <b>Mapa</b> e importe um KMZ (ou desenhe uma área) — ela aparece aqui como cartão em <b>Ofertada</b>.
+  </div>
+  <div class="kb-board" id="kbBoard"></div>
+</div>
 
 <div id="wrap">
   <div id="map"></div>
@@ -664,6 +757,28 @@
     <p class="cfg-desc">O e-mail de acesso não pode ser alterado por aqui.</p>
     <button id="euSalvar" class="cfg-btn">Salvar</button>
     <button id="euCancelar" class="cfg-link">Cancelar</button>
+  </div>
+</div>
+
+<!-- Janela: detalhe do cartão de Novos Negócios -->
+<div id="negOverlay" class="cfg-overlay">
+  <div class="cfg-modal" role="dialog" aria-modal="true">
+    <div class="cfg-head">
+      <div class="brand"><div class="brand-name" id="negTitulo" style="letter-spacing:0;font-size:15px">Área</div></div>
+      <button id="negClose" class="cfg-x" title="fechar">×</button>
+    </div>
+    <div class="cfg-acct"><div id="negSub" class="cfg-email">—</div></div>
+    <label class="cfg-lbl" for="negCol">Etapa</label>
+    <select id="negCol" class="cfg-input"></select>
+    <label class="cfg-lbl" for="negValor">Valor pedido (R$)</label>
+    <input type="number" id="negValor" class="cfg-input" min="0" step="1000" placeholder="—">
+    <label class="cfg-lbl" for="negContato">Contato</label>
+    <input type="text" id="negContato" class="cfg-input" placeholder="nome, telefone ou e-mail">
+    <label class="cfg-lbl" for="negObs">Observações</label>
+    <textarea id="negObs" class="cfg-input" rows="3" placeholder="condições, prazos, pendências…"></textarea>
+    <button id="negSalvar" class="cfg-btn">Salvar</button>
+    <button id="negVerMapa" class="cfg-btn ghost">Ver no mapa</button>
+    <button id="negCancelar" class="cfg-link">Cancelar</button>
   </div>
 </div>
 
@@ -2313,6 +2428,7 @@ var FEATURE_PLANS = {
   exportar:        'free',   // exportar imagem PNG (botão + resolução)
   cores:           'free',   // paletas de cores pré-definidas
   mapaRenda:       'pro',    // "Mapa de renda" — Pro+ apenas
+  novosNegocios:   'pro',    // tela "Novos Negócios" (kanban) — Pro+ apenas
   // Seções internas do painel de "Edição"
   secCidade:       'free',   // "Por cidade" — Free+
   secArea:         'free',   // "Por área" — Free+
@@ -2347,7 +2463,8 @@ var FEATURE_ROTULOS = {
   secSobreMascara: 'Escolher o que fica sobre a máscara',
   salvarProjeto:   'Salvar projetos',
   meusProjetos:    'Abrir e gerenciar projetos salvos',
-  mapaRenda:       'Mapa de renda: raio, Censo IBGE 2022, pontos e mapa de calor'
+  mapaRenda:       'Mapa de renda: raio, Censo IBGE 2022, pontos e mapa de calor',
+  novosNegocios:   'Novos Negócios: quadro das áreas por etapa'
 };
 
 // Nome e chamada de cada plano na janela de Planos.
@@ -2373,6 +2490,7 @@ var FEATURE_ELEMENTS = {
   exportar:        ['#btnExport', '#expScale'],
   cores:           ['#btnCores'],
   mapaRenda:       ['#btnRenda'],
+  novosNegocios:   ['.nv-item[data-view="negocios"]'],
   secCidade:       ['#secCidade'],
   secArea:         ['#secArea'],
   secMapa:         ['#secMapa'],
@@ -3003,6 +3121,173 @@ function renderRenda(){
   if(seg) seg.onclick=function(){ rendaRaio.cores=CENSO_CORES_SEGURA.slice(); censoCamadas(censoCache.res); renderRenda(); };
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  NOVOS NEGÓCIOS — quadro kanban das áreas
+//
+//  Mesma página do Mapa, alternada por CSS (body.view-neg), porque os
+//  cartões são as próprias feições de DATA: um cartão por área
+//  importada de KMZ ou desenhada. Páginas separadas obrigariam a
+//  serializar DATA de um lado para o outro.
+//
+//  A etapa mora em properties.neg_status e os campos de negócio em
+//  properties.neg. Como coletarProjeto() copia DATA inteiro, os dois
+//  são salvos e reabertos com o projeto sem código extra.
+// ══════════════════════════════════════════════════════════════════
+var NEG_COLUNAS = [
+  {k:'ofertada',   rot:'Ofertada'},
+  {k:'negociacao', rot:'Negociação'},
+  {k:'contratada', rot:'Contratada'}
+];
+var NEG_PADRAO = NEG_COLUNAS[0].k;
+var viewAtual = 'mapa';
+var negAberto = null;             // idx da área aberta na janela de detalhe
+
+// Nome de área vem de arquivo KMZ do usuário: escapar antes do innerHTML.
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function negStatus(f){
+  var s = f.properties.neg_status;
+  for(var i=0;i<NEG_COLUNAS.length;i++) if(NEG_COLUNAS[i].k===s) return s;
+  return NEG_PADRAO;                        // inclusive áreas de antes desta versão
+}
+function negCampos(f){ return f.properties.neg || {valor:null, contato:'', obs:''}; }
+function negMoeda(v){ return 'R$ '+Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0}); }
+
+function kbCard(f){
+  var p=f.properties, n=negCampos(f);
+  return '<div class="kb-card" draggable="true" data-idx="'+p.idx+'">'+
+    '<div class="kb-nome"><span class="kb-cor" style="background:'+esc(p.cor_final||p.cor||'#8A8F98')+'"></span>'+
+      '<span class="kb-tx">'+esc(p.nome)+'</span></div>'+
+    '<div class="kb-meta">'+esc(p.municipio)+' · '+esc(p.ha_txt||'')+'</div>'+
+    (n.valor ? '<div class="kb-val">'+negMoeda(n.valor)+'</div>' : '')+
+    (n.contato ? '<div class="kb-meta">'+esc(n.contato)+'</div>' : '')+
+    '</div>';
+}
+
+function renderKanban(){
+  var board=document.getElementById('kbBoard');
+  if(!board) return;
+  var feats=DATA.features, tem=feats.length>0;
+  document.getElementById('kbVazio').style.display = tem ? 'none' : 'block';
+  board.style.display = tem ? 'flex' : 'none';
+
+  var haTot=0, valTot=0;
+  feats.forEach(function(f){ haTot+=f.properties.area_ha||0; valTot+=+negCampos(f).valor||0; });
+  document.getElementById('kbResumo').innerHTML = tem
+    ? '<div>Áreas<b>'+feats.length+'</b></div>'+
+      '<div>Hectares<b>'+fmt(haTot)+'</b></div>'+
+      (valTot ? '<div>Valor<b>'+negMoeda(valTot)+'</b></div>' : '')
+    : '';
+  if(!tem){ board.innerHTML=''; return; }
+
+  board.innerHTML = NEG_COLUNAS.map(function(c){
+    var lista=feats.filter(function(f){ return negStatus(f)===c.k; });
+    var ha=lista.reduce(function(s,f){ return s+(f.properties.area_ha||0); },0);
+    var val=lista.reduce(function(s,f){ return s+(+negCampos(f).valor||0); },0);
+    return '<div class="kb-col" data-col="'+c.k+'">'+
+      '<div class="kb-ch"><b>'+c.rot+'</b><span>'+lista.length+(ha?' · '+fmt(ha)+' ha':'')+'</span></div>'+
+      (val ? '<div class="kb-cv">'+negMoeda(val)+'</div>' : '')+
+      '<div class="kb-cards">'+
+        (lista.length ? lista.map(kbCard).join('') : '<div class="kb-vazio">arraste um cartão para cá</div>')+
+      '</div></div>';
+  }).join('');
+  wireKanban();
+}
+
+function wireKanban(){
+  var board=document.getElementById('kbBoard');
+  var arrastado=null;
+  board.querySelectorAll('.kb-card').forEach(function(el){
+    el.ondragstart=function(e){
+      arrastado=el; el.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+      try{ e.dataTransfer.setData('text/plain', el.getAttribute('data-idx')); }catch(err){}
+    };
+    el.ondragend=function(){
+      el.classList.remove('dragging'); arrastado=null;
+      board.querySelectorAll('.kb-col').forEach(function(c){ c.classList.remove('over'); });
+    };
+    el.onclick=function(){ abrirNeg(+el.getAttribute('data-idx')); };
+  });
+  board.querySelectorAll('.kb-col').forEach(function(col){
+    col.ondragover =function(e){ e.preventDefault(); col.classList.add('over'); };
+    col.ondragleave=function(){ col.classList.remove('over'); };
+    col.ondrop=function(e){
+      e.preventDefault(); col.classList.remove('over');
+      var idx = arrastado ? +arrastado.getAttribute('data-idx')
+                          : parseInt(e.dataTransfer.getData('text/plain'),10);
+      var f = DATA.features.find(function(x){ return x.properties.idx===idx; });
+      if(!f) return;
+      var novo = col.getAttribute('data-col');
+      if(negStatus(f)!==novo){ f.properties.neg_status=novo; renderKanban(); }
+    };
+  });
+}
+
+// ── Janela de detalhe do cartão ──
+function abrirNeg(idx){
+  var f = DATA.features.find(function(x){ return x.properties.idx===idx; });
+  if(!f) return;
+  negAberto = idx;
+  var p=f.properties, n=negCampos(f);
+  document.getElementById('negTitulo').textContent = p.nome || 'Área';
+  document.getElementById('negSub').textContent =
+    (p.municipio||'—')+' · '+(p.ha_txt||'')+' · '+p.lat+', '+p.lon;
+  document.getElementById('negCol').innerHTML = NEG_COLUNAS.map(function(c){
+    return '<option value="'+c.k+'"'+(negStatus(f)===c.k?' selected':'')+'>'+c.rot+'</option>';
+  }).join('');
+  document.getElementById('negValor').value   = (n.valor==null?'':n.valor);
+  document.getElementById('negContato').value = n.contato||'';
+  document.getElementById('negObs').value     = n.obs||'';
+  document.getElementById('negOverlay').classList.add('show');
+}
+function fecharNeg(){ document.getElementById('negOverlay').classList.remove('show'); negAberto=null; }
+function salvarNeg(){
+  var f = DATA.features.find(function(x){ return x.properties.idx===negAberto; });
+  if(!f){ fecharNeg(); return; }
+  var v = parseFloat(document.getElementById('negValor').value);
+  f.properties.neg = {
+    valor:   isFinite(v) && v>0 ? v : null,
+    contato: document.getElementById('negContato').value.trim(),
+    obs:     document.getElementById('negObs').value.trim()
+  };
+  f.properties.neg_status = document.getElementById('negCol').value;
+  fecharNeg(); renderKanban();
+  toast('Cartão atualizado. Salve o projeto para guardar.');
+}
+document.getElementById('negClose').onclick    = fecharNeg;
+document.getElementById('negCancelar').onclick = fecharNeg;
+document.getElementById('negSalvar').onclick   = salvarNeg;
+document.getElementById('negOverlay').onclick  = function(e){ if(e.target===this) fecharNeg(); };
+document.getElementById('negVerMapa').onclick  = function(){
+  var f = DATA.features.find(function(x){ return x.properties.idx===negAberto; });
+  fecharNeg();
+  irPara('mapa');
+  if(f && map) map.flyTo({center:[f.properties.lon, f.properties.lat], zoom:Math.max(map.getZoom(), 13)});
+};
+
+// ── Troca de tela e menu lateral ──
+function irPara(view){
+  viewAtual = view;
+  document.body.classList.toggle('view-neg', view==='negocios');
+  document.querySelectorAll('.nv-item').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-view')===view);
+  });
+  if(view==='negocios'){ renderKanban(); return; }
+  // ao voltar ao mapa o canvas foi reexibido: sem resize ele fica em branco
+  if(map){ map.resize(); setTimeout(function(){ map.resize(); }, 320); }
+}
+document.querySelectorAll('.nv-item').forEach(function(b){
+  b.onclick=function(){ irPara(b.getAttribute('data-view')); };
+});
+document.getElementById('navBtn').onclick=function(){
+  document.body.classList.toggle('nav-open');
+  if(viewAtual==='mapa' && map) setTimeout(function(){ map.resize(); }, 300);
+};
+
 // ── Janela de Planos ──────────────────────────────────────────────
 // O conteúdo é GERADO a partir do FEATURE_PLANS: cada plano lista os
 // recursos que ele destrava, e os anteriores vêm por herança ("inclui
@@ -3193,6 +3478,7 @@ function excluirGrupo(m){
   // reconstrói "Por área" porque os índices mudaram
   const edA = document.getElementById('edAreas');
   if(edA){ edA.innerHTML=''; DATA.features.forEach(f=> appendEditorArea(f)); }
+  renderKanban();
   // atualiza barras e mapa
   maxHa = Math.max(1, ...Object.values(grupos).map(g=>g.ha), 1);
   Object.keys(grupos).forEach(updatePanelRow);
@@ -3238,7 +3524,8 @@ function integrarFeats(feats, grupo, fit){
       area_ha: +ft.ha.toFixed(1), lat: +ft.lat.toFixed(5), lon: +ft.lon.toFixed(5),
       dist_sp: +distSe(ft.lon, ft.lat).toFixed(1),
       ha_txt: ft.tipo==='poligono' ? fmt(+ft.ha.toFixed(1))+' ha' : (ft.tipo==='linha'?'traçado linear':'ponto'),
-      cor, cor_final: cor, fill_on: 1
+      cor, cor_final: cor, fill_on: 1,
+      neg_status: NEG_PADRAO            // nasce na primeira coluna do kanban
     };
     const geom = {type: ft.gtype, coordinates: ft.coords};
     const feat = {type:'Feature', properties:props, geometry:geom};
@@ -3260,6 +3547,7 @@ function integrarFeats(feats, grupo, fit){
     if(fit) map.fitBounds([mi, ma], {padding:80, maxZoom:14});
   }
   refreshStats();
+  renderKanban();
 }
 
 document.getElementById('addKmz').onclick = ()=> document.getElementById('fileKmz').click();
@@ -3571,6 +3859,7 @@ document.getElementById('btnExport').onclick = async function(){
       aplicarFiltros();
     }
     refreshStats();
+    renderKanban();
   }
 
   // ── Abrir um projeto salvo ──
@@ -3600,6 +3889,7 @@ document.getElementById('btnExport').onclick = async function(){
     });
     if(tem) map.fitBounds([mi,ma],{padding:80, maxZoom:14});
     if(proj.estado && window.MakerMap && window.MakerMap.aplicar) window.MakerMap.aplicar(proj.estado);
+    renderKanban();
     toast('Projeto "' + proj.nome + '" aberto.');
   }
 
@@ -3665,6 +3955,9 @@ document.getElementById('btnExport').onclick = async function(){
     if(up && up.classList.contains('show')) fecharUpgrade();
     var pl = document.getElementById('planosOverlay');
     if(pl && pl.classList.contains('show')) fecharPlanos();
+    var ng = document.getElementById('negOverlay');
+    if(ng && ng.classList.contains('show')) fecharNeg();
+    else if(document.body.classList.contains('nav-open')) document.getElementById('navBtn').click();
     if(gavetaAberta()) fecharGaveta();
     if(document.getElementById('editor').classList.contains('show')) abrirEdicao(false);
   });
