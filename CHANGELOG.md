@@ -5,11 +5,33 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 1.3 — Renda corrigida, pontos, mapa de calor e Planos
+## Maker Map 2.0 — Novos Negócios
 
 _Aguardando publicação._
 
+O Maker Map deixa de ser uma tela só. Um **menu à esquerda** abre e fecha, e por
+ele você escolhe entre duas áreas de trabalho: o **Mapa**, com tudo que já
+existia, e **Novos Negócios**, um quadro para acompanhar as áreas.
+
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+**Novos Negócios**
+
+- Nova tela em formato de **quadro (kanban)**, com as colunas **Ofertada**,
+  **Negociação** e **Contratada**.
+- Cada área importada por KMZ ou desenhada no mapa entra como um **cartão**, na
+  coluna Ofertada. O cartão mostra o nome, o grupo de origem, a área e a cor que
+  a área tem no mapa.
+- **Arraste o cartão** entre as colunas para mudar a etapa do negócio.
+- Clique no cartão para preencher **valor pedido, contato e observações**, ou
+  mudar a etapa por uma lista.
+- Cada coluna soma a **quantidade de áreas, os hectares e o valor**; o topo da
+  tela traz o total geral.
+- Botão **Ver no mapa** no cartão: volta para o Mapa já centralizado naquela
+  área.
+- Tudo isso é guardado ao **salvar o projeto** e volta ao abrir. Projetos salvos
+  antes desta versão abrem com todas as áreas em Ofertada.
+- Disponível no plano **Pro**.
 
 **Planos**
 
@@ -105,7 +127,8 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
 > Nota de numeração: os itens de “Legenda do raio” chegaram a ser preparados
 > como 1.1, mas foram publicados junto com o Mapa de renda. A versão 1.1 nunca
-> foi ao ar — a próxima depois da 1.0 é esta.
+> foi ao ar — a próxima depois da 1.0 foi a 1.2. Do mesmo modo, o que estava
+> preparado como 1.3 foi publicado junto com Novos Negócios, na 2.0.
 
 ---
 
