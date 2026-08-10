@@ -80,18 +80,28 @@ A left drawer (`#nav`, toggled by `#navBtn`, `body.nav-open`) switches between t
 
 `irPara(view)` flips `body.view-neg`, which `display:none`s the other screen. **Returning to Mapa must call `map.resize()`** (it does, twice — immediately and after the 280 ms nav transition), or MapLibre paints a blank canvas at the stale size.
 
-They are one file, not two pages, because the kanban's cards *are* the features in `DATA` — separate pages would mean serializing the whole dataset across a navigation.
+They are one file, not two pages, so that going between the board and the map ("Ver no mapa") is instant and the board can tell live which of its deals are currently loaded on the map.
 
-### Novos Negócios (kanban)
+### Novos Negócios (kanban) — separate from Meus Projetos
 
-One card per feature in `DATA` — i.e. per area imported from a KMZ or drawn — not per KMZ file. A KMZ carrying ten plots yields ten cards, since the plot is what gets offered and contracted.
+**The two persistence systems are deliberately independent**, and merging them back would be a regression:
 
-- `NEG_COLUNAS` is the column list (`ofertada` / `negociacao` / `contratada`); add to it and the board grows a column.
-- The stage lives in `properties.neg_status` and the deal fields in `properties.neg` (`{valor, contato, obs}`). Because `coletarProjeto()` deep-copies `DATA.features`, **both persist with the project for free** — no serializer to update. `negStatus()` falls back to the first column, so areas saved before this existed simply show up in Ofertada.
-- `negCampos()` deliberately does **not** create `properties.neg` on read; only saving from the detail window writes it, so untouched areas don't bloat the saved project.
-- `renderKanban()` rebuilds the board and must be called after any mutation of `DATA` — `integrarFeats`, `excluirGrupo`, `limparProjetoAtual`, `carregarProjeto` all do.
+| | What it holds | Where | When it's written |
+|---|---|---|---|
+| **Meus Projetos** | the KMZs + map styling of one presentation map | `makermap.projetos.<email>` | only when the user clicks Salvar Projeto |
+| **Novos Negocios** | the commercial pipeline | `makermap.negocios.<email>` | automatically, on every change |
+
+So a card is **not** a `DATA` feature. It is its own record in `NEGOCIOS` (`{chave, nome, grupo, ha, haTxt, lat, lon, cor, status, valor, contato, obs, ts}`) — a copy of what the board needs, no geometry. Consequences, all intended:
+
+- `negSincronizar(DATA.features)` runs after `integrarFeats` and creates the missing cards. It **only adds** — a deal never disappears because the map changed.
+- Removing the KMZ (`excluirGrupo`) or "comecar do zero" (`limparProjetoAtual`) leaves the board untouched; the card just loses its `kb-flag` "no mapa" badge, computed live by `negNoMapa()`.
+- Re-importing the same KMZ does not duplicate cards, because `negChave()` (`grupo|nome|lat(4)|lon(4)`) is stable across imports.
+- Leaving the board is an explicit act — "Remover do quadro" in the card window.
+- `carregarNegocios()` runs at startup, so the board is there without opening any project.
+- `NEG_COLUNAS` is the column list; add to it and the board grows a column.
 - Card fields come from KMZ files, so `esc()` escapes them before `innerHTML`. (The map popups still interpolate raw — pre-existing, worth fixing.)
 - Pro-gated as `novosNegocios`; the nav item itself is the gated element.
+- One card per **area**, not per KMZ file: a KMZ carrying ten plots yields ten cards, since the plot is what gets offered and contracted.
 
 ## app.html architecture (the map)
 
