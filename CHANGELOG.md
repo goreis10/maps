@@ -29,9 +29,22 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   tela traz o total geral.
 - Botão **Ver no mapa** no cartão: volta para o Mapa já centralizado naquela
   área.
-- Tudo isso é guardado ao **salvar o projeto** e volta ao abrir. Projetos salvos
-  antes desta versão abrem com todas as áreas em Ofertada.
+- **O quadro é guardado sozinho**, a cada mudança, e volta na próxima vez que
+  você entrar — sem precisar salvar projeto.
 - Disponível no plano **Pro**.
+
+**Novos Negócios e Meus Projetos são coisas separadas**
+
+- **Meus Projetos** guarda os **KMZ e a edição do mapa** — o material da
+  apresentação. Continua sendo salvo só quando você manda.
+- **Novos Negócios** guarda a **gestão comercial** das áreas, por conta própria e
+  automaticamente. Um negócio pode existir sem nenhum projeto salvo.
+- Por isso: remover um KMZ do mapa ou usar **Começar do zero** **não apaga** os
+  cartões. O cartão apenas deixa de exibir a marca *no mapa*.
+- Reimportar o mesmo KMZ não cria cartão repetido.
+- Para tirar um negócio do quadro, use **Remover do quadro** na janela do cartão.
+- A marca **no mapa** no cartão indica que o KMZ daquela área está aberto no Mapa
+  neste momento.
 
 **Planos**
 
