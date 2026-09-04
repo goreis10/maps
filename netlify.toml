@@ -13,13 +13,19 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
-# Dataset do Censo 2022: ~4,3 MB (1,2 MB comprimido), imutável — os dados
-# são de julho/2022 e não mudam. Cache longo para o visitante baixar uma
-# única vez, não uma vez por sessão.
+# Dataset do Censo 2022, um arquivo por UF. Imutável — os dados são de
+# julho/2022 e não mudam. Cache longo para o visitante baixar cada estado
+# uma única vez, não uma vez por sessão. O manifesto fica de fora: é
+# pequeno e muda quando um estado novo entra.
 [[headers]]
-  for = "/sp_census_2022.json"
+  for = "/censo/*.json"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/censo/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=300"
 
 # Bloqueio de arquivos de configuração conhecidos (retorna 404).
 # Redirects só casam caminhos exatos (não curinga por extensão), por isso

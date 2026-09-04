@@ -25,7 +25,8 @@
                           raioLbl + aplicarRaioLbl() (legenda editável)
   • Raio do Mapa renda .. rendaRaio, atualizarRaioRenda(),
                           aplicarRaioRenda() — círculo próprio da gaveta
-  • Censo IBGE 2022 ..... carregarCenso() (lazy, sp_census_2022.json),
+  • Censo IBGE 2022 ..... carregarCenso() (lazy, censo/<uf>.json por UF
+                          conforme censo/manifest.json e o alcance do raio),
                           censoConsulta() (agrega no raio + margem de
                           borda), renderRenda() (painel da gaveta),
                           censoCamadas() — censo-pts (1 ponto por setor,
@@ -2756,7 +2757,7 @@ document.getElementById('rdCtSe').onclick = function(){
 // ══════════════════════════════════════════════════════════════════
 //  CENSO IBGE 2022 — análise dentro do raio do Mapa de renda
 //
-//  Dados: sp_census_2022.json (90.789 setores censitários de SP).
+//  Dados: censo/<cod-uf>.json, um arquivo por UF (ver censo/manifest.json).
 //  Carregado SOB DEMANDA — só quando o raio de renda é ligado — para
 //  não cobrar ~1,2 MB de quem nunca abre o Mapa de renda.
 //
@@ -2824,8 +2825,16 @@ function fatorRenda(){
   return f;
 }
 
-var CENSO = null;             // {meta, mun:{cod:nome}, s:[[lat,lon,cd_mun,dom,mor,rmed,rmdn]]}
-var censoStatus = 'vazio';    // vazio | carregando | ok | erro
+// O Censo é servido em UM ARQUIVO POR UF (censo/<cod>.json), listados em
+// censo/manifest.json com o retângulo que cada um cobre. O Brasil inteiro
+// passaria de 6 MB comprimidos: carregar só as UFs que o raio alcança
+// mantém quem trabalha em um estado pagando o custo de um estado.
+// Acrescentar uma UF é acrescentar o arquivo e uma linha no manifesto —
+// nada aqui muda.
+var CENSO = null;             // {mun:{cod:nome}, s:[[lat,lon,cd_mun,dom,mor,rmed,rmdn]]}
+var CENSO_MAN = null;         // manifesto
+var censoUF = {};             // cod -> 'ok' | 'carregando' | 'erro'
+var censoStatus = 'vazio';    // vazio | carregando | ok | erro | fora
 var censoDist = null;         // Float32Array de distâncias (reaproveitado)
 var censoCache = {chave:null, res:null};
 
@@ -2869,20 +2878,71 @@ function censoClasse(v){
   if(v>=3000)  return 'C';  if(v>=1500)  return 'D';  return 'E';
 }
 
+// UFs cujo retângulo é alcançado pelo círculo atual. O retângulo é
+// alargado pelo raio convertido em graus, então uma UF vizinha que
+// entra só na borda do círculo também é carregada.
+function censoUFsDoRaio(){
+  if(!CENSO_MAN) return [];
+  var la=rendaRaio.centro[1], lo=rendaRaio.centro[0], km=rendaRaio.km;
+  var dLa=km/111.32;
+  var cos=Math.cos(la*Math.PI/180);
+  var dLo=km/(111.32*Math.max(0.01, Math.abs(cos)));
+  return CENSO_MAN.ufs.filter(function(u){
+    var b=u.bbox;   // [latMin, lonMin, latMax, lonMax]
+    return (la+dLa)>=b[0] && (la-dLa)<=b[2] && (lo+dLo)>=b[1] && (lo-dLo)<=b[3];
+  });
+}
+function censoNomesUF(){
+  return CENSO_MAN ? CENSO_MAN.ufs.map(function(u){ return u.nome; }) : [];
+}
+// Junta uma UF ao conjunto já carregado.
+function censoAnexar(js){
+  if(!CENSO) CENSO={mun:{}, s:[]};
+  Object.keys(js.mun||{}).forEach(function(k){ CENSO.mun[k]=js.mun[k]; });
+  for(var i=0;i<js.s.length;i++) CENSO.s.push(js.s[i]);
+  censoDist=new Float32Array(CENSO.s.length);   // o vetor de distâncias cresceu
+  censoCache.chave=null;
+}
+
 function carregarCenso(){
   // a correção monetária é buscada junto: sem ela o painel abre com
   // valores de 2022 e teria de se recalcular logo em seguida
   if(rendaRaio.ipca) carregarIPCA();
-  if(censoStatus==='ok' || censoStatus==='carregando') return;
+  if(censoStatus==='carregando') return;
+
+  if(!CENSO_MAN){
+    censoStatus='carregando'; renderRenda();
+    fetch('censo/manifest.json')
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(m){
+        if(!m || !m.ufs || !m.ufs.length) throw new Error('manifesto vazio');
+        CENSO_MAN=m; censoStatus='vazio'; carregarCenso();
+      })
+      .catch(function(e){ console.error('censo/manifest', e); censoStatus='erro'; renderRenda(); });
+    return;
+  }
+
+  var alvo=censoUFsDoRaio();
+  if(!alvo.length){ censoStatus='fora'; renderRenda(); return; }
+
+  var faltam=alvo.filter(function(u){ return censoUF[u.cod]!=='ok'; });
+  if(!faltam.length){ censoStatus='ok'; renderRenda(); return; }
+
   censoStatus='carregando'; renderRenda();
-  fetch('sp_census_2022.json')
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(function(js){
-      if(!js || !js.s || !js.s.length) throw new Error('arquivo vazio');
-      CENSO=js; censoDist=new Float32Array(js.s.length);
-      censoStatus='ok'; censoCache.chave=null; renderRenda();
-    })
-    .catch(function(e){ console.error('censo', e); censoStatus='erro'; renderRenda(); });
+  Promise.all(faltam.map(function(u){
+    censoUF[u.cod]='carregando';
+    return fetch(u.arquivo)
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(js){
+        if(!js || !js.s || !js.s.length) throw new Error('arquivo vazio');
+        censoAnexar(js); censoUF[u.cod]='ok';
+      })
+      .catch(function(e){ console.error('censo '+u.uf, e); censoUF[u.cod]='erro'; });
+  })).then(function(){
+    var ok=alvo.some(function(u){ return censoUF[u.cod]==='ok'; });
+    censoStatus = ok ? 'ok' : 'erro';
+    renderRenda();
+  });
 }
 
 // Agregação dentro do raio. Ponderação por domicílios é obrigatória:
@@ -2994,22 +3054,32 @@ function renderRenda(){
   }
   if(censoStatus==='vazio'){
     censoCamadas(null);
-    box.innerHTML='<button class="rd-load" id="rdCarregar">Carregar dados do Censo (1,2 MB)</button>'+
-      '<div class="rd-foot">Baixado uma vez por sessão, só quando você pede.</div>';
+    box.innerHTML='<button class="rd-load" id="rdCarregar">Carregar dados do Censo</button>'+
+      '<div class="rd-foot">Baixa só o estado que o raio alcança, e só quando você pede.</div>';
     document.getElementById('rdCarregar').onclick=carregarCenso;
     return;
   }
   if(censoStatus==='carregando'){
     censoCamadas(null);
-    box.innerHTML='<div class="rd-msg">Carregando os 90.789 setores censitários…</div>';
+    box.innerHTML='<div class="rd-msg">Carregando os setores censitários…</div>';
+    return;
+  }
+  if(censoStatus==='fora'){
+    censoCamadas(null);
+    box.innerHTML='<div class="rd-msg warn">O centro do raio está <b>fora dos estados disponíveis</b>.'+
+      (CENSO_MAN ? ' A base cobre hoje: <b>'+esc(censoNomesUF().join(', '))+'</b>.' : '')+
+      '<br>Mova o centro para dentro de um deles, ou acrescente o arquivo daquele estado em '+
+      '<code>censo/</code>.</div>';
     return;
   }
   if(censoStatus==='erro'){
     censoCamadas(null);
-    box.innerHTML='<div class="rd-msg bad">Não foi possível carregar <b>sp_census_2022.json</b>. '+
-      'Verifique se o arquivo está publicado no site.</div>'+
+    box.innerHTML='<div class="rd-msg bad">Não foi possível carregar os dados do Censo. '+
+      'Verifique se a pasta <b>censo/</b> está publicada no site.</div>'+
       '<button class="rd-load" id="rdCarregar" style="margin-top:8px">Tentar de novo</button>';
-    document.getElementById('rdCarregar').onclick=function(){ censoStatus='vazio'; carregarCenso(); };
+    document.getElementById('rdCarregar').onclick=function(){
+      censoStatus='vazio'; censoUF={}; carregarCenso();
+    };
     return;
   }
 
@@ -3024,8 +3094,8 @@ function renderRenda(){
 
   if(q.vazio){
     box.innerHTML='<div class="rd-h">Dentro do raio</div>'+
-      '<div class="rd-msg warn">Nenhum setor censitário neste raio. A base cobre <b>apenas o Estado de '+
-      'São Paulo</b> — um centro em outro estado não retorna dados.</div>';
+      '<div class="rd-msg warn">Nenhum setor censitário neste raio.'+
+      (CENSO_MAN ? ' A base carregada cobre <b>'+esc(censoNomesUF().join(', '))+'</b>.' : '')+'</div>';
     return;
   }
 

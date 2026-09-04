@@ -1,0 +1,19 @@
+{
+  "versao": 1,
+  "fonte": "IBGE — Censo Demográfico 2022 (referência 31/07/2022)",
+  "ufs": [
+    {
+      "uf": "SP",
+      "cod": 35,
+      "nome": "São Paulo",
+      "arquivo": "censo/35.json",
+      "setores": 90789,
+      "bbox": [
+        -25.2439,
+        -53.0653,
+        -19.8718,
+        -44.1984
+      ]
+    }
+  ]
+}
