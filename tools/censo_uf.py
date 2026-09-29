@@ -43,10 +43,34 @@ def so_digitos(v):
     return re.sub(r'\D', '', str(v or ''))
 
 
+def abrir(caminho):
+    """O IBGE mistura codificações entre arquivos: o CSV de renda é UTF-8,
+    o de municípios é Latin-1. Tenta na ordem em vez de supor."""
+    for enc in ('utf-8-sig', 'utf-8', 'latin-1'):
+        try:
+            f = open(caminho, encoding=enc)
+            f.read(8192)
+            f.seek(0)
+            return f
+        except UnicodeDecodeError:
+            pass
+    raise SystemExit(f'Não consegui ler {caminho}: codificação desconhecida.')
+
+
+def nomes_municipios():
+    """CD_MUN -> nome, para os 5.570 municípios. Deixa os nomes independentes
+    de a malha trazer ou não a propriedade NM_MUN."""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'municipios.json')
+    try:
+        return json.load(open(p, encoding='utf-8'))
+    except Exception:
+        return {}
+
+
 def features_em_fluxo(caminho):
     """Percorre o array "features" sem carregar o arquivo inteiro na memória.
     Malha estadual passa de 100 MB; json.load() custaria vários GB."""
-    with open(caminho, encoding='utf-8') as f:
+    with abrir(caminho) as f:
         buf = f.read(1 << 20)
         i = buf.find('"features"')
         while i < 0:
@@ -145,7 +169,7 @@ def centroide(geom):
 def ler_renda(caminho):
     """CD_SETOR -> (domicilios, moradores_por_domicilio, renda_media, renda_mediana)"""
     out = {}
-    with open(caminho, encoding='utf-8') as f:
+    with abrir(caminho) as f:
         for row in csv.DictReader(f, delimiter=';'):
             cd = so_digitos(row.get('CD_SETOR'))
             if not cd:
@@ -176,6 +200,10 @@ def main():
                  '  ogr2ogr -f GeoJSON -t_srs EPSG:4326 saida.json entrada.shp\n'
                  'ou use mapshaper.org (arraste o .shp e exporte GeoJSON).')
 
+    nomes = nomes_municipios()
+    print(f'tabela de municípios: {len(nomes)} nomes' if nomes
+          else 'tabela de municípios ausente — usando o nome que vier na malha')
+
     print('lendo renda…', flush=True)
     renda = ler_renda(a.renda)
     print(f'  {len(renda):,} setores com dados'.replace(',', '.'))
@@ -199,9 +227,14 @@ def main():
         if not r:
             semRenda += 1; continue
         cd_mun = int(cd[:7])
-        for k in CHAVES_MUN:
-            if p.get(k):
-                muns.setdefault(str(cd_mun), str(p[k])); break
+        if str(cd_mun) not in muns:
+            nm = nomes.get(cd[:7])
+            if not nm:
+                for k in CHAVES_MUN:
+                    if p.get(k):
+                        nm = str(p[k]); break
+            if nm:
+                muns[str(cd_mun)] = nm
         setores.append([round(c[1], 5), round(c[0], 5), cd_mun, r[0], r[1], r[2], r[3]])
         if total % 20000 == 0:
             print(f'  {total:,} feições…'.replace(',', '.'), flush=True)
