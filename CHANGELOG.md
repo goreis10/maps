@@ -63,9 +63,11 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 - Um raio que cruza divisa carrega os dois estados automaticamente.
 - Se o centro do raio cair fora dos estados disponíveis, o painel diz quais
   estão disponíveis, em vez de mostrar zeros.
-- Hoje a base tem **apenas São Paulo** — falta a geometria dos demais estados.
-  Acrescentar um estado passou a ser só acrescentar o arquivo dele, sem mexer no
-  programa.
+- **A Bahia entrou**: 30.311 setores, 417 municípios, 5,09 milhões de
+  domicílios. Um raio em Salvador, Feira de Santana ou qualquer ponto do estado
+  agora responde.
+- A base tem hoje **São Paulo e Bahia**. Acrescentar um estado é só acrescentar
+  o arquivo dele, sem mexer no programa.
 
 **Mapa de renda — ajuste dos valores**
 

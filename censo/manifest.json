@@ -3,6 +3,19 @@
   "fonte": "IBGE — Censo Demográfico 2022 (referência 31/07/2022)",
   "ufs": [
     {
+      "uf": "BA",
+      "cod": 29,
+      "nome": "Bahia",
+      "arquivo": "censo/29.json",
+      "setores": 30311,
+      "bbox": [
+        -18.256,
+        -46.3682,
+        -8.5482,
+        -37.3673
+      ]
+    },
+    {
       "uf": "SP",
       "cod": 35,
       "nome": "São Paulo",
