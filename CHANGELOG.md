@@ -5,9 +5,29 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 2.0 — Novos Negócios
+## Maker Map 2.1 — Bahia no Mapa de renda
 
 _Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **A Bahia entrou no Mapa de renda**: 30.311 setores, 417 municípios e 5,09
+  milhões de domicílios. Um raio em Salvador, Feira de Santana ou qualquer ponto
+  do estado agora responde.
+- Os dados do Censo passaram a ser organizados **um arquivo por estado**. O raio
+  baixa apenas o estado (ou estados) que ele alcança, então quem trabalha só em
+  São Paulo continua baixando o mesmo tanto de antes.
+- Um raio que cruza divisa carrega os dois estados automaticamente.
+- Se o centro do raio cair fora dos estados disponíveis, o painel passa a dizer
+  **quais estão disponíveis**, em vez da mensagem fixa que citava só São Paulo.
+- Acrescentar um estado novo passou a ser só acrescentar o arquivo dele, sem
+  mexer no programa.
+
+---
+
+## Maker Map 2.0 — Novos Negócios
+
+_No ar em maker-map.netlify.app._
 
 O Maker Map deixa de ser uma tela só. Um **menu à esquerda** abre e fecha, e por
 ele você escolhe entre duas áreas de trabalho: o **Mapa**, com tudo que já
@@ -54,20 +74,6 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   selo do seu plano na barra superior.
 - Quando um recurso bloqueado é clicado, a janela de aviso passa a ter um botão
   **Ver planos**.
-
-**Mapa de renda — preparado para outros estados**
-
-- Os dados do Censo passaram a ser organizados **um arquivo por estado**. O raio
-  baixa apenas o estado (ou estados) que ele alcança, então quem trabalha só em
-  São Paulo continua baixando o mesmo tanto de antes.
-- Um raio que cruza divisa carrega os dois estados automaticamente.
-- Se o centro do raio cair fora dos estados disponíveis, o painel diz quais
-  estão disponíveis, em vez de mostrar zeros.
-- **A Bahia entrou**: 30.311 setores, 417 municípios, 5,09 milhões de
-  domicílios. Um raio em Salvador, Feira de Santana ou qualquer ponto do estado
-  agora responde.
-- A base tem hoje **São Paulo e Bahia**. Acrescentar um estado é só acrescentar
-  o arquivo dele, sem mexer no programa.
 
 **Mapa de renda — ajuste dos valores**
 

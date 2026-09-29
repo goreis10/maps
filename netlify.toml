@@ -13,19 +13,28 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
-# Dataset do Censo 2022, um arquivo por UF. Imutável — os dados são de
-# julho/2022 e não mudam. Cache longo para o visitante baixar cada estado
-# uma única vez, não uma vez por sessão. O manifesto fica de fora: é
-# pequeno e muda quando um estado novo entra.
-[[headers]]
-  for = "/censo/*.json"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
+# Censo 2022, um arquivo por UF.
+#
+# A ORDEM IMPORTA: a Netlify aplica a primeira regra que casa, e "/censo/*"
+# casaria também com o manifesto. Por isso o manifesto vem ANTES. Não inverta.
+#
+# O manifesto tem cache curto porque é ele que anuncia um estado novo — se
+# ficasse preso no cache, a UF recém-publicada não apareceria para quem já
+# visitou o site.
 [[headers]]
   for = "/censo/manifest.json"
   [headers.values]
     Cache-Control = "public, max-age=300"
+
+# Os arquivos de UF são grandes e mudam raramente, mas NÃO são "immutable":
+# o SP atual vem de uma fonte de geometria incompleta (faltam ~10% dos
+# setores) e deve ser regerado. Com "immutable" o visitante ficaria um ano
+# preso na versão velha. Um dia de cache + revalidação por ETag dá o mesmo
+# ganho prático sem esse risco.
+[[headers]]
+  for = "/censo/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
 
 # Bloqueio de arquivos de configuração conhecidos (retorna 404).
 # Redirects só casam caminhos exatos (não curinga por extensão), por isso

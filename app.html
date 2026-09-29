@@ -1515,6 +1515,10 @@ function atualizarRaioRenda(){
   if(lo) lo.value = rendaRaio.centro[0].toFixed(5);
   aplicarRaioRenda();
   renderRenda();          // raio ou centro mudou: refaz a análise do Censo
+  // ...e pode ter passado a alcançar um estado ainda não baixado. Sem esta
+  // chamada o conjunto de UFs congelaria no que valia na primeira carga, e
+  // mover o centro para outro estado mostraria "nenhum setor" para sempre.
+  if(rendaRaio.on) carregarCenso();
 }
 function aplicarRaioRenda(){
   const chip = document.getElementById('chipRaioRenda');
@@ -2307,7 +2311,7 @@ function montarEditor(){
       syncRaioRendaInputs();
       atualizarRaioRenda();
       // projeto salvo com o raio de renda ligado quer a análise de volta
-      if(rendaRaio.on && censoStatus==='vazio') carregarCenso();
+      if(rendaRaio.on && censoStatus!=='carregando') carregarCenso();
 
       // glebas: cores + preenchimento
       if(s.areas){
@@ -2662,7 +2666,7 @@ document.getElementById('chipRaioRenda').onclick = function(){
   rendaRaio.on = !rendaRaio.on;
   aplicarRaioRenda();
   // primeiro "ligar" puxa o dataset do Censo; depois é só recalcular
-  if(rendaRaio.on && censoStatus==='vazio') carregarCenso();
+  if(rendaRaio.on && censoStatus!=='carregando') carregarCenso();
   else renderRenda();
 };
 document.getElementById('chipCensoPts').onclick = function(){
@@ -2670,7 +2674,7 @@ document.getElementById('chipCensoPts').onclick = function(){
   if(!rendaRaio.on){ toast('Ligue o Raio primeiro — os pontos são os setores dentro dele.'); return; }
   rendaRaio.pts = !rendaRaio.pts;
   aplicarRaioRenda();
-  if(rendaRaio.pts && censoStatus==='vazio') carregarCenso();
+  if(rendaRaio.pts && censoStatus!=='carregando') carregarCenso();
   else renderRenda();
 };
 document.getElementById('chipCensoHeat').onclick = function(){
@@ -2678,7 +2682,7 @@ document.getElementById('chipCensoHeat').onclick = function(){
   if(!rendaRaio.on){ toast('Ligue o Raio primeiro — o calor é calculado dentro dele.'); return; }
   rendaRaio.heat = !rendaRaio.heat;
   aplicarRaioRenda();
-  if(rendaRaio.heat && censoStatus==='vazio') carregarCenso();
+  if(rendaRaio.heat && censoStatus!=='carregando') carregarCenso();
   else renderRenda();
 };
 function setHeatModo(m){
@@ -2892,14 +2896,29 @@ function censoUFsDoRaio(){
     return (la+dLa)>=b[0] && (la-dLa)<=b[2] && (lo+dLo)>=b[1] && (lo-dLo)<=b[3];
   });
 }
+// Todas as UFs que o manifesto oferece.
 function censoNomesUF(){
   return CENSO_MAN ? CENSO_MAN.ufs.map(function(u){ return u.nome; }) : [];
 }
-// Junta uma UF ao conjunto já carregado.
-function censoAnexar(js){
+// Só as que estão de fato em CENSO. Separado do anterior de propósito: dizer
+// "a base carregada cobre X" listando o manifesto inteiro seria mentira.
+function censoNomesCarregadas(){
+  if(!CENSO_MAN) return [];
+  return CENSO_MAN.ufs.filter(function(u){ return censoUF[u.cod]==='ok'; })
+                      .map(function(u){ return u.nome; });
+}
+// UFs que o raio alcança mas que não estão carregadas (rede falhou).
+function censoUFsFaltando(){
+  return censoUFsDoRaio().filter(function(u){ return censoUF[u.cod]!=='ok'; });
+}
+// Junta uma UF ao conjunto já carregado. Recusa repetir: anexar duas vezes
+// dobraria domicílios, população e a distribuição por faixa.
+function censoAnexar(cod, js){
+  if(censoUF[cod]==='ok') return;
   if(!CENSO) CENSO={mun:{}, s:[]};
   Object.keys(js.mun||{}).forEach(function(k){ CENSO.mun[k]=js.mun[k]; });
   for(var i=0;i<js.s.length;i++) CENSO.s.push(js.s[i]);
+  censoUF[cod]='ok';
   censoDist=new Float32Array(CENSO.s.length);   // o vetor de distâncias cresceu
   censoCache.chave=null;
 }
@@ -2923,7 +2942,7 @@ function carregarCenso(){
   }
 
   var alvo=censoUFsDoRaio();
-  if(!alvo.length){ censoStatus='fora'; renderRenda(); return; }
+  if(!alvo.length){ censoStatus='fora'; renderRenda(); return; }   // reversível: mover o centro chama de novo
 
   var faltam=alvo.filter(function(u){ return censoUF[u.cod]!=='ok'; });
   if(!faltam.length){ censoStatus='ok'; renderRenda(); return; }
@@ -2935,7 +2954,7 @@ function carregarCenso(){
       .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
       .then(function(js){
         if(!js || !js.s || !js.s.length) throw new Error('arquivo vazio');
-        censoAnexar(js); censoUF[u.cod]='ok';
+        censoAnexar(u.cod, js);
       })
       .catch(function(e){ console.error('censo '+u.uf, e); censoUF[u.cod]='erro'; });
   })).then(function(){
@@ -3078,7 +3097,11 @@ function renderRenda(){
       'Verifique se a pasta <b>censo/</b> está publicada no site.</div>'+
       '<button class="rd-load" id="rdCarregar" style="margin-top:8px">Tentar de novo</button>';
     document.getElementById('rdCarregar').onclick=function(){
-      censoStatus='vazio'; censoUF={}; carregarCenso();
+      // reencaminha só as que falharam; apagar as 'ok' faria censoAnexar
+      // empilhar a mesma UF de novo
+      Object.keys(censoUF).forEach(function(k){ if(censoUF[k]!=='ok') delete censoUF[k]; });
+      censoStatus = CENSO ? 'ok' : 'vazio';
+      carregarCenso();
     };
     return;
   }
@@ -3095,9 +3118,20 @@ function renderRenda(){
   if(q.vazio){
     box.innerHTML='<div class="rd-h">Dentro do raio</div>'+
       '<div class="rd-msg warn">Nenhum setor censitário neste raio.'+
-      (CENSO_MAN ? ' A base carregada cobre <b>'+esc(censoNomesUF().join(', '))+'</b>.' : '')+'</div>';
+      (censoNomesCarregadas().length
+        ? ' Estão carregados: <b>'+esc(censoNomesCarregadas().join(', '))+'</b>.' : '')+'</div>';
     return;
   }
+
+  // Falha parcial de rede: um estado do raio não entrou na conta. Sem este
+  // aviso o painel apresentaria médias e totais do raio inteiro estando metade
+  // do território de fora — número errado com cara de certo.
+  var faltando = censoUFsFaltando();
+  var avisoUF = faltando.length
+    ? '<div class="rd-msg bad">Faltou carregar <b>'+esc(faltando.map(function(u){ return u.nome; }).join(', '))+
+      '</b> — os números abaixo cobrem só o restante do raio. '+
+      '<a id="rdRetentar" style="color:inherit;text-decoration:underline;cursor:pointer">tentar de novo</a></div>'
+    : '';
 
   // Confiabilidade: em raio pequeno a margem de borda domina o resultado.
   var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
@@ -3155,7 +3189,7 @@ function renderRenda(){
     '<div class="rd-stat"><span>Densidade</span><b>'+nf(q.densPes)+' pess/km²</b></div>'+
     '<div class="rd-stat"><span>Setores censitários</span><b>'+nf(q.setores)+'</b></div>'+
     '<div class="rd-stat"><span>Municípios ('+q.muns.length+')</span><b style="font-weight:600;font-size:10.5px">'+munTxt+'</b></div>'+
-    aviso+
+    avisoUF+aviso+
     '<div class="rd-sub">Domicílios por faixa de renda'+
       (usaCorRenda ? ' <em style="font-weight:600;text-transform:none;letter-spacing:0">· cores no mapa</em>' : '')+'</div>'+
     '<div class="rd-fx">'+faixasHtml+'</div>'+
@@ -3192,6 +3226,11 @@ function renderRenda(){
       if(barra) barra.style.background=inp.value;
     };
   });
+  var ret=box.querySelector('#rdRetentar');
+  if(ret) ret.onclick=function(){
+    Object.keys(censoUF).forEach(function(k){ if(censoUF[k]!=='ok') delete censoUF[k]; });
+    carregarCenso();
+  };
   var pad=box.querySelector('#rdCorPadrao'), seg=box.querySelector('#rdCorSegura');
   if(pad) pad.onclick=function(){ rendaRaio.cores=null; censoCamadas(censoCache.res); renderRenda(); };
   if(seg) seg.onclick=function(){ rendaRaio.cores=CENSO_CORES_SEGURA.slice(); censoCamadas(censoCache.res); renderRenda(); };
