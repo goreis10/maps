@@ -19,6 +19,19 @@ None of `tools/` is served — `netlify.toml`'s command strips it.
 
 Deployed to Netlify (project **maker-map**, `maker-map.netlify.app`) with continuous deployment from `main`: **merging to `main` publishes the live site automatically** (~1 min). There is no other release process.
 
+### Publishing — standing authorization
+
+The owner has authorized Claude to **publish without asking**: finish the work, open the PR, merge it, let Netlify deploy, then report what went live. Do not stop to ask "shall I merge?" — that question is already answered.
+
+Two things this does **not** cover, because they are not publishing:
+
+- destroying data or history (force-push over merged commits, deleting a user's stored projects, dropping a table);
+- changing how people sign in, or what a plan unlocks for someone who is paying.
+
+For those, ask.
+
+**Review before publishing.** Whatever reaches `main` should first be checked by a dedicated reviewer pass (a subagent works well) focused on what would break production, not on style. This is not ceremony: the review before 2.1 found six defects, one of which meant the release did not deliver its headline feature — the new state was never fetched once the user moved the map centre. A syntax check alone would have passed it. Doc-only changes do not need this.
+
 ## Versioning — iOS-style
 
 Releases are numbered and named the way Apple names iOS updates: `MAJOR.MINOR.PATCH`, where the third number exists **only** when the release is fixes-only.
