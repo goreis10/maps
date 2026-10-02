@@ -43,6 +43,10 @@ function json(status, corpo, extra) {
 const erro = (status, msg) => json(status, { erro: msg });
 
 export default async (req) => {
+  // Só leitura. Sem isto, um POST ou DELETE seria repassado ao ORS e
+  // gastaria cota do mesmo jeito.
+  if (req.method !== 'GET') return erro(405, 'Método não permitido.');
+
   const chave = Netlify.env.get('ORS_API_KEY');
   if (!chave) {
     // Só o dono do site vê o log da função. Listar os NOMES das
@@ -57,17 +61,32 @@ export default async (req) => {
   // Anti-hotlink simples. O Referer de uma requisição same-origin pode
   // vir vazio por configuração de privacidade, então ausência não
   // bloqueia; só bloqueia quando vem e aponta para outro domínio.
+  //
+  // O host vem preferencialmente dos cabeçalhos: req.url numa função
+  // pode trazer host interno, e comparar contra ele 403aria TODO
+  // pedido legítimo — a feature não funcionaria para ninguém.
+  // Compara hostname (sem porta) para não quebrar em dev.
   const ref = req.headers.get('referer');
   if (ref) {
     try {
-      if (new URL(ref).host !== new URL(req.url).host) return erro(403, 'Origem não autorizada.');
-    } catch (e) { /* Referer malformado: ignora e segue para a validação */ }
+      const meu = req.headers.get('x-forwarded-host') || req.headers.get('host') || new URL(req.url).host;
+      if (new URL(ref).hostname !== new URL('https://' + meu).hostname) {
+        return erro(403, 'Origem não autorizada.');
+      }
+    } catch (e) { /* Referer ou host malformado: ignora e segue para a validação */ }
   }
 
   const q = new URL(req.url).searchParams;
 
-  const lon = Number(q.get('lon'));
-  const lat = Number(q.get('lat'));
+  // Number('') e Number(null) dão 0, que é finito e cai dentro do
+  // Brasil — sem esta checagem, pedido sem coordenada responderia
+  // "o centro precisa estar no Brasil", que não ajuda ninguém.
+  const lonTxt = q.get('lon'), latTxt = q.get('lat');
+  if (lonTxt == null || lonTxt === '' || latTxt == null || latTxt === '') {
+    return erro(400, 'Informe as coordenadas do centro.');
+  }
+  const lon = Number(lonTxt);
+  const lat = Number(latTxt);
   if (!Number.isFinite(lon) || !Number.isFinite(lat)) return erro(400, 'Coordenadas inválidas.');
   if (lon < BRASIL.lonMin || lon > BRASIL.lonMax || lat < BRASIL.latMin || lat > BRASIL.latMax) {
     return erro(400, 'O centro precisa estar no Brasil.');
@@ -77,11 +96,15 @@ export default async (req) => {
   if (!PERFIS.has(perfil)) return erro(400, 'Modo de deslocamento inválido.');
 
   // "15,30,45" -> [900, 1800, 2700], sem repetição e em ordem.
-  const mins = [...new Set((q.get('min') || '')
-    .split(',')
-    .map((s) => Math.round(Number(s)))
-    .filter((n) => Number.isFinite(n) && n >= 1 && n <= MAX_MINUTOS))]
-    .sort((a, b) => a - b);
+  const pedidos = (q.get('min') || '').split(',').map((s) => s.trim()).filter((s) => s !== '');
+  const validos = pedidos.map((s) => Math.round(Number(s)))
+    .filter((n) => Number.isFinite(n) && n >= 1 && n <= MAX_MINUTOS);
+  // Descartar em silêncio devolveria 200 para um pedido que não foi o
+  // que se pediu — quem chama direto o endpoint merece saber.
+  if (validos.length !== pedidos.length) {
+    return erro(400, 'Cada faixa de tempo precisa ser um número de 1 a ' + MAX_MINUTOS + ' minutos.');
+  }
+  const mins = [...new Set(validos)].sort((a, b) => a - b);
 
   if (!mins.length) return erro(400, 'Informe de 1 a ' + MAX_FAIXAS + ' faixas de tempo, entre 1 e ' + MAX_MINUTOS + ' minutos.');
   if (mins.length > MAX_FAIXAS) return erro(400, 'No máximo ' + MAX_FAIXAS + ' faixas de tempo por cálculo.');
@@ -106,8 +129,12 @@ export default async (req) => {
       })
     });
   } catch (e) {
-    const abortou = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
-    console.error('ORS falhou:', e && e.name, e && e.message);
+    // O undici embrulha o abort num TypeError("fetch failed") e põe o
+    // TimeoutError em .cause — olhar só e.name perderia o timeout e
+    // daria a mensagem errada.
+    const nome = e && (e.name === 'TypeError' && e.cause ? e.cause.name : e.name);
+    const abortou = nome === 'TimeoutError' || nome === 'AbortError';
+    console.error('ORS falhou:', nome, e && e.message);
     return erro(abortou ? 504 : 502, abortou
       ? 'O cálculo passou de ' + Math.round(TIMEOUT_MS / 1000) + 's. Tente menos faixas ou tempos menores.'
       : 'Não foi possível falar com o serviço de roteamento.');
@@ -121,6 +148,12 @@ export default async (req) => {
     console.error('ORS HTTP', resp.status, corpo);
     if (resp.status === 401 || resp.status === 403) return erro(502, 'Chave do serviço de roteamento recusada.');
     if (resp.status === 429) return erro(429, 'Cota de cálculos esgotada por agora. Tente mais tarde.');
+    // O plano gratuito do ORS limita o tempo máximo da isócrona (o teto
+    // histórico é 60 min). Um 400 com faixa grande é quase sempre isso,
+    // e "HTTP 400" sozinho não diz a ninguém o que fazer.
+    if (resp.status === 400 && mins[mins.length - 1] > 60) {
+      return erro(400, 'A faixa de ' + mins[mins.length - 1] + ' min passa do limite do serviço. Tente até 60 minutos.');
+    }
     return erro(502, 'O serviço de roteamento recusou o cálculo (HTTP ' + resp.status + ').');
   }
 
@@ -133,6 +166,10 @@ export default async (req) => {
   if (!geo || !Array.isArray(geo.features) || !geo.features.length) {
     return erro(502, 'O serviço não encontrou vias alcançáveis a partir deste ponto.');
   }
+  // O polígono é guardado dentro do projeto, no localStorage do
+  // visitante. "metadata" é o eco do pedido e dos atributos do motor,
+  // não serve para desenhar nada e só ocupa a cota de armazenamento.
+  delete geo.metadata;
 
   // A mesma isócrona pedida de novo não deve gastar cota: um dia no
   // navegador, uma semana no CDN. O resultado não muda — é a malha

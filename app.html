@@ -748,7 +748,9 @@
         <input type="number" id="isoMin3" min="1" max="120" step="1" value="" title="4ª faixa">
       </div>
       <div class="e-hint">Até quatro faixas, de 1 a 120 minutos. Deixe em branco as que
-        não quiser. As faixas são aninhadas: a de 15 min fica dentro da de 30.</div>
+        não quiser. As faixas são aninhadas: a de 15 min fica dentro da de 30.
+        Acima de 60 minutos o serviço de roteamento pode recusar o cálculo,
+        conforme o limite do plano contratado.</div>
       <div class="e-subhead">Origem</div>
       <div class="e-row"><label>Centro</label><input type="number" id="isoCtLat" step="0.0001" value="-23.5505" title="latitude"><input type="number" id="isoCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
       <div class="e-row"><input type="text" id="isoCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
@@ -1193,7 +1195,9 @@ function montarCamadas(){
     paint:{'circle-radius':5, 'circle-color':ISO_CORES_PADRAO[0],
            'circle-stroke-color':'#FFFFFF', 'circle-stroke-width':2}});
   map.addLayer({id:'iso-rotulo', type:'symbol', source:'isocrona',
-    filter:['==',['geometry-type'],'Point'],
+    // só na origem CALCULADA: o rótulo descreve o polígono, então não
+    // pode se grudar na origem pendente, que ainda não gerou desenho
+    filter:['all',['==',['geometry-type'],'Point'],['!=',['get','pendente'],1]],
     layout:{visibility:'none', 'text-field':'30 min · carro', 'text-font':['Noto Sans Regular'],
       'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
     paint:{'text-color':'#6B21A8', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
@@ -1259,6 +1263,7 @@ function montarCamadas(){
   classificarTiers();
   if(window.__ajustarViasUI) window.__ajustarViasUI();   // mostra só os subníveis que existem
   atualizarRaioRenda();          // desenha o círculo do Mapa de renda (nasce oculto)
+  atualizarIso();                // semeia o marcador de origem da isócrona (idem)
   if(window.__aplicarRaioLbl) window.__aplicarRaioLbl();
   refreshStats();
   // cada sessão começa do zero; projetos são abertos manualmente em "Meus Projetos"
@@ -1683,7 +1688,7 @@ function aplicarRaioRenda(){
   map.setPaintProperty('raior-fill','fill-color', rendaRaio.cor);
   map.setPaintProperty('raior-fill','fill-opacity', rendaRaio.fill ? 0.05 : 0);
   map.setPaintProperty('raior-centro','circle-color', rendaRaio.cor);
-  map.setLayoutProperty('raior-rotulo','text-field', L.texto.trim() || textoRendaAuto());
+  map.setLayoutProperty('raior-rotulo','text-field', (L.texto||'').trim() || textoRendaAuto());
   map.setLayoutProperty('raior-rotulo','text-size', 11.5*L.tam);
   map.setPaintProperty('raior-rotulo','text-color', L.cor);
   map.setPaintProperty('raior-rotulo','text-halo-color', L.haloCor);
@@ -1728,9 +1733,15 @@ function isoPerfilNome(k){
   var p=ISO_PERFIS.filter(function(x){ return x.k===(k||iso.perfil); })[0];
   return p ? p.nome : 'Carro';
 }
+// O rótulo descreve O POLÍGONO DESENHADO, não os campos da gaveta.
+// Ele é o único texto da isócrona que entra no PNG exportado, então
+// amarrá-lo aos parâmetros atuais faria a imagem mentir toda vez que
+// alguém mexesse num campo sem recalcular.
 function textoIsoAuto(){
-  var m=isoMinutos();
-  return m.length ? (m[m.length-1]+' min · '+isoPerfilNome().toLowerCase()) : 'Isócrona';
+  var calc=!!iso.poly;
+  var m=(calc && iso.calcMin && iso.calcMin.length) ? iso.calcMin : isoMinutos();
+  var pf=calc ? (iso.calcPerfil||iso.perfil) : iso.perfil;
+  return m.length ? (m[m.length-1]+' min · '+isoPerfilNome(pf).toLowerCase()) : 'Isócrona';
 }
 // O desenho na tela é de outra pergunta? Isso tem de estar escrito, e
 // não dá para recalcular sozinho: cada cálculo é uma chamada com cota.
@@ -1747,11 +1758,20 @@ function atualizarIso(){
   if(iso.poly && iso.poly.features && iso.poly.features.length){
     // O ORS devolve uma feição por faixa, com properties.value em
     // SEGUNDOS e, porque pedimos attributes:['area'], a área em km².
-    var fs=iso.poly.features.filter(function(f){ return f && f.geometry; })
-            .map(function(f){
-              var p=f.properties||{};
-              return {g:f.geometry, min:Math.round((+p.value||0)/60), area:+p.area||0};
-            });
+    var fs=iso.poly.features.filter(function(f){
+             // Faixa sem "value" não tem tempo. Virando 0 ela pegaria a
+             // cor mais interna E ficaria por cima de todas — a pior
+             // degradação possível. Melhor não desenhar.
+             return f && f.geometry && isFinite(+((f.properties||{}).value));
+           })
+           .map(function(f){
+             var p=f.properties||{};
+             return {g:f.geometry, min:Math.round((+p.value)/60), area:+p.area||0};
+           });
+    // Duas faixas que arredondam para o mesmo minuto virariam duas barras
+    // com o mesmo índice de cor, e editar uma mudaria as duas.
+    var vistos={};
+    fs=fs.filter(function(x){ if(vistos[x.min]) return false; vistos[x.min]=1; return true; });
     var ordem=fs.map(function(x){ return x.min; }).sort(function(a,b){ return a-b; });
     // MAIOR PRIMEIRO: dentro de uma camada, feição posterior fica em cima,
     // então as faixas menores (mais internas) precisam vir depois.
@@ -1760,8 +1780,18 @@ function atualizarIso(){
         properties:{min:x.min, area:x.area, ordem:ordem.indexOf(x.min)}});
     });
   }
-  ISO_GEO.features.push({type:'Feature', properties:{centro:1},
-    geometry:{type:'Point', coordinates:iso.centro.slice()}});
+  // Dois pontos possíveis, e a diferença importa para o PNG:
+  //  · a origem CALCULADA, à qual o polígono e o rótulo correspondem;
+  //  · a origem PENDENTE (vazada), só quando os parâmetros mudaram —
+  //    é o retorno visual de "escolher no mapa" sem fazer o rótulo
+  //    descrever um ponto que não gerou o desenho.
+  var temPoly=ISO_GEO.features.length>0;
+  var base=(temPoly && iso.calcCentro) ? iso.calcCentro : iso.centro;
+  ISO_GEO.features.push({type:'Feature', properties:{centro:1, pendente:0},
+    geometry:{type:'Point', coordinates:base.slice()}});
+  if(temPoly && isoDesatualizado())
+    ISO_GEO.features.push({type:'Feature', properties:{centro:1, pendente:1},
+      geometry:{type:'Point', coordinates:iso.centro.slice()}});
   if(map && map.getSource('isocrona')) map.getSource('isocrona').setData(ISO_GEO);
   aplicarIso();
 }
@@ -1785,8 +1815,12 @@ function aplicarIso(){
   map.setPaintProperty('iso-fill','fill-color',cor);
   map.setPaintProperty('iso-fill','fill-opacity', iso.fill ? 0.18 : 0);
   map.setPaintProperty('iso-borda','line-color',cor);
-  map.setPaintProperty('iso-centro','circle-color',isoCorFaixa(0));
-  map.setLayoutProperty('iso-rotulo','text-field', L.texto.trim() || textoIsoAuto());
+  // origem pendente sai vazada; a calculada, sólida
+  map.setPaintProperty('iso-centro','circle-color',
+    ['case',['==',['get','pendente'],1], '#FFFFFF', isoCorFaixa(0)]);
+  map.setPaintProperty('iso-centro','circle-stroke-color',
+    ['case',['==',['get','pendente'],1], isoCorFaixa(0), '#FFFFFF']);
+  map.setLayoutProperty('iso-rotulo','text-field', (L.texto||'').trim() || textoIsoAuto());
   map.setLayoutProperty('iso-rotulo','text-size', 11.5*L.tam);
   map.setPaintProperty('iso-rotulo','text-color',L.cor);
   map.setPaintProperty('iso-rotulo','text-halo-color',L.haloCor);
@@ -1802,10 +1836,10 @@ function isoMudouParametro(){
   iso.on = true;
   atualizarIso();
   syncIsoInputs();
-  isoPainel();
+  renderIso();
 }
 
-function isoPainel(){
+function renderIso(){
   var box=document.getElementById('isoPainel');
   var btn=document.getElementById('isoCalc');
   if(btn){
@@ -1834,7 +1868,7 @@ function isoPainel(){
          return '<div class="rd-fxr">'+
                   '<input type="color" class="rd-sw" value="'+isoCorFaixa(i)+'" '+
                     'data-iso-cor="'+i+'" title="cor desta faixa">'+
-                  '<span>'+f.properties.min+' min de '+isoPerfilNome().toLowerCase()+'</span>'+
+                  '<span>'+f.properties.min+' min de '+isoPerfilNome(iso.calcPerfil).toLowerCase()+'</span>'+
                 '</div>'+
                 '<u>'+(f.properties.area>0 ? num(f.properties.area)+' km²' : '—')+'</u>';
        }).join('')+'</div>';
@@ -1861,7 +1895,7 @@ async function buscarIsocrona(){
   if(!map || !map.getLayer('iso-borda')){ toast('Aguarde o mapa carregar.'); return; }
   var mins=isoMinutos();
   if(!mins.length){ toast('Informe ao menos uma faixa de tempo, de 1 a 120 minutos.'); return; }
-  isoCarregando=true; isoPainel();
+  isoCarregando=true; renderIso();
   var url='/api/isocrona?lon='+iso.centro[0]+'&lat='+iso.centro[1]+
           '&perfil='+encodeURIComponent(iso.perfil)+'&min='+mins.join(',');
   try{
@@ -1887,7 +1921,7 @@ async function buscarIsocrona(){
     console.error('isocrona', err);
     toast('Falha de rede ao calcular a isócrona.');
   }finally{
-    isoCarregando=false; isoPainel();
+    isoCarregando=false; renderIso();
   }
 }
 
@@ -2329,7 +2363,7 @@ function montarEditor(){
     document.getElementById('isoCtEnd').value = '';
     syncIsoInputs();
     atualizarIso();
-    isoPainel();
+    renderIso();
     // glebas: cores de grupo, preenchimento, filtros e rótulos
     DATA.features.forEach(f=>{
       f.properties.cor_final = CORES[f.properties.municipio] || '#8A8F98';
@@ -2675,7 +2709,7 @@ function montarEditor(){
       isoCarregando=false;
       syncIsoInputs();
       atualizarIso();
-      isoPainel();
+      renderIso();
 
       // glebas: cores + preenchimento
       if(s.areas){
@@ -3127,7 +3161,7 @@ document.getElementById('rdCtSe').onclick = function(){
 // ── Isócrona (Pro) — gaveta própria ──
 document.getElementById('btnIso').onclick = function(){
   syncIsoInputs();
-  isoPainel();
+  renderIso();
   abrirGaveta('drawerIso');
 };
 document.getElementById('isoClose').onclick = fecharGaveta;
@@ -3157,7 +3191,11 @@ for(var _i=0; _i<ISO_MAX_FAIXAS; _i++){
       // corresponde a ela — e não necessariamente à ordem do estado.
       var novo=isoMinutos();
       while(novo.length < i) novo.push(null);
-      novo[i] = txt==='' ? null : Math.max(1, Math.min(120, Math.round(+txt)||1));
+      // 0, negativo ou lixo RETIRA a faixa em vez de virar 1 minuto
+      // calado — substituir o valor do usuário por outro é pior que
+      // obedecer ao que ele digitou.
+      var v=Math.round(+txt);
+      novo[i] = (txt==='' || !isFinite(v) || v<1) ? null : Math.min(120, v);
       novo = novo.filter(function(v){ return v!=null; });
       if(novo.length) iso.minutos = novo;
       else toast('É preciso ao menos uma faixa de tempo.');
@@ -4285,6 +4323,7 @@ function drawSetup(){
   });
 }
 function drawSetMode(on){
+  if(on) pickDesligar();   // os dois modos de clique se excluem
   drawing = on;
   drawPts = [];
   drawRefresh();
