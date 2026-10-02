@@ -9,7 +9,7 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 _Aguardando publicação._
 
-Esta atualização inclui as seguintes correções de erros:
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
 - O **mapa de calor de densidade** deixava de fora os setores em que o IBGE não
   divulga rendimento, e por isso desenhava menos gente do que o painel contava.
@@ -21,6 +21,8 @@ Esta atualização inclui as seguintes correções de erros:
 - Os **pontos** e o **calor de renda** continuam mostrando apenas setores com
   renda informada, como deve ser — não há como colorir por faixa de renda um
   setor que não tem renda.
+- O rodapé do painel passou a dizer exatamente onde esses domicílios entram e
+  onde ficam de fora, para não haver dúvida depois da correção.
 
 ---
 

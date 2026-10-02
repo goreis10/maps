@@ -3019,9 +3019,15 @@ function censoConsulta(lat, lon, raioKm){
 }
 
 // Camadas do Censo no mapa (pontos e mapa de calor). Um setor censitário =
-// um ponto; as três camadas comem da mesma fonte 'censo'. Setores sem
-// informação de renda ficam de fora — a mesma regra do cálculo agregado,
-// para o mapa não contradizer o painel. Passe q=null para apagar tudo.
+// um ponto; as três camadas comem da mesma fonte 'censo', que recebe TODOS
+// os setores do raio — inclusive os sem rendimento divulgado.
+//
+// Quem filtra é a camada, não a fonte: 'censo-pts' e 'censo-surf' carregam
+// filter ['>',['get','renda'],0], porque não há como pintar faixa de renda
+// de um setor sem renda; 'censo-heat' não filtra, porque ele pesa por
+// domicílio e precisa enxergar os mesmos domicílios que o painel soma.
+//
+// Passe q=null para apagar tudo.
 function censoCamadas(q){
   if(!map || !map.getLayer('censo-pts')) return;
   var vale   = !!(q && !q.vazio && rendaRaio.on);
@@ -3204,7 +3210,9 @@ function renderRenda(){
       '<a id="rdCorPadrao">semáforo</a> · <a id="rdCorSegura">tons de âmbar</a></div>'+
     legendaDens+
     (q.domSemRenda>0 ? '<div class="rd-foot">'+nf(q.domSemRenda)+' domicílios ficam fora do cálculo de renda '+
-      '(setor sem informação de rendimento).</div>' : '')+
+      '(setor sem informação de rendimento). Eles contam no total de domicílios, '+
+      'de pessoas e no mapa de calor de densidade; ficam de fora da média, da '+
+      'distribuição por faixa, dos pontos e do calor de renda.</div>' : '')+
     '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
     'O Censo mede a renda <b>do responsável pelo domicílio</b>.<br>'+
     (corrigido
