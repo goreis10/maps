@@ -32,7 +32,7 @@
       "uf": "SP",
       "cod": 35,
       "nome": "São Paulo",
-      "arquivo": "censo/35.json",
+      "arquivo": "censo/35-v2.json",
       "setores": 98989,
       "bbox": [
         -25.2438,
