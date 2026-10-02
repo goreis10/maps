@@ -7,6 +7,11 @@
   publish = "."
   command = "rm -rf ./tools && rm -f ./*.md ./*.markdown"
 
+# Único código de servidor do projeto: netlify/functions/isocrona.mjs,
+# que guarda a chave do OpenRouteService fora do app.html.
+[functions]
+  directory = "netlify/functions"
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -45,6 +50,22 @@
 # os .md são tratados pelo "command" acima, e os configs são listados aqui.
 [[redirects]]
   from = "/netlify.toml"
+  to = "/404.html"
+  status = 404
+  force = true
+
+# O CÓDIGO DA FUNÇÃO não deve ser servido como arquivo estático.
+#
+# "publish" é a raiz do repositório, então netlify/functions/isocrona.mjs
+# ficaria legível em /netlify/functions/isocrona.mjs. A chave não está no
+# código (está no ambiente), então não é vazamento de credencial — mas é
+# entregar o mapa das validações a quem queira contorná-las.
+#
+# Não dá para resolver com "rm -rf ./netlify" no command, como foi feito
+# com tools/: o command roda ANTES do empacotamento das funções, e
+# apagaria a própria função. Daí o 404 por caminho.
+[[redirects]]
+  from = "/netlify/*"
   to = "/404.html"
   status = 404
   force = true
