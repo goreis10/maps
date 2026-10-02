@@ -1759,10 +1759,11 @@ function atualizarIso(){
     // O ORS devolve uma feição por faixa, com properties.value em
     // SEGUNDOS e, porque pedimos attributes:['area'], a área em km².
     var fs=iso.poly.features.filter(function(f){
-             // Faixa sem "value" não tem tempo. Virando 0 ela pegaria a
-             // cor mais interna E ficaria por cima de todas — a pior
-             // degradação possível. Melhor não desenhar.
-             return f && f.geometry && isFinite(+((f.properties||{}).value));
+             // Faixa sem tempo válido pegaria a cor mais interna E
+             // ficaria por cima de todas — a pior degradação possível.
+             // O teste é "> 0", não isFinite: +null, +'' e +false são 0,
+             // que é finito, e passariam.
+             return f && f.geometry && +((f.properties||{}).value) > 0;
            })
            .map(function(f){
              var p=f.properties||{};
@@ -1803,11 +1804,17 @@ function aplicarIso(){
   // O MARCADOR DE ORIGEM aparece com o chip ligado mesmo sem cálculo:
   // é o retorno visual de "escolher no mapa". O polígono e a legenda só
   // aparecem quando há o que desenhar.
-  var vis=(iso.on && iso.poly) ? 'visible' : 'none';
+  //
+  // A fonte da verdade é o que FOI PARA A FONTE, não iso.poly: um poly
+  // cujas faixas foram todas descartadas é truthy e ligaria rótulo e
+  // contorno sobre desenho nenhum — o PNG sairia com legenda e sem
+  // isócrona, que é exatamente o que este bloco existe para impedir.
+  var temDesenho=ISO_GEO.features.some(function(f){ return !f.properties.centro; });
+  var vis=(iso.on && temDesenho) ? 'visible' : 'none';
   ['iso-fill','iso-borda'].forEach(function(id){ map.setLayoutProperty(id,'visibility',vis); });
   map.setLayoutProperty('iso-centro','visibility', iso.on ? 'visible' : 'none');
   var L=iso.lbl;
-  map.setLayoutProperty('iso-rotulo','visibility', (iso.on && iso.poly && L.on) ? 'visible' : 'none');
+  map.setLayoutProperty('iso-rotulo','visibility', (iso.on && temDesenho && L.on) ? 'visible' : 'none');
 
   var cor=['match',['get','ordem']];
   for(var i=0;i<ISO_MAX_FAIXAS;i++) cor.push(i, isoCorFaixa(i));
@@ -2704,6 +2711,11 @@ function montarEditor(){
         iso.minutos=(Array.isArray(s.iso.minutos)&&s.iso.minutos.length)?s.iso.minutos.slice():ISO_PADRAO.minutos.slice();
         iso.cores=(Array.isArray(s.iso.cores)&&s.iso.cores.length)?s.iso.cores.slice():null;
         if(ISO_PERFIS.every(function(p){ return p.k!==iso.perfil; })) iso.perfil=ISO_PADRAO.perfil;
+        // os calc* alimentam isoDesatualizado() e o rótulo; vindos
+        // crus de um localStorage adulterado, derrubam a gaveta
+        iso.calcMin=Array.isArray(s.iso.calcMin)?s.iso.calcMin.slice():null;
+        iso.calcCentro=(s.iso.calcCentro&&s.iso.calcCentro.length===2)?s.iso.calcCentro.slice():null;
+        if(ISO_PERFIS.every(function(p){ return p.k!==iso.calcPerfil; })) iso.calcPerfil=null;
         if(!iso.poly || !iso.poly.features || !iso.poly.features.length){ iso.poly=null; iso.on=false; }
       }
       isoCarregando=false;

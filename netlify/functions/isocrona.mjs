@@ -45,7 +45,7 @@ const erro = (status, msg) => json(status, { erro: msg });
 export default async (req) => {
   // Só leitura. Sem isto, um POST ou DELETE seria repassado ao ORS e
   // gastaria cota do mesmo jeito.
-  if (req.method !== 'GET') return erro(405, 'Método não permitido.');
+  if (req.method !== 'GET' && req.method !== 'HEAD') return erro(405, 'Método não permitido.');
 
   const chave = Netlify.env.get('ORS_API_KEY');
   if (!chave) {
@@ -66,6 +66,12 @@ export default async (req) => {
   // pode trazer host interno, e comparar contra ele 403aria TODO
   // pedido legítimo — a feature não funcionaria para ninguém.
   // Compara hostname (sem porta) para não quebrar em dev.
+  //
+  // x-forwarded-host É FORJÁVEL por quem chama direto, então quem quiser
+  // burlar isto burla. Não é problema: a checagem só filtra uso casual,
+  // a borda da Netlify reescreve o header no tráfego real, e a proteção
+  // que de fato vale são os tetos acima. Não confie neste header para
+  // mais nada.
   const ref = req.headers.get('referer');
   if (ref) {
     try {
@@ -148,11 +154,14 @@ export default async (req) => {
     console.error('ORS HTTP', resp.status, corpo);
     if (resp.status === 401 || resp.status === 403) return erro(502, 'Chave do serviço de roteamento recusada.');
     if (resp.status === 429) return erro(429, 'Cota de cálculos esgotada por agora. Tente mais tarde.');
-    // O plano gratuito do ORS limita o tempo máximo da isócrona (o teto
-    // histórico é 60 min). Um 400 com faixa grande é quase sempre isso,
-    // e "HTTP 400" sozinho não diz a ninguém o que fazer.
-    if (resp.status === 400 && mins[mins.length - 1] > 60) {
-      return erro(400, 'A faixa de ' + mins[mins.length - 1] + ' min passa do limite do serviço. Tente até 60 minutos.');
+    // O plano do ORS limita o tempo máximo da isócrona, e o teto varia
+    // por perfil (a pé costuma ser mais apertado). Reconhecer isso pelo
+    // CORPO do erro, e não por um número fixo nosso, cobre qualquer teto
+    // — inclusive um que recuse 45 min. O texto devolvido é nosso; nada
+    // do corpo do ORS vai para o navegador.
+    if (resp.status === 400 && /maximum range|"?code"?\s*:\s*2003/i.test(corpo)) {
+      return erro(400, 'A faixa de ' + mins[mins.length - 1] +
+        ' min passa do limite do serviço de roteamento para este modo. Reduza o tempo.');
     }
     return erro(502, 'O serviço de roteamento recusou o cálculo (HTTP ' + resp.status + ').');
   }
