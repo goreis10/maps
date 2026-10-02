@@ -253,6 +253,15 @@
     box-shadow:-10px 0 30px rgba(28,25,23,.16);overflow-y:auto;overflow-x:hidden;font-size:13px;
     padding:16px 18px 22px;transform:translateX(101%);transition:transform .32s ease}
   .side-drawer.show{transform:translateX(0)}
+  /* legenda da isócrona: canvas solto sobre o mapa, sem capturar clique.
+     Fica dentro de #map, então acompanha sozinho o encolhimento quando
+     uma gaveta abre. */
+  #isoLegenda{position:absolute;z-index:3;pointer-events:none;display:none;
+    filter:drop-shadow(0 3px 10px rgba(28,25,23,.18))}
+  #isoLegenda.leg-sup-esq{top:14px;left:14px}
+  #isoLegenda.leg-sup-dir{top:14px;right:14px}
+  #isoLegenda.leg-inf-esq{bottom:44px;left:14px}
+  #isoLegenda.leg-inf-dir{bottom:44px;right:14px}
   #wrap.side-open #map{right:var(--drawer-w)}
   #wrap.side-open #ctrl{right:calc(var(--drawer-w) + 14px)}
   #wrap.side-open #edResize{display:block;right:calc(var(--drawer-w) - 5px)}
@@ -773,7 +782,17 @@
         <input type="color" id="isoLblHaloCor" value="#FFFFFF" title="cor do contorno">
         <input type="range" id="isoLblHaloW" min="0" max="40" value="16" title="espessura do contorno">
       </div>
-      <div class="e-hint">A cor de cada faixa é editada na bolinha ao lado dela, na lista abaixo.</div>
+      <div class="e-subhead">Legenda no mapa</div>
+      <div class="e-row"><label><input type="checkbox" id="isoLegOn" checked> mostrar no mapa</label>
+        <select id="isoLegCanto" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:600 11.5px 'Archivo',sans-serif">
+          <option value="inf-esq">canto inferior esquerdo</option>
+          <option value="inf-dir">canto inferior direito</option>
+          <option value="sup-esq">canto superior esquerdo</option>
+          <option value="sup-dir">canto superior direito</option>
+        </select></div>
+      <div class="e-row"><input type="text" id="isoLegTit" placeholder="título automático" title="deixe vazio para usar o título automático" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
+      <div class="e-hint">Esta caixa <b>sai na imagem exportada</b>, ao contrário das legendas
+        que ficam nesta gaveta. A cor de cada faixa é editada na bolinha ao lado dela, na lista abaixo.</div>
     </div>
     <div id="isoPainel" class="rd-box"></div>
   </div>
@@ -1619,6 +1638,7 @@ const ISO_PADRAO = {
   minutos:[15,30,45],     // até ISO_MAX_FAIXAS faixas, 1..120 min
   cores:null,             // null = ISO_CORES_PADRAO
   fill:true,
+  legenda:{on:true, canto:'inf-esq', titulo:''},   // caixa desenhada no mapa
   poly:null,              // GeoJSON devolvido pelo serviço
   calcCentro:null,        // centro/perfil/minutos de quando foi calculado,
   calcPerfil:null,        // para a gaveta saber que os parâmetros mudaram
@@ -1774,10 +1794,36 @@ function atualizarIso(){
     var vistos={};
     fs=fs.filter(function(x){ if(vistos[x.min]) return false; vistos[x.min]=1; return true; });
     var ordem=fs.map(function(x){ return x.min; }).sort(function(a,b){ return a-b; });
-    // MAIOR PRIMEIRO: dentro de uma camada, feição posterior fica em cima,
-    // então as faixas menores (mais internas) precisam vir depois.
+
+    // ANÉIS VERDADEIROS. O ORS devolve as faixas ANINHADAS — a de 15 min
+    // é um polígono inteiro dentro do de 30. Pintadas assim, com
+    // preenchimento translúcido, a região interna aparece como a SOMA de
+    // todas as camadas sobre ela, e a cor no mapa deixa de ser a cor da
+    // legenda. Transformando cada faixa num anel (o contorno dela mais o
+    // contorno da faixa anterior como FURO), cada região do mapa recebe
+    // exatamente uma cor, que é a da bolinha ao lado dela.
+    //
+    // Só vale para Polygon. Se alguma faixa vier MultiPolygon (área
+    // desconexa — uma ilha, o outro lado de um rio sem ponte), não dá
+    // para saber qual parte contém qual sem operação booleana de
+    // verdade, então todas voltam ao modo aninhado: pior na cor,
+    // correto na geometria.
+    var asc=fs.slice().sort(function(a,b){ return a.min-b.min; });
+    var anel=asc.every(function(x){ return x.g.type==='Polygon' && (x.g.coordinates||[]).length>=1; });
+    asc.forEach(function(x,k){
+      if(!anel){ x.gf=x.g; return; }
+      // mantém os furos próprios da faixa e acrescenta o contorno da
+      // faixa anterior como mais um furo
+      x.gf = (k===0) ? x.g
+           : {type:'Polygon', coordinates:x.g.coordinates.concat([asc[k-1].g.coordinates[0]])};
+    });
+
+    // MAIOR PRIMEIRO: no modo aninhado, feição posterior fica em cima, e
+    // as faixas menores precisam vir depois. Com anéis não há sobreposição
+    // e a ordem é indiferente — manter a mesma regra para os dois casos
+    // evita um comportamento que depende de qual modo caiu.
     fs.sort(function(a,b){ return b.min-a.min; }).forEach(function(x){
-      ISO_GEO.features.push({type:'Feature', geometry:x.g,
+      ISO_GEO.features.push({type:'Feature', geometry:x.gf,
         properties:{min:x.min, area:x.area, ordem:ordem.indexOf(x.min)}});
     });
   }
@@ -1827,11 +1873,137 @@ function aplicarIso(){
     ['case',['==',['get','pendente'],1], '#FFFFFF', isoCorFaixa(0)]);
   map.setPaintProperty('iso-centro','circle-stroke-color',
     ['case',['==',['get','pendente'],1], isoCorFaixa(0), '#FFFFFF']);
+  pintarLegendaIso(iso.on && temDesenho && iso.legenda.on);
   map.setLayoutProperty('iso-rotulo','text-field', (L.texto||'').trim() || textoIsoAuto());
   map.setLayoutProperty('iso-rotulo','text-size', 11.5*L.tam);
   map.setPaintProperty('iso-rotulo','text-color',L.cor);
   map.setPaintProperty('iso-rotulo','text-halo-color',L.haloCor);
   map.setPaintProperty('iso-rotulo','text-halo-width', L.halo ? L.haloW : 0);
+}
+
+// ── Legenda da isócrona DENTRO do mapa ────────────────────────────
+// Desenhada em CANVAS, não em HTML, e o motivo é o produto: o PNG
+// exportado é o canvas do mapa, então legenda em HTML não sai na imagem
+// — é a lacuna que o Mapa de renda tem desde sempre. Em canvas, a MESMA
+// função pinta a caixa na tela e dentro do PNG, na escala pedida.
+var LEG_ISO = {pad:11, sw:13, gap:9, lh:19, fTit:11.5, fTxt:12, fNota:9.5, raio:9, margem:14};
+
+function isoLegendaItens(){
+  return ISO_GEO.features
+    .filter(function(f){ return !f.properties.centro; })
+    .slice().sort(function(a,b){ return a.properties.min-b.properties.min; })
+    .map(function(f){ return {txt:f.properties.min+' min', cor:isoCorFaixa(f.properties.ordem)}; });
+}
+
+function retanguloArredondado(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y,   x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x,   y+h, r);
+  ctx.arcTo(x,   y+h, x,   y,   r);
+  ctx.arcTo(x,   y,   x+w, y,   r);
+  ctx.closePath();
+}
+
+// Mede e, com pintar=true, desenha. Uma função só para os dois usos:
+// medir antes de dimensionar o canvas da tela, e pintar no PNG.
+function legendaIsoCaixa(ctx, esc, x, y, pintar){
+  var itens=isoLegendaItens();
+  if(!itens.length) return null;
+  var L=LEG_ISO, e=esc;
+  var tit=(iso.legenda.titulo||'').trim() ||
+          ('Isócrona · '+isoPerfilNome(iso.calcPerfil).toLowerCase());
+  var nota='Tempo de deslocamento, sem trânsito';
+
+  var fTit='700 '+(L.fTit*e)+'px Archivo, sans-serif';
+  var fTxt='600 '+(L.fTxt*e)+'px Archivo, sans-serif';
+  var fNota='500 '+(L.fNota*e)+'px Archivo, sans-serif';
+
+  ctx.font=fTit;  var w=ctx.measureText(tit).width;
+  ctx.font=fTxt;
+  itens.forEach(function(it){ w=Math.max(w, (L.sw+L.gap)*e + ctx.measureText(it.txt).width); });
+  ctx.font=fNota; w=Math.max(w, ctx.measureText(nota).width);
+  w += L.pad*2*e;
+
+  var hTit=L.fTit*1.55*e, hNota=L.fNota*2.0*e;
+  var h=L.pad*2*e + hTit + L.lh*e*itens.length + hNota;
+  if(!pintar) return {w:w, h:h};
+
+  ctx.save();
+  retanguloArredondado(ctx, x, y, w, h, L.raio*e);
+  ctx.fillStyle='rgba(255,255,255,0.93)';
+  ctx.fill();
+  ctx.lineWidth=1*e;
+  ctx.strokeStyle='rgba(28,25,23,0.20)';
+  ctx.stroke();
+
+  var cx=x+L.pad*e, cy=y+L.pad*e;
+  ctx.textBaseline='top';
+  ctx.fillStyle='#1C1917';
+  ctx.font=fTit;
+  ctx.fillText(tit, cx, cy);
+  cy += hTit;
+
+  ctx.font=fTxt;
+  itens.forEach(function(it){
+    var sy=cy+(L.lh*e-L.sw*e)/2;
+    retanguloArredondado(ctx, cx, sy, L.sw*e, L.sw*e, 3*e);
+    ctx.fillStyle=it.cor; ctx.fill();
+    ctx.lineWidth=1*e; ctx.strokeStyle='rgba(28,25,23,0.30)'; ctx.stroke();
+    ctx.fillStyle='#1C1917';
+    ctx.fillText(it.txt, cx+(L.sw+L.gap)*e, cy+(L.lh*e-L.fTxt*e)/2 - 1*e);
+    cy += L.lh*e;
+  });
+
+  ctx.font=fNota;
+  ctx.fillStyle='#57534E';
+  ctx.fillText(nota, cx, cy+2*e);
+  ctx.restore();
+  return {w:w, h:h};
+}
+
+// Canto -> posição dentro de um canvas de larg×alt (já em px do device).
+function legendaIsoPos(canto, cx, larg, alt, esc){
+  var m=LEG_ISO.margem*esc;
+  // o controle de escala da MapLibre mora no canto inferior esquerdo e
+  // a bússola no inferior direito: sobe a caixa para não cobri-los
+  var mb=m+30*esc;
+  switch(canto){
+    case 'sup-dir': return {x:larg-cx.w-m,  y:m};
+    case 'inf-dir': return {x:larg-cx.w-m,  y:alt-cx.h-mb};
+    case 'sup-esq': return {x:m,            y:m};
+    default:        return {x:m,            y:alt-cx.h-mb};   // inf-esq
+  }
+}
+
+function legendaIsoEl(){
+  var el=document.getElementById('isoLegenda');
+  if(!el){
+    var cont=document.getElementById('map');
+    if(!cont) return null;
+    el=document.createElement('canvas');
+    el.id='isoLegenda';
+    cont.appendChild(el);
+  }
+  return el;
+}
+
+// Pinta a caixa na tela. O canvas é dimensionado à caixa e posicionado
+// por CSS, então só o canto muda de lugar — não há layout a recalcular.
+function pintarLegendaIso(mostrar){
+  var el=legendaIsoEl();
+  if(!el) return;
+  if(!mostrar){ el.style.display='none'; return; }
+  var dpr=window.devicePixelRatio||1;
+  var ctx=el.getContext('2d');
+  var m=legendaIsoCaixa(ctx, dpr, 0, 0, false);
+  if(!m){ el.style.display='none'; return; }
+  el.width=Math.ceil(m.w); el.height=Math.ceil(m.h);
+  el.style.width=(m.w/dpr)+'px'; el.style.height=(m.h/dpr)+'px';
+  ctx.clearRect(0,0,el.width,el.height);
+  legendaIsoCaixa(ctx, dpr, 0, 0, true);
+  el.className='leg-'+(iso.legenda.canto||'inf-esq');
+  el.style.display='block';
 }
 
 // Mudou parâmetro: atualiza o marcador do centro e o painel, mas NÃO
@@ -1942,6 +2114,9 @@ function syncIsoInputs(){
     var el=g('isoMin'+i); if(el) el.value=(m[i]!=null ? m[i] : '');
   }
   g('isoFill').checked=!!iso.fill;
+  g('isoLegOn').checked=!!iso.legenda.on;
+  g('isoLegCanto').value=iso.legenda.canto||'inf-esq';
+  g('isoLegTit').value=iso.legenda.titulo||'';
   var L=iso.lbl;
   g('isoLblOn').checked=!!L.on;
   g('isoLblTxt').value=L.texto;
@@ -2707,6 +2882,7 @@ function montarEditor(){
       if(s.iso){
         Object.assign(iso, s.iso);
         iso.lbl=Object.assign(JSON.parse(JSON.stringify(ISO_PADRAO.lbl)), s.iso.lbl||{});
+        iso.legenda=Object.assign(JSON.parse(JSON.stringify(ISO_PADRAO.legenda)), s.iso.legenda||{});
         iso.centro=(s.iso.centro&&s.iso.centro.length===2)?s.iso.centro.slice():CENTRO_SE.slice();
         iso.minutos=(Array.isArray(s.iso.minutos)&&s.iso.minutos.length)?s.iso.minutos.slice():ISO_PADRAO.minutos.slice();
         iso.cores=(Array.isArray(s.iso.cores)&&s.iso.cores.length)?s.iso.cores.slice():null;
@@ -3224,6 +3400,9 @@ document.getElementById('isoLblHalo').onchange = function(e){ iso.lbl.halo=e.tar
 document.getElementById('isoLblHaloCor').oninput = function(e){ iso.lbl.haloCor=e.target.value; aplicarIso(); };
 document.getElementById('isoLblHaloW').oninput = function(e){ iso.lbl.haloW=(+e.target.value)/10; aplicarIso(); };
 
+document.getElementById('isoLegOn').onchange = function(e){ iso.legenda.on=e.target.checked; aplicarIso(); };
+document.getElementById('isoLegCanto').onchange = function(e){ iso.legenda.canto=e.target.value; aplicarIso(); };
+document.getElementById('isoLegTit').oninput = function(e){ iso.legenda.titulo=e.target.value; aplicarIso(); };
 document.getElementById('isoCtAplicar').onclick = function(){
   var la=parseFloat(document.getElementById('isoCtLat').value);
   var lo=parseFloat(document.getElementById('isoCtLon').value);
@@ -4406,7 +4585,28 @@ document.getElementById('btnExport').onclick = async function(){
     Object.defineProperty(window,'devicePixelRatio',{get:()=>scale, configurable:true});
     map.resize();
     await new Promise(res=> map.once('idle', res));
-    const url = map.getCanvas().toDataURL('image/png');
+
+    // A legenda da isócrona é desenhada POR CIMA do canvas do mapa, aqui,
+    // na escala da exportação. É o único jeito de ela sair na imagem: o
+    // PNG é o canvas do mapa, e nada de HTML entra nele. Se não houver
+    // legenda a mostrar, exporta o canvas direto, como sempre foi.
+    const base = map.getCanvas();
+    let url;
+    const temLeg = iso.on && iso.legenda.on && ISO_GEO.features.some(f=> !f.properties.centro);
+    if(temLeg){
+      const out = document.createElement('canvas');
+      out.width = base.width; out.height = base.height;
+      const ctx = out.getContext('2d');
+      ctx.drawImage(base, 0, 0);
+      const cx = legendaIsoCaixa(ctx, scale, 0, 0, false);
+      if(cx){
+        const p = legendaIsoPos(iso.legenda.canto, cx, out.width, out.height, scale);
+        legendaIsoCaixa(ctx, scale, p.x, p.y, true);
+      }
+      url = out.toDataURL('image/png');
+    } else {
+      url = base.toDataURL('image/png');
+    }
     const a=document.createElement('a');
     a.download = `MakerMap_mapa_${new Date().toISOString().slice(0,10)}_${scale}x.png`;
     a.href = url; a.click();
