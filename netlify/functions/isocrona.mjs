@@ -43,9 +43,11 @@ function json(status, corpo, extra) {
 const erro = (status, msg) => json(status, { erro: msg });
 
 export default async (req) => {
-  // Só leitura. Sem isto, um POST ou DELETE seria repassado ao ORS e
-  // gastaria cota do mesmo jeito.
-  if (req.method !== 'GET' && req.method !== 'HEAD') return erro(405, 'Método não permitido.');
+  // SÓ GET. Aceitar HEAD seria o convencional em HTTP, mas aqui um HEAD
+  // atravessaria a validação e dispararia a chamada ao ORS do mesmo
+  // jeito — e HEAD é o que crawler e pré-visualização de link usam.
+  // Proteger a cota vale mais que a convenção num endpoint privado.
+  if (req.method !== 'GET') return erro(405, 'Método não permitido.');
 
   const chave = Netlify.env.get('ORS_API_KEY');
   if (!chave) {
@@ -176,9 +178,22 @@ export default async (req) => {
     return erro(502, 'O serviço não encontrou vias alcançáveis a partir deste ponto.');
   }
   // O polígono é guardado dentro do projeto, no localStorage do
-  // visitante. "metadata" é o eco do pedido e dos atributos do motor,
-  // não serve para desenhar nada e só ocupa a cota de armazenamento.
+  // visitante, cuja cota de ~5 MB é dividida com os projetos e o quadro
+  // de Novos Negócios. Duas economias antes de devolver:
+  //   · "metadata" é o eco do pedido e dos atributos do motor, e não
+  //     desenha nada;
+  //   · o ORS manda coordenadas com precisão de nanômetro. Cinco casas
+  //     decimais são ~1 m, muito além do que uma isócrona significa, e
+  //     cortam perto da metade do tamanho.
   delete geo.metadata;
+  const arredondar = (c) => Array.isArray(c[0])
+    ? c.map(arredondar)
+    : [Math.round(c[0] * 1e5) / 1e5, Math.round(c[1] * 1e5) / 1e5];
+  for (const f of geo.features) {
+    if (f && f.geometry && Array.isArray(f.geometry.coordinates)) {
+      try { f.geometry.coordinates = arredondar(f.geometry.coordinates); } catch (e) {}
+    }
+  }
 
   // A mesma isócrona pedida de novo não deve gastar cota: um dia no
   // navegador, uma semana no CDN. O resultado não muda — é a malha

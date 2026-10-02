@@ -19,11 +19,14 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   a da legenda.
 - **Nova legenda desenhada dentro do mapa**, com a cor e o tempo de cada faixa.
   Escolha o canto (os quatro), ligue e desligue, e troque o título — deixando
-  em branco, ele é automático ("Isócrona · de carro").
+  em branco, ele é automático ("Isócrona · carro").
 - **Essa legenda sai na imagem exportada.** É a primeira do Maker Map que sai:
   as legendas das gavetas são HTML e nunca apareceram no PNG. Esta é desenhada
-  no próprio mapa, na mesma resolução da exportação, então sai nítida em 2×,
-  3× ou 4×.
+  no próprio mapa, na mesma resolução que a imagem acabar tendo — a caixa
+  cresce junto com ela, sem borrar.
+- Os cantos de cima ficam **por cima do painel de municípios e dos botões**, na
+  tela. Nada deixa de funcionar (o clique passa direto) e na imagem exportada a
+  questão não existe: painel e botões não entram no PNG.
 - A caixa sobe um pouco no rodapé para não cobrir a escala do mapa nem a
   bússola.
 

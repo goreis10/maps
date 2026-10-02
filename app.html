@@ -256,12 +256,18 @@
   /* legenda da isócrona: canvas solto sobre o mapa, sem capturar clique.
      Fica dentro de #map, então acompanha sozinho o encolhimento quando
      uma gaveta abre. */
-  #isoLegenda{position:absolute;z-index:3;pointer-events:none;display:none;
+     Fica ACIMA do painel e dos chips (z-index 1001): com z-index baixo,
+     dois dos quatro cantos ficavam escondidos atrás deles e o usuário
+     escolhia um canto e não via nada. Como não captura clique, o que
+     está embaixo continua utilizável — e no PNG a questão nem existe,
+     porque painel e chips são HTML e não entram na imagem. */
+  #isoLegenda{position:absolute;z-index:1001;pointer-events:none;display:none;
     filter:drop-shadow(0 3px 10px rgba(28,25,23,.18))}
   #isoLegenda.leg-sup-esq{top:14px;left:14px}
   #isoLegenda.leg-sup-dir{top:14px;right:14px}
   #isoLegenda.leg-inf-esq{bottom:44px;left:14px}
-  #isoLegenda.leg-inf-dir{bottom:44px;right:14px}
+  /* 104px: altura do grupo de zoom/bússola da MapLibre, que mora aqui */
+  #isoLegenda.leg-inf-dir{bottom:104px;right:14px}
   #wrap.side-open #map{right:var(--drawer-w)}
   #wrap.side-open #ctrl{right:calc(var(--drawer-w) + 14px)}
   #wrap.side-open #edResize{display:block;right:calc(var(--drawer-w) - 5px)}
@@ -1793,6 +1799,9 @@ function atualizarIso(){
     // com o mesmo índice de cor, e editar uma mudaria as duas.
     var vistos={};
     fs=fs.filter(function(x){ if(vistos[x.min]) return false; vistos[x.min]=1; return true; });
+    // o match de cor só tem paradas 0..ISO_MAX_FAIXAS-1: uma faixa a mais
+    // cairia no fallback e seria pintada com a cor da primeira
+    fs=fs.slice(0, ISO_MAX_FAIXAS);
     var ordem=fs.map(function(x){ return x.min; }).sort(function(a,b){ return a-b; });
 
     // ANÉIS VERDADEIROS. O ORS devolve as faixas ANINHADAS — a de 15 min
@@ -1911,7 +1920,7 @@ function legendaIsoCaixa(ctx, esc, x, y, pintar){
   var itens=isoLegendaItens();
   if(!itens.length) return null;
   var L=LEG_ISO, e=esc;
-  var tit=(iso.legenda.titulo||'').trim() ||
+  var tit=String(iso.legenda.titulo||'').trim() ||
           ('Isócrona · '+isoPerfilNome(iso.calcPerfil).toLowerCase());
   var nota='Tempo de deslocamento, sem trânsito';
 
@@ -3328,7 +3337,7 @@ document.getElementById('rdCtBuscar').onclick = async function(){
     var r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q='+encodeURIComponent(q));
     var js = await r.json();
     if(!js.length){ toast('Endereço não encontrado.'); return; }
-    rendaRaio.centro = [parseFloat(js[0].lon), parseFloat(js[0].lat)];
+    rendaRaio.centro = [+parseFloat(js[0].lon).toFixed(5), +parseFloat(js[0].lat).toFixed(5)];
     atualizarRaioRenda();
     if(map) map.flyTo({center:rendaRaio.centro, zoom:Math.max(map.getZoom(), 9)});
     toast('Centro do raio de renda: '+js[0].display_name.split(',').slice(0,3).join(','));
@@ -3418,7 +3427,10 @@ document.getElementById('isoCtBuscar').onclick = async function(){
     var r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q='+encodeURIComponent(q));
     var js=await r.json();
     if(!js.length){ toast('Endereço não encontrado.'); return; }
-    iso.centro=[parseFloat(js[0].lon), parseFloat(js[0].lat)];
+    // arredonda como os outros caminhos de centro: guardar 8 decimais
+    // aqui e 5 nos campos faria "aplicar coords" mover o centro além da
+    // tolerância e anunciar "os parâmetros mudaram" sem o usuário mexer
+    iso.centro=[+parseFloat(js[0].lon).toFixed(5), +parseFloat(js[0].lat).toFixed(5)];
     isoMudouParametro();
     if(map) map.flyTo({center:iso.centro, zoom:Math.max(map.getZoom(), 10)});
     toast('Origem da isócrona: '+js[0].display_name.split(',').slice(0,3).join(','));
@@ -4591,22 +4603,38 @@ document.getElementById('btnExport').onclick = async function(){
     // PNG é o canvas do mapa, e nada de HTML entra nele. Se não houver
     // legenda a mostrar, exporta o canvas direto, como sempre foi.
     const base = map.getCanvas();
-    let url;
+    let url = null;
     const temLeg = iso.on && iso.legenda.on && ISO_GEO.features.some(f=> !f.properties.centro);
     if(temLeg){
-      const out = document.createElement('canvas');
-      out.width = base.width; out.height = base.height;
-      const ctx = out.getContext('2d');
-      ctx.drawImage(base, 0, 0);
-      const cx = legendaIsoCaixa(ctx, scale, 0, 0, false);
-      if(cx){
-        const p = legendaIsoPos(iso.legenda.canto, cx, out.width, out.height, scale);
-        legendaIsoCaixa(ctx, scale, p.x, p.y, true);
+      // A ESCALA REAL não é a pedida. A MapLibre limita o canvas a
+      // maxCanvasSize (4096 por padrão), então pedir 4× numa janela
+      // grande entrega bem menos. Pintar a legenda com o número pedido
+      // faria a caixa sair inflada — até 3,75× — justamente no arquivo
+      // que ela existe para ilustrar. A razão de fato aplicada é a
+      // largura do canvas dividida pela largura em px de tela.
+      const escReal = base.width / (base.clientWidth || base.width);
+      let out = null;
+      try{
+        out = document.createElement('canvas');
+        out.width = base.width; out.height = base.height;
+        const ctx = out.getContext('2d');
+        ctx.drawImage(base, 0, 0);
+        const cx = legendaIsoCaixa(ctx, escReal, 0, 0, false);
+        if(cx){
+          const p = legendaIsoPos(iso.legenda.canto, cx, out.width, out.height, escReal);
+          legendaIsoCaixa(ctx, escReal, p.x, p.y, true);
+        }
+        url = out.toDataURL('image/png');
+      }catch(e){
+        // Compor é um extra. Falhar nele não pode custar o PNG inteiro:
+        // antes da legenda existir, o usuário receberia o mapa.
+        console.error('legenda no PNG', e);
+        url = null;
+      }finally{
+        if(out){ out.width = 0; out.height = 0; }   // libera o buffer
       }
-      url = out.toDataURL('image/png');
-    } else {
-      url = base.toDataURL('image/png');
     }
+    if(url === null) url = base.toDataURL('image/png');
     const a=document.createElement('a');
     a.download = `MakerMap_mapa_${new Date().toISOString().slice(0,10)}_${scale}x.png`;
     a.href = url; a.click();
