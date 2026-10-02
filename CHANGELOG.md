@@ -5,6 +5,33 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 2.4 — Legenda da isócrona no mapa
+
+_No ar em maker-map.netlify.app._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Cada faixa de tempo agora tem a sua cor de verdade.** As faixas vêm
+  encaixadas umas dentro das outras, e antes eram pintadas empilhadas — a
+  região de 15 minutos aparecia como a soma de todas as camadas por cima dela,
+  então a cor no mapa não era a cor da bolinha ao lado da faixa. Agora cada
+  faixa é desenhada como um **anel**, e a cor que você vê no mapa é exatamente
+  a da legenda.
+- **Nova legenda desenhada dentro do mapa**, com a cor e o tempo de cada faixa.
+  Escolha o canto (os quatro), ligue e desligue, e troque o título — deixando
+  em branco, ele é automático ("Isócrona · carro").
+- **Essa legenda sai na imagem exportada.** É a primeira do Maker Map que sai:
+  as legendas das gavetas são HTML e nunca apareceram no PNG. Esta é desenhada
+  no próprio mapa, na mesma resolução que a imagem acabar tendo — a caixa
+  cresce junto com ela, sem borrar.
+- Os cantos de cima ficam **por cima do painel de municípios e dos botões**, na
+  tela. Nada deixa de funcionar (o clique passa direto) e na imagem exportada a
+  questão não existe: painel e botões não entram no PNG.
+- A caixa sobe um pouco no rodapé para não cobrir a escala do mapa nem a
+  bússola.
+
+---
+
 ## Maker Map 2.3 — Isócrona
 
 _No ar em maker-map.netlify.app._

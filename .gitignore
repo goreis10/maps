@@ -1,0 +1,8 @@
+# O projeto não tem package.json: nada aqui é dependência do produto.
+# node_modules só aparece quando uma ferramenta de conferência é
+# instalada em caráter temporário (um parser de CSS, a style-spec da
+# MapLibre). Como o netlify.toml publica a raiz do repositório, um
+# node_modules versionado iria junto para o site.
+node_modules/
+package-lock.json
+package.json
