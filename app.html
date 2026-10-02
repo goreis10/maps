@@ -1055,6 +1055,9 @@ function montarCamadas(){
 
   // Calor de DENSIDADE — heatmap nativo, que é literalmente uma estimativa de
   // densidade: soma o peso dos pontos vizinhos. Peso = domicílios do setor.
+  // SEM filtro de renda, de propósito: densidade é gente morando, e o setor
+  // que o IBGE não divulga rendimento tem domicílios do mesmo jeito. Filtrar
+  // aqui faria o calor desenhar menos gente do que o painel conta.
   map.addLayer({id:'censo-heat', type:'heatmap', source:'censo', layout:{visibility:'none'},
     paint:{
       'heatmap-weight':['interpolate',['linear'],['get','dom'], 0,0, 600,1],
@@ -1072,6 +1075,7 @@ function montarCamadas(){
   // com a COR da sua faixa, em círculos grandes e borrados que se fundem numa
   // superfície. É uma suavização visual da renda, não uma densidade.
   map.addLayer({id:'censo-surf', type:'circle', source:'censo', layout:{visibility:'none'},
+    filter:['>',['get','renda'],0],       // setor sem rendimento divulgado não pinta renda
     paint:{
       'circle-color':censoStepCor(),
       'circle-radius':['interpolate',['linear'],['zoom'], 7,14, 11,26, 14,44, 17,80],
@@ -1080,6 +1084,7 @@ function montarCamadas(){
     }});
 
   map.addLayer({id:'censo-pts', type:'circle', source:'censo', layout:{visibility:'none'},
+    filter:['>',['get','renda'],0],       // idem: um ponto por setor COM renda
     paint:{
       'circle-color':censoStepCor(),
       'circle-radius':['interpolate',['linear'],['zoom'], 7,1.6, 10,3, 13,5, 16,9, 18,14],
@@ -3048,10 +3053,12 @@ function censoCamadas(q){
 
   // mesma renda ajustada do painel, para a cor no mapa bater com a faixa
   var fat=fatorRenda();
+  // Todos os setores do raio entram na fonte. Quem não tem renda é excluído
+  // pelo FILTRO das camadas de renda, não aqui — assim o calor de densidade
+  // enxerga os mesmos domicílios que o painel soma.
   var S=CENSO.s, idx=q.idx, feats=[];
   for(var i=0;i<idx.length;i++){
     var r=S[idx[i]];
-    if(!(r[5]>0)) continue;
     feats.push({type:'Feature',
       properties:{renda:Math.round(r[5]*fat), mdn:Math.round(r[6]*fat),
                   dom:r[3], mor:r[4], mun:CENSO.mun[r[2]]||''},
