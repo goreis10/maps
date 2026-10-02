@@ -5,6 +5,27 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 2.2 — Minas Gerais, e São Paulo mais completo
+
+_Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Minas Gerais entrou no Mapa de renda**: 49.924 setores, 853 municípios e
+  7,54 milhões de domicílios. Um raio em Belo Horizonte, Uberlândia ou qualquer
+  ponto do estado agora responde.
+- **São Paulo ficou mais completo.** A base anterior vinha de uma fonte que não
+  cobre áreas sem rua mapeada e deixava de fora 10% dos setores — quase um
+  milhão de domicílios, a maioria em zona rural. A nova base vem dos polígonos
+  oficiais do IBGE e recupera esses setores: de 90.789 para **98.989**, de 15,26
+  para **16,24 milhões de domicílios**.
+  Na prática, raios que incluem área rural paulista passam a mostrar números
+  maiores — e corretos. Vale refazer análises antigas que dependiam disso.
+- A base cobre agora **São Paulo, Minas Gerais e Bahia**: 179.224 setores. O raio
+  continua baixando só os estados que alcança.
+
+---
+
 ## Maker Map 2.1 — Bahia no Mapa de renda
 
 _Aguardando publicação._
