@@ -255,7 +255,7 @@
   .side-drawer.show{transform:translateX(0)}
   /* legenda da isócrona: canvas solto sobre o mapa, sem capturar clique.
      Fica dentro de #map, então acompanha sozinho o encolhimento quando
-     uma gaveta abre. */
+     uma gaveta abre.
      Fica ACIMA do painel e dos chips (z-index 1001): com z-index baixo,
      dois dos quatro cantos ficavam escondidos atrás deles e o usuário
      escolhia um canto e não via nada. Como não captura clique, o que
@@ -1799,8 +1799,12 @@ function atualizarIso(){
     // com o mesmo índice de cor, e editar uma mudaria as duas.
     var vistos={};
     fs=fs.filter(function(x){ if(vistos[x.min]) return false; vistos[x.min]=1; return true; });
-    // o match de cor só tem paradas 0..ISO_MAX_FAIXAS-1: uma faixa a mais
-    // cairia no fallback e seria pintada com a cor da primeira
+    // O match de cor só tem paradas 0..ISO_MAX_FAIXAS-1: uma faixa a mais
+    // cairia no fallback e seria pintada com a cor da primeira. Ordena
+    // ANTES de cortar para guardar as menores, e não as quatro primeiras
+    // da resposta — hoje o ORS manda em ordem crescente, mas depender
+    // disso faria o corte mudar de significado se ele mudasse.
+    fs.sort(function(a,b){ return a.min-b.min; });
     fs=fs.slice(0, ISO_MAX_FAIXAS);
     var ordem=fs.map(function(x){ return x.min; }).sort(function(a,b){ return a-b; });
 

@@ -186,9 +186,14 @@ export default async (req) => {
   //     decimais são ~1 m, muito além do que uma isócrona significa, e
   //     cortam perto da metade do tamanho.
   delete geo.metadata;
-  const arredondar = (c) => Array.isArray(c[0])
-    ? c.map(arredondar)
-    : [Math.round(c[0] * 1e5) / 1e5, Math.round(c[1] * 1e5) / 1e5];
+  // O teste de array vazio não é zelo: sem ele, [] vira [NaN,NaN], que o
+  // JSON.stringify grava como [null,null] — GeoJSON inválido que faria o
+  // worker da MapLibre lançar ao calcular o sentido do anel. E NaN não
+  // lança, então o try/catch abaixo não pegaria.
+  const arredondar = (c) => c.length === 0 ? c
+    : Array.isArray(c[0])
+      ? c.map((x) => arredondar(x))
+      : [Math.round(c[0] * 1e5) / 1e5, Math.round(c[1] * 1e5) / 1e5];
   for (const f of geo.features) {
     if (f && f.geometry && Array.isArray(f.geometry.coordinates)) {
       try { f.geometry.coordinates = arredondar(f.geometry.coordinates); } catch (e) {}
