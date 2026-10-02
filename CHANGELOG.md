@@ -5,6 +5,45 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 2.3 — Isócrona
+
+_Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Nova ferramenta: Isócrona.** Em vez de um círculo, ela desenha a área que
+  se alcança de verdade a partir de um ponto dentro de um tempo de
+  deslocamento — recortada pelas estradas reais. Botão **Isócrona** na barra
+  superior.
+- **Quatro modos de deslocamento**: carro, caminhão, bicicleta e a pé.
+- **Até quatro faixas de tempo** por cálculo, de 1 a 120 minutos. As faixas são
+  aninhadas (a de 15 min fica dentro da de 30) e aparecem em tons de roxo, da
+  mais próxima para a mais distante.
+- A **origem** é definida por coordenadas, por endereço ou clicando no mapa,
+  como nos dois raios que já existiam.
+- Cada faixa mostra a **área em km²**, e a **cor de cada faixa pode ser
+  trocada** na bolinha ao lado dela — a lista serve de legenda e de editor.
+- Cor, preenchimento e legenda da isócrona são ajustáveis, com o mesmo controle
+  de texto, tamanho e contorno dos demais rótulos.
+- A isócrona **sai na imagem exportada**, porque é desenhada no mapa.
+- O cálculo **só acontece quando você clica em Calcular**, não a cada ajuste.
+  Se mudar algum parâmetro depois, o painel avisa que o desenho na tela é o
+  anterior. Isso é de propósito: cada cálculo é uma consulta a um serviço
+  externo, com limite de uso.
+- A isócrona **fica salva no projeto**, inclusive o desenho já calculado —
+  reabrir um projeto não gasta uma nova consulta.
+- Disponível no plano **Pro**.
+
+> **Os tempos não consideram trânsito.** O cálculo usa a malha viária do
+> OpenStreetMap com velocidade de via livre, então "30 minutos" é 30 minutos de
+> madrugada. Em horário de pico a área real é menor. O painel informa isso.
+
+> A análise de renda do Censo **dentro** da isócrona vem na próxima versão.
+> Por enquanto a isócrona desenha, e o Mapa de renda continua trabalhando com
+> o raio circular.
+
+---
+
 ## Maker Map 2.2.1 — Correção no mapa de calor de densidade
 
 _No ar em maker-map.netlify.app._

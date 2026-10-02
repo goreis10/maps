@@ -25,6 +25,10 @@
                           raioLbl + aplicarRaioLbl() (legenda editável)
   • Raio do Mapa renda .. rendaRaio, atualizarRaioRenda(),
                           aplicarRaioRenda() — círculo próprio da gaveta
+  • Isócrona ............ iso, buscarIsocrona() (chama /api/isocrona,
+                          que guarda a chave do OpenRouteService),
+                          atualizarIso(), aplicarIso() — polígono de
+                          alcance por tempo de deslocamento
   • Censo IBGE 2022 ..... carregarCenso() (lazy, censo/<uf>.json por UF
                           conforme censo/manifest.json e o alcance do raio),
                           censoConsulta() (agrega no raio + margem de
@@ -46,6 +50,8 @@
   Requisitos de rede do visitante: cdnjs.cloudflare.com,
   tiles.openfreemap.org, server.arcgisonline.com, api.bcb.gov.br,
   fonts.googleapis.com e (busca de endereço) nominatim.openstreetmap.org
+  A isócrona NÃO acrescenta host: o navegador chama /api/isocrona, no
+  próprio domínio, e é a função da Netlify que fala com o ORS.
 ═══════════════════════════════════════════════════════════════════
 -->
 
@@ -270,6 +276,8 @@
   .sd-toggles{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:12px;margin-bottom:6px;border-bottom:1px solid var(--line)}
   .sd-toggles .chip{box-shadow:none}
   .sd-sec .e-row,.sd-sec .grid-edit,.sd-sec .grid-head,.sd-sec .e-hint{padding-left:0;padding-right:0}
+  /* 4 modos de deslocamento numa gaveta estreita: aperta para caber */
+  #isoPerfil button{padding:6px 9px;font-size:11px}
 
   /* Análise do Censo dentro do raio do Mapa de renda */
   .rd-box{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
@@ -510,6 +518,7 @@
     <div class="chip" id="chipEdit"><span class="dot"></span>Edição</div>
     <div class="chip" id="btnCores"><span class="dot" style="background:var(--magenta)"></span>Cores</div>
     <div class="chip" id="btnRenda"><span class="dot" style="background:#0E9F8A"></span>Mapa de renda</div>
+    <div class="chip" id="btnIso"><span class="dot" style="background:#6B21A8"></span>Isócrona</div>
     <select id="expScale" title="Resolução da imagem exportada">
       <option value="2">PNG 2×</option>
       <option value="3" selected>PNG 3×</option>
@@ -709,6 +718,64 @@
       <div class="e-hint">Raio próprio do Mapa de renda, independente do raio da Edição.</div>
     </div>
     <div id="rendaAnalise" class="rd-box"></div>
+  </div>
+
+  <div id="drawerIso" class="side-drawer" role="dialog" aria-modal="true">
+    <div class="sd-head">
+      <div class="sd-title">Isócrona</div>
+      <button id="isoClose" class="e-x" title="fechar">×</button>
+    </div>
+    <div class="sd-toggles">
+      <div class="chip" id="chipIso" title="mostrar/esconder a isócrona no mapa"><span class="dot"></span>Isócrona</div>
+    </div>
+    <div class="sd-sec">
+      <div class="e-hint">Área alcançável a partir de um ponto dentro de um tempo de
+        deslocamento — recortada pelas estradas reais, não um círculo.</div>
+      <div class="e-subhead">Modo de deslocamento</div>
+      <div class="e-row">
+        <div class="seg" id="isoPerfil" style="box-shadow:none;flex-wrap:wrap">
+          <button type="button" data-perfil="driving-car" class="on">Carro</button>
+          <button type="button" data-perfil="driving-hgv">Caminhão</button>
+          <button type="button" data-perfil="cycling-regular">Bicicleta</button>
+          <button type="button" data-perfil="foot-walking">A pé</button>
+        </div>
+      </div>
+      <div class="e-subhead">Faixas de tempo (minutos)</div>
+      <div class="e-row" style="gap:6px">
+        <input type="number" id="isoMin0" min="1" max="120" step="1" value="15" title="1ª faixa">
+        <input type="number" id="isoMin1" min="1" max="120" step="1" value="30" title="2ª faixa">
+        <input type="number" id="isoMin2" min="1" max="120" step="1" value="45" title="3ª faixa">
+        <input type="number" id="isoMin3" min="1" max="120" step="1" value="" title="4ª faixa">
+      </div>
+      <div class="e-hint">Até quatro faixas, de 1 a 120 minutos. Deixe em branco as que
+        não quiser. As faixas são aninhadas: a de 15 min fica dentro da de 30.
+        Acima de 60 minutos o serviço de roteamento pode recusar o cálculo,
+        conforme o limite do plano contratado.</div>
+      <div class="e-subhead">Origem</div>
+      <div class="e-row"><label>Centro</label><input type="number" id="isoCtLat" step="0.0001" value="-23.5505" title="latitude"><input type="number" id="isoCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
+      <div class="e-row"><input type="text" id="isoCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
+      <div class="e-row" style="gap:12px;font-size:11px">
+        <a id="isoCtAplicar" style="color:var(--azul);cursor:pointer">aplicar coords</a>
+        <a id="isoCtBuscar" style="color:var(--azul);cursor:pointer">buscar endereço</a>
+        <a id="isoCtMapa" style="color:var(--azul);cursor:pointer">escolher no mapa</a>
+      </div>
+      <div class="e-row" style="margin-top:10px"><button class="rd-load" id="isoCalc">Calcular isócrona</button></div>
+      <div class="e-subhead">Aparência</div>
+      <div class="e-row"><label><input type="checkbox" id="isoFill" checked> preenchimento</label></div>
+      <div class="e-row"><label><input type="checkbox" id="isoLblOn" checked> legenda</label>
+        <input type="text" id="isoLblTxt" placeholder="texto automático" title="deixe vazio para usar o texto automático" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
+      <div class="grid-rot grid-head"><span></span><span></span><span></span><span>Tamanho</span><span></span><span>Contorno</span></div>
+      <div class="grid-edit grid-rot">
+        <span class="e-nome" style="font-weight:600">Legenda</span>
+        <label class="lbl-halochk" title="contorno liga/desliga"><input type="checkbox" id="isoLblHalo" checked></label>
+        <input type="color" id="isoLblCor" value="#6B21A8" title="cor do texto">
+        <input type="range" id="isoLblTam" min="60" max="240" value="100" title="tamanho do texto (%)">
+        <input type="color" id="isoLblHaloCor" value="#FFFFFF" title="cor do contorno">
+        <input type="range" id="isoLblHaloW" min="0" max="40" value="16" title="espessura do contorno">
+      </div>
+      <div class="e-hint">A cor de cada faixa é editada na bolinha ao lado dela, na lista abaixo.</div>
+    </div>
+    <div id="isoPainel" class="rd-box"></div>
   </div>
 
   <div id="edResize" title="arraste para ajustar a largura"></div>
@@ -1110,6 +1177,31 @@ function montarCamadas(){
       'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
     paint:{'text-color':'#0A6E60', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
 
+  // isócrona — polígono de alcance por tempo de deslocamento.
+  // As faixas são aninhadas e vêm na fonte da maior para a menor, então
+  // o preenchimento translúcido se acumula e cria o efeito de cebola.
+  // O filtro é "não é ponto" (e não "é Polygon") porque o serviço pode
+  // devolver MultiPolygon quando a área sai desconexa — uma ilha, ou o
+  // outro lado de um rio sem ponte dentro do tempo.
+  map.addSource('isocrona', {type:'geojson', data:ISO_GEO});
+  map.addLayer({id:'iso-fill', type:'fill', source:'isocrona',
+    filter:['!=',['geometry-type'],'Point'], layout:{visibility:'none'},
+    paint:{'fill-color':ISO_CORES_PADRAO[0], 'fill-opacity':0.18}});
+  map.addLayer({id:'iso-borda', type:'line', source:'isocrona',
+    filter:['!=',['geometry-type'],'Point'], layout:{visibility:'none'},
+    paint:{'line-color':ISO_CORES_PADRAO[0], 'line-width':1.8}});
+  map.addLayer({id:'iso-centro', type:'circle', source:'isocrona',
+    filter:['==',['geometry-type'],'Point'], layout:{visibility:'none'},
+    paint:{'circle-radius':5, 'circle-color':ISO_CORES_PADRAO[0],
+           'circle-stroke-color':'#FFFFFF', 'circle-stroke-width':2}});
+  map.addLayer({id:'iso-rotulo', type:'symbol', source:'isocrona',
+    // só na origem CALCULADA: o rótulo descreve o polígono, então não
+    // pode se grudar na origem pendente, que ainda não gerou desenho
+    filter:['all',['==',['geometry-type'],'Point'],['!=',['get','pendente'],1]],
+    layout:{visibility:'none', 'text-field':'30 min · carro', 'text-font':['Noto Sans Regular'],
+      'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
+    paint:{'text-color':'#6B21A8', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
+
   map.addSource('glebas', {type:'geojson', data:DATA});
   map.addSource('glebas-pts', {type:'geojson', data:labelPts});
 
@@ -1130,7 +1222,7 @@ function montarCamadas(){
 
   ['gleba-fill','gleba-linha','gleba-ponto'].forEach(id=>{
     map.on('click', id, e=>{
-      if (drawing || pickCentro || pickCentroRenda) return;
+      if (drawing || pickAtivo) return;
       const p = e.features[0].properties;
       new maplibregl.Popup({closeButton:true, maxWidth:'280px'})
         .setLngLat(e.lngLat)
@@ -1149,7 +1241,7 @@ function montarCamadas(){
 
   // popup de um setor censitário
   map.on('click','censo-pts', e=>{
-    if(drawing || pickCentro || pickCentroRenda) return;
+    if(drawing || pickAtivo) return;
     const p=e.features[0].properties;
     const n=(v,d)=>Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});
     new maplibregl.Popup({closeButton:true, maxWidth:'260px'})
@@ -1171,6 +1263,7 @@ function montarCamadas(){
   classificarTiers();
   if(window.__ajustarViasUI) window.__ajustarViasUI();   // mostra só os subníveis que existem
   atualizarRaioRenda();          // desenha o círculo do Mapa de renda (nasce oculto)
+  atualizarIso();                // semeia o marcador de origem da isócrona (idem)
   if(window.__aplicarRaioLbl) window.__aplicarRaioLbl();
   refreshStats();
   // cada sessão começa do zero; projetos são abertos manualmente em "Meus Projetos"
@@ -1467,7 +1560,6 @@ bS.onclick = ()=> setSat(true);
 let raioKm = 100;
 const CENTRO_SE = [-46.6333, -23.5505];
 let centroRaio = CENTRO_SE.slice();
-let pickCentro = false;
 function centroEhSe(){ return Math.abs(centroRaio[0]-CENTRO_SE[0])<1e-6 && Math.abs(centroRaio[1]-CENTRO_SE[1])<1e-6; }
 
 function gerarCirculo(km, centro){
@@ -1502,7 +1594,53 @@ const RENDA_PADRAO = {on:false, km:10, centro:CENTRO_SE.slice(), cor:'#0E9F8A', 
 // se parecer.
 var CENSO_HEAT_CORES = ['#2C7FB8','#41B6C4','#A1DAB4','#FFFFB2','#FEB24C','#E31A1C'];
 let rendaRaio = JSON.parse(JSON.stringify(RENDA_PADRAO));
-let pickCentroRenda = false;
+
+// ── Isócrona ──────────────────────────────────────────────────────
+// Área alcançável em X minutos de deslocamento a partir de um ponto.
+// Não é um círculo: é um polígono recortado pelas estradas reais.
+//
+// As faixas vêm ANINHADAS do ORS (a de 15 min está dentro da de 30),
+// então desenhar da maior para a menor com opacidade baixa dá o efeito
+// de camadas de cebola sem precisar de recorte geométrico.
+const ISO_PERFIS = [
+  {k:'driving-car',     nome:'Carro'},
+  {k:'driving-hgv',     nome:'Caminhão'},
+  {k:'cycling-regular', nome:'Bicicleta'},
+  {k:'foot-walking',    nome:'A pé'}
+];
+// Cores das faixas, da mais próxima para a mais distante. Roxo para não
+// competir com o azul do raio da Edição nem com o verde do de renda.
+const ISO_CORES_PADRAO = ['#6B21A8','#9333EA','#C084FC','#E9D5FF'];
+const ISO_MAX_FAIXAS = 4;      // o mesmo teto que a função impõe
+const ISO_PADRAO = {
+  on:false,
+  centro:CENTRO_SE.slice(),
+  perfil:'driving-car',
+  minutos:[15,30,45],     // até ISO_MAX_FAIXAS faixas, 1..120 min
+  cores:null,             // null = ISO_CORES_PADRAO
+  fill:true,
+  poly:null,              // GeoJSON devolvido pelo serviço
+  calcCentro:null,        // centro/perfil/minutos de quando foi calculado,
+  calcPerfil:null,        // para a gaveta saber que os parâmetros mudaram
+  calcMin:null,
+  calcEm:null,            // timestamp do cálculo
+  lbl:{on:true, texto:'', cor:'#6B21A8', tam:1, halo:true, haloCor:'#FFFFFF', haloW:1.6}
+};
+let iso = JSON.parse(JSON.stringify(ISO_PADRAO));
+let isoCarregando = false;
+const ISO_GEO = {type:'FeatureCollection', features:[]};
+
+// Um único modo de clique no mapa por vez. Eram dois flags se excluindo
+// aos pares; com três centros (raio, renda, isócrona) isso viraria bug
+// garantido — dois modos ligados ao mesmo tempo e o primeiro clique
+// definindo o centro errado.
+let pickAtivo = null;          // null | 'raio' | 'renda' | 'iso'
+function pickLigar(qual){
+  if(typeof drawing!=='undefined' && drawing) drawSetMode(false);
+  pickAtivo = qual;
+  if(map) map.getCanvas().style.cursor = qual ? 'crosshair' : '';
+}
+function pickDesligar(){ pickAtivo=null; if(map) map.getCanvas().style.cursor=''; }
 const RAIO_RENDA = {type:'FeatureCollection', features:[
   {type:'Feature', properties:{}, geometry:{type:'Polygon', coordinates:[[]]}},
   {type:'Feature', properties:{}, geometry:{type:'Point', coordinates:CENTRO_SE.slice()}}
@@ -1550,7 +1688,7 @@ function aplicarRaioRenda(){
   map.setPaintProperty('raior-fill','fill-color', rendaRaio.cor);
   map.setPaintProperty('raior-fill','fill-opacity', rendaRaio.fill ? 0.05 : 0);
   map.setPaintProperty('raior-centro','circle-color', rendaRaio.cor);
-  map.setLayoutProperty('raior-rotulo','text-field', L.texto.trim() || textoRendaAuto());
+  map.setLayoutProperty('raior-rotulo','text-field', (L.texto||'').trim() || textoRendaAuto());
   map.setLayoutProperty('raior-rotulo','text-size', 11.5*L.tam);
   map.setPaintProperty('raior-rotulo','text-color', L.cor);
   map.setPaintProperty('raior-rotulo','text-halo-color', L.haloCor);
@@ -1576,6 +1714,245 @@ function syncRaioRendaInputs(){
   g('rdIpca').checked = !!rendaRaio.ipca;
   g('rdOutros').value = (+rendaRaio.outros||0);
   syncAjusteInfo();
+}
+
+// ── Isócrona: estado derivado, mapa e chamada do serviço ──────────
+function isoCores(){ return (iso.cores && iso.cores.length) ? iso.cores : ISO_CORES_PADRAO; }
+function isoCorFaixa(i){ var C=isoCores(); return C[i] || C[C.length-1]; }
+
+// Normaliza o que o usuário digitou: inteiros de 1 a 120, sem repetir,
+// em ordem, no máximo ISO_MAX_FAIXAS. A função no servidor aplica os
+// mesmos limites — aqui é só para não gastar uma chamada à toa.
+function isoMinutos(){
+  var m=(iso.minutos||[]).map(function(v){ return Math.round(+v); })
+         .filter(function(v){ return isFinite(v) && v>=1 && v<=120; });
+  m=m.filter(function(v,i,a){ return a.indexOf(v)===i; }).sort(function(a,b){ return a-b; });
+  return m.slice(0, ISO_MAX_FAIXAS);
+}
+function isoPerfilNome(k){
+  var p=ISO_PERFIS.filter(function(x){ return x.k===(k||iso.perfil); })[0];
+  return p ? p.nome : 'Carro';
+}
+// O rótulo descreve O POLÍGONO DESENHADO, não os campos da gaveta.
+// Ele é o único texto da isócrona que entra no PNG exportado, então
+// amarrá-lo aos parâmetros atuais faria a imagem mentir toda vez que
+// alguém mexesse num campo sem recalcular.
+function textoIsoAuto(){
+  var calc=!!iso.poly;
+  var m=(calc && iso.calcMin && iso.calcMin.length) ? iso.calcMin : isoMinutos();
+  var pf=calc ? (iso.calcPerfil||iso.perfil) : iso.perfil;
+  return m.length ? (m[m.length-1]+' min · '+isoPerfilNome(pf).toLowerCase()) : 'Isócrona';
+}
+// O desenho na tela é de outra pergunta? Isso tem de estar escrito, e
+// não dá para recalcular sozinho: cada cálculo é uma chamada com cota.
+function isoDesatualizado(){
+  if(!iso.poly) return false;
+  if(iso.calcPerfil!==iso.perfil) return true;
+  if(!iso.calcCentro || Math.abs(iso.calcCentro[0]-iso.centro[0])>1e-6
+                     || Math.abs(iso.calcCentro[1]-iso.centro[1])>1e-6) return true;
+  return (iso.calcMin||[]).join(',') !== isoMinutos().join(',');
+}
+
+function atualizarIso(){
+  ISO_GEO.features = [];
+  if(iso.poly && iso.poly.features && iso.poly.features.length){
+    // O ORS devolve uma feição por faixa, com properties.value em
+    // SEGUNDOS e, porque pedimos attributes:['area'], a área em km².
+    var fs=iso.poly.features.filter(function(f){
+             // Faixa sem tempo válido pegaria a cor mais interna E
+             // ficaria por cima de todas — a pior degradação possível.
+             // O teste é "> 0", não isFinite: +null, +'' e +false são 0,
+             // que é finito, e passariam.
+             return f && f.geometry && +((f.properties||{}).value) > 0;
+           })
+           .map(function(f){
+             var p=f.properties||{};
+             return {g:f.geometry, min:Math.round((+p.value)/60), area:+p.area||0};
+           });
+    // Duas faixas que arredondam para o mesmo minuto virariam duas barras
+    // com o mesmo índice de cor, e editar uma mudaria as duas.
+    var vistos={};
+    fs=fs.filter(function(x){ if(vistos[x.min]) return false; vistos[x.min]=1; return true; });
+    var ordem=fs.map(function(x){ return x.min; }).sort(function(a,b){ return a-b; });
+    // MAIOR PRIMEIRO: dentro de uma camada, feição posterior fica em cima,
+    // então as faixas menores (mais internas) precisam vir depois.
+    fs.sort(function(a,b){ return b.min-a.min; }).forEach(function(x){
+      ISO_GEO.features.push({type:'Feature', geometry:x.g,
+        properties:{min:x.min, area:x.area, ordem:ordem.indexOf(x.min)}});
+    });
+  }
+  // Dois pontos possíveis, e a diferença importa para o PNG:
+  //  · a origem CALCULADA, à qual o polígono e o rótulo correspondem;
+  //  · a origem PENDENTE (vazada), só quando os parâmetros mudaram —
+  //    é o retorno visual de "escolher no mapa" sem fazer o rótulo
+  //    descrever um ponto que não gerou o desenho.
+  var temPoly=ISO_GEO.features.length>0;
+  var base=(temPoly && iso.calcCentro) ? iso.calcCentro : iso.centro;
+  ISO_GEO.features.push({type:'Feature', properties:{centro:1, pendente:0},
+    geometry:{type:'Point', coordinates:base.slice()}});
+  if(temPoly && isoDesatualizado())
+    ISO_GEO.features.push({type:'Feature', properties:{centro:1, pendente:1},
+      geometry:{type:'Point', coordinates:iso.centro.slice()}});
+  if(map && map.getSource('isocrona')) map.getSource('isocrona').setData(ISO_GEO);
+  aplicarIso();
+}
+
+function aplicarIso(){
+  var chip=document.getElementById('chipIso');
+  if(chip) chip.classList.toggle('on', iso.on);
+  if(!map || !map.getLayer('iso-borda')) return;
+  // O MARCADOR DE ORIGEM aparece com o chip ligado mesmo sem cálculo:
+  // é o retorno visual de "escolher no mapa". O polígono e a legenda só
+  // aparecem quando há o que desenhar.
+  //
+  // A fonte da verdade é o que FOI PARA A FONTE, não iso.poly: um poly
+  // cujas faixas foram todas descartadas é truthy e ligaria rótulo e
+  // contorno sobre desenho nenhum — o PNG sairia com legenda e sem
+  // isócrona, que é exatamente o que este bloco existe para impedir.
+  var temDesenho=ISO_GEO.features.some(function(f){ return !f.properties.centro; });
+  var vis=(iso.on && temDesenho) ? 'visible' : 'none';
+  ['iso-fill','iso-borda'].forEach(function(id){ map.setLayoutProperty(id,'visibility',vis); });
+  map.setLayoutProperty('iso-centro','visibility', iso.on ? 'visible' : 'none');
+  var L=iso.lbl;
+  map.setLayoutProperty('iso-rotulo','visibility', (iso.on && temDesenho && L.on) ? 'visible' : 'none');
+
+  var cor=['match',['get','ordem']];
+  for(var i=0;i<ISO_MAX_FAIXAS;i++) cor.push(i, isoCorFaixa(i));
+  cor.push(isoCorFaixa(0));          // fallback do match
+  map.setPaintProperty('iso-fill','fill-color',cor);
+  map.setPaintProperty('iso-fill','fill-opacity', iso.fill ? 0.18 : 0);
+  map.setPaintProperty('iso-borda','line-color',cor);
+  // origem pendente sai vazada; a calculada, sólida
+  map.setPaintProperty('iso-centro','circle-color',
+    ['case',['==',['get','pendente'],1], '#FFFFFF', isoCorFaixa(0)]);
+  map.setPaintProperty('iso-centro','circle-stroke-color',
+    ['case',['==',['get','pendente'],1], isoCorFaixa(0), '#FFFFFF']);
+  map.setLayoutProperty('iso-rotulo','text-field', (L.texto||'').trim() || textoIsoAuto());
+  map.setLayoutProperty('iso-rotulo','text-size', 11.5*L.tam);
+  map.setPaintProperty('iso-rotulo','text-color',L.cor);
+  map.setPaintProperty('iso-rotulo','text-halo-color',L.haloCor);
+  map.setPaintProperty('iso-rotulo','text-halo-width', L.halo ? L.haloW : 0);
+}
+
+// Mudou parâmetro: atualiza o marcador do centro e o painel, mas NÃO
+// busca nada. O raio redesenha ao vivo porque é geometria local; a
+// isócrona não pode, porque cada redesenho seria uma chamada paga.
+function isoMudouParametro(){
+  // Mexer nos parâmetros é trabalhar na isócrona: liga a exibição, de
+  // modo que ao menos o marcador de origem apareça na hora.
+  iso.on = true;
+  atualizarIso();
+  syncIsoInputs();
+  renderIso();
+}
+
+function renderIso(){
+  var box=document.getElementById('isoPainel');
+  var btn=document.getElementById('isoCalc');
+  if(btn){
+    btn.disabled=isoCarregando;
+    btn.textContent=isoCarregando ? 'Calculando…' : (iso.poly ? 'Recalcular isócrona' : 'Calcular isócrona');
+  }
+  if(!box) return;
+  var num=function(v,d){ return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); };
+  var h='';
+  if(isoCarregando){
+    h+='<div class="rd-msg">Consultando o serviço de roteamento…</div>';
+  } else if(!iso.poly){
+    h+='<div class="rd-msg">Defina a origem, o modo de deslocamento e as faixas de tempo, '+
+       'e clique em <b>Calcular isócrona</b>.</div>';
+  } else {
+    if(isoDesatualizado())
+      h+='<div class="rd-msg warn">Os parâmetros mudaram desde o cálculo. O desenho no mapa '+
+         'ainda é o anterior — clique em <b>Recalcular isócrona</b>.</div>';
+    var fs=ISO_GEO.features.filter(function(f){ return !f.properties.centro; })
+            .slice().sort(function(a,b){ return a.properties.min-b.properties.min; });
+    // A bolinha de cor é a própria legenda: editar aqui repinta o mapa,
+    // igual ao gráfico de faixas de renda.
+    h+='<div class="rd-sub">Faixas de tempo</div><div class="rd-fx">'+
+       fs.map(function(f){
+         var i=f.properties.ordem;
+         return '<div class="rd-fxr">'+
+                  '<input type="color" class="rd-sw" value="'+isoCorFaixa(i)+'" '+
+                    'data-iso-cor="'+i+'" title="cor desta faixa">'+
+                  '<span>'+f.properties.min+' min de '+isoPerfilNome(iso.calcPerfil).toLowerCase()+'</span>'+
+                '</div>'+
+                '<u>'+(f.properties.area>0 ? num(f.properties.area)+' km²' : '—')+'</u>';
+       }).join('')+'</div>';
+    if(iso.calcEm)
+      h+='<div class="rd-foot">Calculada em '+
+         new Date(iso.calcEm).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})+'.</div>';
+  }
+  h+='<div class="rd-foot">Tempos calculados sobre a malha viária do OpenStreetMap, '+
+     '<b>sem considerar trânsito</b>. Em horário de pico a área alcançada é menor.</div>';
+  box.innerHTML=h;
+  // oninput repinta e NÃO refaz este HTML: reconstruir fecharia o
+  // seletor de cor do navegador no meio do arraste.
+  box.querySelectorAll('input[data-iso-cor]').forEach(function(inp){
+    inp.oninput=function(){
+      if(!iso.cores) iso.cores=ISO_CORES_PADRAO.slice();
+      iso.cores[+inp.getAttribute('data-iso-cor')]=inp.value;
+      aplicarIso();
+    };
+  });
+}
+
+async function buscarIsocrona(){
+  if(isoCarregando) return;
+  if(!map || !map.getLayer('iso-borda')){ toast('Aguarde o mapa carregar.'); return; }
+  var mins=isoMinutos();
+  if(!mins.length){ toast('Informe ao menos uma faixa de tempo, de 1 a 120 minutos.'); return; }
+  isoCarregando=true; renderIso();
+  var url='/api/isocrona?lon='+iso.centro[0]+'&lat='+iso.centro[1]+
+          '&perfil='+encodeURIComponent(iso.perfil)+'&min='+mins.join(',');
+  try{
+    var r=await fetch(url);
+    var js=null;
+    try{ js=await r.json(); }catch(e){}
+    if(!r.ok){
+      // Falha NÃO apaga o polígono anterior: perder um cálculo que deu
+      // certo por causa de uma tentativa que falhou custaria outra cota.
+      toast((js && js.erro) || ('Falha no cálculo (HTTP '+r.status+').'));
+      return;
+    }
+    iso.poly=js;
+    iso.minutos=mins.slice();
+    iso.calcCentro=iso.centro.slice();
+    iso.calcPerfil=iso.perfil;
+    iso.calcMin=mins.slice();
+    iso.calcEm=Date.now();
+    iso.on=true;
+    atualizarIso();
+    toast('Isócrona de '+mins.join(' / ')+' min ('+isoPerfilNome().toLowerCase()+') calculada.');
+  }catch(err){
+    console.error('isocrona', err);
+    toast('Falha de rede ao calcular a isócrona.');
+  }finally{
+    isoCarregando=false; renderIso();
+  }
+}
+
+function syncIsoInputs(){
+  var g=function(id){ return document.getElementById(id); };
+  if(!g('isoCtLat')) return;
+  g('isoCtLat').value=iso.centro[1].toFixed(5);
+  g('isoCtLon').value=iso.centro[0].toFixed(5);
+  var m=isoMinutos();
+  for(var i=0;i<ISO_MAX_FAIXAS;i++){
+    var el=g('isoMin'+i); if(el) el.value=(m[i]!=null ? m[i] : '');
+  }
+  g('isoFill').checked=!!iso.fill;
+  var L=iso.lbl;
+  g('isoLblOn').checked=!!L.on;
+  g('isoLblTxt').value=L.texto;
+  g('isoLblCor').value=L.cor;
+  g('isoLblTam').value=Math.round(L.tam*100);
+  g('isoLblHalo').checked=!!L.halo;
+  g('isoLblHaloCor').value=L.haloCor;
+  g('isoLblHaloW').value=Math.round(L.haloW*10);
+  document.querySelectorAll('#isoPerfil button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-perfil')===iso.perfil);
+  });
 }
 
 // Estado dos dois campos de ajuste, mostrado ao lado deles.
@@ -1719,8 +2096,7 @@ function montarEditor(){
   };
   document.getElementById('edCtMapa').onclick = ()=>{
     if(drawing) drawSetMode(false);
-    pickCentroRenda = false;
-    pickCentro = true;
+    pickLigar('raio');
     if(map) map.getCanvas().style.cursor = 'crosshair';
     toast('Clique no mapa para definir o centro do raio.');
   };
@@ -1934,7 +2310,7 @@ function montarEditor(){
     if(!map){ toast('Aguarde o mapa carregar.'); return; }
     // modos interativos
     if(drawing) drawSetMode(false);
-    pickCentro = false; map.getCanvas().style.cursor='';
+    pickDesligar();
     // pilha acima da máscara
     ['edViaRod','edViaAv','edViaRua','edDemaisAcima','edCidAcima'].forEach(i=> document.getElementById(i).checked=false);
     cidadesAcima = false; cidadesSel = []; document.getElementById('edCidSel').value='';
@@ -1984,11 +2360,17 @@ function montarEditor(){
     }
     document.getElementById('chipRaio').classList.remove('on');
     // raio do Mapa de renda
-    pickCentroRenda = false;
     rendaRaio = JSON.parse(JSON.stringify(RENDA_PADRAO));
     document.getElementById('rdCtEnd').value = '';
     syncRaioRendaInputs();
     atualizarRaioRenda();
+    // isócrona — descarta também o polígono calculado
+    iso = JSON.parse(JSON.stringify(ISO_PADRAO));
+    isoCarregando = false;
+    document.getElementById('isoCtEnd').value = '';
+    syncIsoInputs();
+    atualizarIso();
+    renderIso();
     // glebas: cores de grupo, preenchimento, filtros e rótulos
     DATA.features.forEach(f=>{
       f.properties.cor_final = CORES[f.properties.municipio] || '#8A8F98';
@@ -2218,6 +2600,7 @@ function montarEditor(){
              fill: document.getElementById('edRaioFill').checked,
              lbl: JSON.parse(JSON.stringify(raioLbl)) },
       renda: JSON.parse(JSON.stringify(rendaRaio)),
+      iso:   JSON.parse(JSON.stringify(iso)),
       mask:{ cor: document.getElementById('edMaskCor').value,
              op: +document.getElementById('edMaskOp').value,
              cobre: maskCobreGlebas },
@@ -2237,7 +2620,7 @@ function montarEditor(){
     if(!map || !s) return;
     try{
       if(typeof drawing!=='undefined' && drawing) drawSetMode(false);
-      pickCentro=false; map.getCanvas().style.cursor='';
+      pickDesligar();
 
       // vias (config + fundo) e inputs da seção Vias
       Object.keys(viaCfg).forEach(function(k){ if(s.vias && s.vias[k]) Object.assign(viaCfg[k], s.vias[k]); });
@@ -2301,7 +2684,6 @@ function montarEditor(){
       }
 
       // raio do Mapa de renda (projetos antigos não têm: cai no padrão)
-      pickCentroRenda=false;
       rendaRaio=JSON.parse(JSON.stringify(RENDA_PADRAO));
       if(s.renda){
         Object.assign(rendaRaio, s.renda);
@@ -2317,6 +2699,29 @@ function montarEditor(){
       atualizarRaioRenda();
       // projeto salvo com o raio de renda ligado quer a análise de volta
       if(rendaRaio.on && censoStatus!=='carregando') carregarCenso();
+
+      // isócrona (projetos antigos não têm: cai no padrão).
+      // O POLÍGONO volta do projeto, nunca é recalculado: reabrir um
+      // projeto não deve gastar uma chamada da cota de roteamento.
+      iso=JSON.parse(JSON.stringify(ISO_PADRAO));
+      if(s.iso){
+        Object.assign(iso, s.iso);
+        iso.lbl=Object.assign(JSON.parse(JSON.stringify(ISO_PADRAO.lbl)), s.iso.lbl||{});
+        iso.centro=(s.iso.centro&&s.iso.centro.length===2)?s.iso.centro.slice():CENTRO_SE.slice();
+        iso.minutos=(Array.isArray(s.iso.minutos)&&s.iso.minutos.length)?s.iso.minutos.slice():ISO_PADRAO.minutos.slice();
+        iso.cores=(Array.isArray(s.iso.cores)&&s.iso.cores.length)?s.iso.cores.slice():null;
+        if(ISO_PERFIS.every(function(p){ return p.k!==iso.perfil; })) iso.perfil=ISO_PADRAO.perfil;
+        // os calc* alimentam isoDesatualizado() e o rótulo; vindos
+        // crus de um localStorage adulterado, derrubam a gaveta
+        iso.calcMin=Array.isArray(s.iso.calcMin)?s.iso.calcMin.slice():null;
+        iso.calcCentro=(s.iso.calcCentro&&s.iso.calcCentro.length===2)?s.iso.calcCentro.slice():null;
+        if(ISO_PERFIS.every(function(p){ return p.k!==iso.calcPerfil; })) iso.calcPerfil=null;
+        if(!iso.poly || !iso.poly.features || !iso.poly.features.length){ iso.poly=null; iso.on=false; }
+      }
+      isoCarregando=false;
+      syncIsoInputs();
+      atualizarIso();
+      renderIso();
 
       // glebas: cores + preenchimento
       if(s.areas){
@@ -2444,6 +2849,7 @@ var FEATURE_PLANS = {
   exportar:        'free',   // exportar imagem PNG (botão + resolução)
   cores:           'free',   // paletas de cores pré-definidas
   mapaRenda:       'pro',    // "Mapa de renda" — Pro+ apenas
+  isocrona:        'pro',    // "Isócrona" — Pro+ apenas
   novosNegocios:   'pro',    // tela "Novos Negócios" (kanban) — Pro+ apenas
   // Seções internas do painel de "Edição"
   secCidade:       'free',   // "Por cidade" — Free+
@@ -2480,6 +2886,7 @@ var FEATURE_ROTULOS = {
   salvarProjeto:   'Salvar projetos',
   meusProjetos:    'Abrir e gerenciar projetos salvos',
   mapaRenda:       'Mapa de renda: raio, Censo IBGE 2022, pontos e mapa de calor',
+  isocrona:        'Isócrona: área alcançável por tempo de deslocamento',
   novosNegocios:   'Novos Negócios: quadro das áreas por etapa'
 };
 
@@ -2506,6 +2913,7 @@ var FEATURE_ELEMENTS = {
   exportar:        ['#btnExport', '#expScale'],
   cores:           ['#btnCores'],
   mapaRenda:       ['#btnRenda'],
+  isocrona:        ['#btnIso'],
   novosNegocios:   ['.nv-item[data-view="negocios"]'],
   secCidade:       ['#secCidade'],
   secArea:         ['#secArea'],
@@ -2615,7 +3023,7 @@ window.MakerPlano = { get: getUserPlano, temAcesso: temAcesso, aplicar: aplicarP
 aplicarPlano();
 
 const __wrap = document.getElementById('wrap');
-var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda'];
+var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda','drawerIso'];
 function abrirEdicao(on){
   const ed = document.getElementById('editor');
   if(on){ // abrir a Edição fecha as gavetas laterais
@@ -2752,8 +3160,7 @@ document.getElementById('rdCtBuscar').onclick = async function(){
 };
 document.getElementById('rdCtMapa').onclick = function(){
   if(drawing) drawSetMode(false);
-  pickCentro = false;
-  pickCentroRenda = true;
+  pickLigar('renda');
   if(map) map.getCanvas().style.cursor = 'crosshair';
   toast('Clique no mapa para definir o centro do raio de renda.');
 };
@@ -2761,6 +3168,86 @@ document.getElementById('rdCtSe').onclick = function(){
   rendaRaio.centro = CENTRO_SE.slice();
   atualizarRaioRenda();
   toast('Centro restaurado: Marco Zero, Praça da Sé.');
+};
+
+// ── Isócrona (Pro) — gaveta própria ──
+document.getElementById('btnIso').onclick = function(){
+  syncIsoInputs();
+  renderIso();
+  abrirGaveta('drawerIso');
+};
+document.getElementById('isoClose').onclick = fecharGaveta;
+
+document.getElementById('chipIso').onclick = function(){
+  if(!map || !map.getLayer('iso-borda')){ toast('Aguarde o mapa carregar.'); return; }
+  iso.on = !iso.on;
+  aplicarIso();
+  if(iso.on && !iso.poly) toast('Origem marcada. Clique em Calcular isócrona para desenhar a área.');
+};
+document.getElementById('isoCalc').onclick = function(){ buscarIsocrona(); };
+
+document.querySelectorAll('#isoPerfil button').forEach(function(b){
+  b.onclick = function(){
+    iso.perfil = b.getAttribute('data-perfil');
+    isoMudouParametro();
+  };
+});
+for(var _i=0; _i<ISO_MAX_FAIXAS; _i++){
+  (function(i){
+    var el=document.getElementById('isoMin'+i);
+    if(!el) return;
+    el.onchange = function(){
+      var txt=(el.value||'').trim();
+      // A base é isoMinutos(), não iso.minutos: é a lista normalizada
+      // que syncIsoInputs escreveu nos campos, então o índice do campo
+      // corresponde a ela — e não necessariamente à ordem do estado.
+      var novo=isoMinutos();
+      while(novo.length < i) novo.push(null);
+      // 0, negativo ou lixo RETIRA a faixa em vez de virar 1 minuto
+      // calado — substituir o valor do usuário por outro é pior que
+      // obedecer ao que ele digitou.
+      var v=Math.round(+txt);
+      novo[i] = (txt==='' || !isFinite(v) || v<1) ? null : Math.min(120, v);
+      novo = novo.filter(function(v){ return v!=null; });
+      if(novo.length) iso.minutos = novo;
+      else toast('É preciso ao menos uma faixa de tempo.');
+      isoMudouParametro();   // reescreve os campos a partir do estado
+    };
+  })(_i);
+}
+document.getElementById('isoFill').onchange = function(e){ iso.fill=e.target.checked; aplicarIso(); };
+document.getElementById('isoLblOn').onchange = function(e){ iso.lbl.on=e.target.checked; aplicarIso(); };
+document.getElementById('isoLblTxt').oninput = function(e){ iso.lbl.texto=e.target.value; aplicarIso(); };
+document.getElementById('isoLblCor').oninput = function(e){ iso.lbl.cor=e.target.value; aplicarIso(); };
+document.getElementById('isoLblTam').oninput = function(e){ iso.lbl.tam=(+e.target.value)/100; aplicarIso(); };
+document.getElementById('isoLblHalo').onchange = function(e){ iso.lbl.halo=e.target.checked; aplicarIso(); };
+document.getElementById('isoLblHaloCor').oninput = function(e){ iso.lbl.haloCor=e.target.value; aplicarIso(); };
+document.getElementById('isoLblHaloW').oninput = function(e){ iso.lbl.haloW=(+e.target.value)/10; aplicarIso(); };
+
+document.getElementById('isoCtAplicar').onclick = function(){
+  var la=parseFloat(document.getElementById('isoCtLat').value);
+  var lo=parseFloat(document.getElementById('isoCtLon').value);
+  if(!isFinite(la) || !isFinite(lo)){ toast('Coordenadas inválidas.'); return; }
+  iso.centro=[+lo.toFixed(5), +la.toFixed(5)];
+  isoMudouParametro();
+  if(map) map.flyTo({center:iso.centro, zoom:Math.max(map.getZoom(), 9)});
+};
+document.getElementById('isoCtBuscar').onclick = async function(){
+  var q=(document.getElementById('isoCtEnd').value||'').trim();
+  if(!q){ toast('Digite um endereço ou cidade.'); return; }
+  try{
+    var r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q='+encodeURIComponent(q));
+    var js=await r.json();
+    if(!js.length){ toast('Endereço não encontrado.'); return; }
+    iso.centro=[parseFloat(js[0].lon), parseFloat(js[0].lat)];
+    isoMudouParametro();
+    if(map) map.flyTo({center:iso.centro, zoom:Math.max(map.getZoom(), 10)});
+    toast('Origem da isócrona: '+js[0].display_name.split(',').slice(0,3).join(','));
+  }catch(err){ console.error(err); toast('Falha na busca (rede bloqueando nominatim.openstreetmap.org?).'); }
+};
+document.getElementById('isoCtMapa').onclick = function(){
+  pickLigar('iso');
+  toast('Clique no mapa para definir a origem da isócrona.');
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -3819,20 +4306,22 @@ function drawSetup(){
     filter:['==',['geometry-type'],'Point'],
     paint:{'circle-radius':4,'circle-color':'#FFFFFF','circle-stroke-color':'#E04010','circle-stroke-width':2}});
   map.on('click', e=>{
-    if(pickCentro){
-      pickCentro = false;
-      centroRaio = [+e.lngLat.lng.toFixed(5), +e.lngLat.lat.toFixed(5)];
-      map.getCanvas().style.cursor = '';
-      if(typeof window.__atualizarRaio === 'function') window.__atualizarRaio();
-      toast('Centro do raio definido.');
-      return;
-    }
-    if(pickCentroRenda){
-      pickCentroRenda = false;
-      rendaRaio.centro = [+e.lngLat.lng.toFixed(5), +e.lngLat.lat.toFixed(5)];
-      map.getCanvas().style.cursor = '';
-      atualizarRaioRenda();
-      toast('Centro do raio de renda definido.');
+    if(pickAtivo){
+      var qual = pickAtivo, pt = [+e.lngLat.lng.toFixed(5), +e.lngLat.lat.toFixed(5)];
+      pickDesligar();
+      if(qual==='raio'){
+        centroRaio = pt;
+        if(typeof window.__atualizarRaio === 'function') window.__atualizarRaio();
+        toast('Centro do raio definido.');
+      } else if(qual==='renda'){
+        rendaRaio.centro = pt;
+        atualizarRaioRenda();
+        toast('Centro do raio de renda definido.');
+      } else if(qual==='iso'){
+        iso.centro = pt;
+        isoMudouParametro();
+        toast('Origem da isócrona definida — clique em Calcular.');
+      }
       return;
     }
     if(!drawing) return;
@@ -3846,6 +4335,7 @@ function drawSetup(){
   });
 }
 function drawSetMode(on){
+  if(on) pickDesligar();   // os dois modos de clique se excluem
   drawing = on;
   drawPts = [];
   drawRefresh();
@@ -3873,9 +4363,8 @@ document.getElementById('chipDraw').onclick = ()=>{
 window.addEventListener('keydown', e=>{
   if(e.key !== 'Escape') return;
   if(drawing) drawSetMode(false);
-  if(pickCentro || pickCentroRenda){
-    pickCentro = false; pickCentroRenda = false;
-    if(map) map.getCanvas().style.cursor='';
+  if(pickAtivo){
+    pickDesligar();
     toast('Seleção de centro cancelada.');
   }
 });
