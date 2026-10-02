@@ -5,9 +5,30 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 2.2 — Minas Gerais, e São Paulo mais completo
+## Maker Map 2.2.1 — Correção no mapa de calor de densidade
 
 _Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- O **mapa de calor de densidade** deixava de fora os setores em que o IBGE não
+  divulga rendimento, e por isso desenhava menos gente do que o painel contava.
+  Em Campinas, num raio de 20 km, o painel somava 671.387 domicílios e o calor
+  representava 555.930 — 17% a menos. Agora os dois concordam.
+- O erro existia desde que o mapa de calor foi criado, mas quase não aparecia:
+  a base antiga de São Paulo enxergava poucos setores sem renda. Com a base nova
+  da versão 2.2, ele passou a ser visível.
+- Os **pontos** e o **calor de renda** continuam mostrando apenas setores com
+  renda informada, como deve ser — não há como colorir por faixa de renda um
+  setor que não tem renda.
+- O rodapé do painel passou a dizer exatamente onde esses domicílios entram e
+  onde ficam de fora, para não haver dúvida depois da correção.
+
+---
+
+## Maker Map 2.2 — Minas Gerais, e São Paulo mais completo
+
+_No ar em maker-map.netlify.app._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
