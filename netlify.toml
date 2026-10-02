@@ -26,11 +26,15 @@
   [headers.values]
     Cache-Control = "public, max-age=300"
 
-# Os arquivos de UF são grandes e mudam raramente, mas NÃO são "immutable":
-# o SP atual vem de uma fonte de geometria incompleta (faltam ~10% dos
-# setores) e deve ser regerado. Com "immutable" o visitante ficaria um ano
-# preso na versão velha. Um dia de cache + revalidação por ETag dá o mesmo
-# ganho prático sem esse risco.
+# Arquivos de UF: um dia de cache. NÃO são "immutable" porque a base de um
+# estado pode ser refeita (o SP foi, ao migrar para polígonos).
+#
+# ATENÇÃO: max-age sem must-revalidate significa que, DENTRO da janela de um
+# dia, o navegador nem pergunta — serve do cache. Então trocar o CONTEÚDO de
+# um arquivo sem trocar o NOME faz o visitante recente combinar manifesto
+# novo com dado velho, e o painel apresenta número subnotificado sem avisar.
+# Por isso a regra: conteúdo novo, nome novo (ex.: 35.json -> 35-v2.json),
+# com o manifesto apontando para ele. O manifesto propaga em 5 minutos.
 [[headers]]
   for = "/censo/*"
   [headers.values]
