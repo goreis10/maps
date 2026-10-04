@@ -736,7 +736,7 @@
         <div class="e-row"><label><input type="checkbox" id="riFill" checked> preenchimento</label>
           <label><input type="checkbox" id="riLblOn" checked> legenda</label></div>
         <div class="e-hint">Duas faixas: a análise responde por <b>uma</b> de cada vez — clique na
-          bolinha para escolher qual. A outra fica no mapa para comparar.
+          linha da faixa para escolher qual (a bolinha troca a cor). A outra fica no mapa para comparar.
           Tempos calculados sobre a malha viária do OpenStreetMap, <b>sem considerar trânsito</b>.</div>
       </div>
 
@@ -1751,7 +1751,7 @@ const ISO_GEO = {type:'FeatureCollection', features:[]};
 // aos pares; com três centros (raio, renda, isócrona) isso viraria bug
 // garantido — dois modos ligados ao mesmo tempo e o primeiro clique
 // definindo o centro errado.
-let pickAtivo = null;          // null | 'raio' | 'renda' | 'iso'
+let pickAtivo = null;          // null | 'raio' | 'renda' | 'iso' | 'renda-iso'
 function pickLigar(qual){
   if(typeof drawing!=='undefined' && drawing) drawSetMode(false);
   pickAtivo = qual;
@@ -2085,12 +2085,14 @@ function aplicarRendaIso(){
   map.setPaintProperty('isor-fill','fill-color',cor);
   map.setPaintProperty('isor-fill','fill-opacity', rendaIso.fill ? 0.18 : 0);
   map.setPaintProperty('isor-borda','line-color',cor);
-  // a faixa analisada ganha traço cheio; a outra, tracejado
+  // A faixa analisada ganha traço mais grosso. NÃO use line-dasharray
+  // para distinguir: além de ser propriedade de PAINT (chamá-la como
+  // layout lança e derruba esta função inteira), ela é cross-faded e
+  // não aceita expressão por feição — o traço valeria para a camada
+  // toda. O line-width abaixo já faz a distinção, por feição.
   var sel=rendaIsoFaixaAtual();
   map.setPaintProperty('isor-borda','line-width',
     ['case',['==',['get','min'], sel?sel.min:-1], 2.6, 1.4]);
-  map.setLayoutProperty('isor-borda','line-dasharray',
-    sel ? ['literal',[1,0]] : ['literal',[3,2]]);
   map.setPaintProperty('isor-centro','circle-color',
     ['case',['==',['get','pendente'],1], '#FFFFFF', rendaIsoCorFaixa(0)]);
   map.setPaintProperty('isor-centro','circle-stroke-color',
@@ -2341,18 +2343,8 @@ async function buscarIsocrona(){
   var mins=isoMinutos();
   if(!mins.length){ toast('Informe ao menos uma faixa de tempo, de 1 a 120 minutos.'); return; }
   isoCarregando=true; renderIso();
-  var url='/api/isocrona?lon='+iso.centro[0]+'&lat='+iso.centro[1]+
-          '&perfil='+encodeURIComponent(iso.perfil)+'&min='+mins.join(',');
   try{
-    var r=await fetch(url);
-    var js=null;
-    try{ js=await r.json(); }catch(e){}
-    if(!r.ok){
-      // Falha NÃO apaga o polígono anterior: perder um cálculo que deu
-      // certo por causa de uma tentativa que falhou custaria outra cota.
-      toast((js && js.erro) || ('Falha no cálculo (HTTP '+r.status+').'));
-      return;
-    }
+    var js=await isoPedir(iso, mins);
     iso.poly=js;
     iso.minutos=mins.slice();
     iso.calcCentro=iso.centro.slice();
@@ -2364,7 +2356,12 @@ async function buscarIsocrona(){
     toast('Isócrona de '+mins.join(' / ')+' min ('+isoPerfilNome().toLowerCase()+') calculada.');
   }catch(err){
     console.error('isocrona', err);
-    toast('Falha de rede ao calcular a isócrona.');
+    // A mensagem do servidor é acionável ("cota esgotada", "faixa passa
+    // do limite", "chave recusada"); trocá-la por um genérico de rede
+    // apagaria a informação de que o usuário precisa. Falha NÃO apaga o
+    // polígono anterior: perder um cálculo que deu certo por causa de
+    // uma tentativa que falhou custaria outra cota.
+    toast(err && err.message ? err.message : 'Falha de rede ao calcular a isócrona.');
   }finally{
     isoCarregando=false; renderIso();
   }
@@ -2820,6 +2817,8 @@ function montarEditor(){
     if(_riEnd) _riEnd.value = '';
     censoCache.chave = null;
     atualizarRendaIso();
+    syncRendaModo();
+    renderRenda();
     // glebas: cores de grupo, preenchimento, filtros e rótulos
     DATA.features.forEach(f=>{
       f.properties.cor_final = CORES[f.properties.municipio] || '#8A8F98';
@@ -3198,6 +3197,8 @@ function montarEditor(){
       rendaIsoCarregando=false;
       censoCache.chave=null;
       atualizarRendaIso();
+      syncRendaModo();          // segmentado, caixa da isócrona e lista de faixas
+      renderRenda();
 
       // glebas: cores + preenchimento
       if(s.areas){
@@ -4170,7 +4171,9 @@ function areaPoligonoKm2(geom){
       total += (i===0 ? 1 : -1) * Math.abs(s)/2;   // anel 0 soma, furos descontam
     });
   });
-  return Math.max(0, total);
+  // NaN propagaria: 'NaN km²' no cabeçalho, densidade 0 e margem 0% —
+  // ou seja, o aviso de recorte ruim calado por causa de um dado ruim.
+  return isFinite(total) ? Math.max(0, total) : 0;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -4263,35 +4266,65 @@ function censoConsultaPoly(geom){
   if(q.vazio) return q;
   var rs=Math.sqrt(q.area/(Math.PI*idx.length));
   q.setorMedioM=rs*1000;
-  q.margem = q.dom>0 ? censoBordaPoly(geom, rs)/q.dom*100 : 100;
+  // a banda conta domicílios de fora do recorte e divide pelos de
+  // dentro, então em recorte minúsculo passa de 100%; exibir 143% só
+  // confunde — acima de 100 a mensagem já é "não use estes números"
+  q.margem = q.dom>0 ? Math.min(100, censoBordaPoly(geom, rs)/q.dom*100) : 100;
   return q;
 }
 
 // Domicílios a menos de rs do contorno, dentro ou fora — a mesma conta
 // que o círculo faz, só que contra um polígono.
 //
-// Aproximação deliberada: mede a distância aos VÉRTICES do contorno, e
-// não aos segmentos. O polígono do roteamento tem vértice a cada poucas
-// centenas de metros, e a margem já é um limite superior e não uma
-// medida exata; contra todos os segmentos seriam ~10^8 operações a cada
-// redesenho. Os vértices vão para uma grade de célula rs, então cada
-// setor olha só 9 células em vez do contorno inteiro.
+// O contorno é DENSIFICADO em passos de rs/2 antes de ir para a grade.
+// Medir só contra os vértices originais SUBESTIMA, e muito: com vértices
+// a 1,9 km e rs de 175 m, a medida saiu em 14% do valor real. Subestimar
+// aqui é o pior erro possível — o aviso de "recorte pequeno demais" cala
+// justamente quando deveria falar, e o painel apresenta número confiante
+// e errado. Densificar sai mais exato E mais rápido, porque a grade
+// deixa de ter poucas células com muitos vértices.
+//
+// A grade tem célula rs, então cada setor olha 9 células em vez do
+// contorno inteiro; e só são testados os setores dentro da caixa do
+// polígono alargada em rs — o resto está longe demais por construção.
 function censoBordaPoly(geom, rsKm){
-  var vs=[];
-  aneisDe(geom).forEach(function(a){ for(var i=0;i<a.length;i++) vs.push(a[i]); });
-  if(!vs.length || !(rsKm>0)) return 0;
-  var latM=0;
-  for(var i=0;i<vs.length;i++) latM+=vs[i][1];
-  latM/=vs.length;
-  var kx=111.320*Math.cos(latM*Math.PI/180) || 1, ky=110.574;
+  var aneis=aneisDe(geom), bb=geomCaixa(geom);
+  if(!aneis.length || !bb || !(rsKm>0)) return 0;
+
+  // latitude média dos vértices originais, para converter grau em km
+  var soma=0, cont=0;
+  aneis.forEach(function(a){ for(var i=0;i<a.length;i++){ soma+=a[i][1]; cont++; } });
+  if(!cont) return 0;
+  var kx=111.320*Math.cos((soma/cont)*Math.PI/180) || 1, ky=110.574;
+
+  var vs=[], passo=rsKm/2;
+  aneis.forEach(function(a){
+    for(var i=0;i<a.length;i++){
+      var p0=a[i], p1=a[(i+1)%a.length];
+      vs.push(p0);
+      var dx=(p1[0]-p0[0])*kx, dy=(p1[1]-p0[1])*ky;
+      var L=Math.sqrt(dx*dx+dy*dy);
+      // teto por segmento: sem ele, um rs minúsculo com um segmento
+      // longo geraria milhões de pontos e travaria a aba
+      var n=Math.min(Math.floor(L/passo), 1000);
+      for(var t=1;t<=n;t++){
+        var f=t/(n+1);
+        vs.push([p0[0]+(p1[0]-p0[0])*f, p0[1]+(p1[1]-p0[1])*f]);
+      }
+    }
+  });
+
   var dLon=rsKm/kx, dLat=rsKm/ky, grade={};
   for(var v=0;v<vs.length;v++){
     var ch=Math.floor(vs[v][0]/dLon)+'|'+Math.floor(vs[v][1]/dLat);
     (grade[ch] || (grade[ch]=[])).push(vs[v]);
   }
+
   var S=CENSO.s, dom=0, r2=rsKm*rsKm;
+  var mLon=rsKm/kx, mLat=rsKm/ky;
   for(var k=0;k<S.length;k++){
     var r=S[k], lon=r[1], lat=r[0];
+    if(lon<bb[0]-mLon || lon>bb[2]+mLon || lat<bb[1]-mLat || lat>bb[3]+mLat) continue;
     var cx=Math.floor(lon/dLon), cy=Math.floor(lat/dLat), perto=false;
     for(var ax=-1;ax<=1 && !perto;ax++) for(var ay=-1;ay<=1 && !perto;ay++){
       var cel=grade[(cx+ax)+'|'+(cy+ay)];
@@ -4506,7 +4539,7 @@ function renderRenda(){
 
   box.innerHTML=
     '<div class="rd-h">Dentro d'+(rendaModo==='iso'?'a isócrona':'o raio')+' <em>'+
-      (rendaModo==='iso' ? esc(censoTituloCurto())+' · '+isoPerfilNome(rendaIso.calcPerfil).toLowerCase()
+      (rendaModo==='iso' ? esc(censoTituloCurto())+' · '+isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()
                          : nf(rendaRaio.km)+' km')+' · '+nf(q.area)+' km²</em></div>'+
     '<div class="rd-stat big"><span>Domicílios ocupados</span><b>'+nf(q.dom)+'</b></div>'+
     '<div class="rd-stat big"><span>Pessoas (estimativa)</span><b>'+nf(q.pes)+'</b></div>'+

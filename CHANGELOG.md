@@ -11,7 +11,7 @@ _Aguardando publicação._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
-- **O Mapa de renda deixa de ser só por raio.** Um botão novo, no topo da gaveta,
+- **O Mapa de renda deixa de ser só por raio.** Um botão novo, na gaveta,
   troca o recorte da análise entre **Raio** e **Isócrona**. No modo isócrona, o
   perfil de domicílios, renda, classe e faixas passa a ser calculado dentro da
   área que se alcança de verdade pelas estradas — e não dentro de um círculo.
@@ -20,7 +20,7 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   botão Isócrona da barra superior — do mesmo jeito que o raio daqui já é
   independente do raio da Edição.
 - **Duas faixas de tempo.** A análise responde por uma delas de cada vez: clique
-  na faixa para escolher qual. A outra continua desenhada no mapa, para
+  na linha da faixa para escolher qual (a bolinha ao lado troca a cor). A outra continua desenhada no mapa, para
   comparar — a de 15 e a de 30 minutos lado a lado.
 - Cada faixa mostra a **área em km²**, tem cor editável na bolinha, e a faixa
   analisada aparece com traço mais forte no mapa.
