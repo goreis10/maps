@@ -722,28 +722,9 @@
       <div class="e-row"><label>Raio</label><input type="number" id="edRaioKm" value="100" min="1" max="2000" step="5"><label>km</label></div>
       <div class="e-row"><label>Cor</label><input type="color" id="edRaioCor" value="#337FFF"></div>
       <div class="e-row"><label><input type="checkbox" id="edRaioFill" checked> preenchimento</label></div>
-      <div class="e-row"><label><input type="checkbox" id="edRaioLblOn" checked> legenda</label>
-        <input type="text" id="edRaioLblTxt" placeholder="texto automático" title="deixe vazio para usar o texto automático" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
-      <div class="grid-rot grid-head"><span></span><span></span><span></span><span>Tamanho</span><span></span><span>Contorno</span></div>
-      <div class="grid-edit grid-rot">
-        <span class="e-nome" style="font-weight:600">Legenda</span>
-        <label class="lbl-halochk" title="contorno liga/desliga"><input type="checkbox" id="edRaioLblHalo" checked></label>
-        <input type="color" id="edRaioLblCor" value="#1D4FA8" title="cor do texto">
-        <input type="range" id="edRaioLblTam" min="60" max="240" value="100" title="tamanho do texto (%)">
-        <input type="color" id="edRaioLblHaloCor" value="#FFFFFF" title="cor do contorno">
-        <input type="range" id="edRaioLblHaloW" min="0" max="40" value="16" title="espessura do contorno">
-      </div>
+      <div data-mm-leg="edRaioLbl" data-cor="#1D4FA8"></div>
       <div class="e-hint">Legenda vazia = texto automático (“Marco Zero · raio 100 km”). Cor, tamanho e contorno são próprios da legenda.</div>
-      <div class="e-row"><label>Centro</label><input type="number" id="edCtLat" step="0.0001" value="-23.5505" title="latitude"><input type="number" id="edCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
-      <div class="e-row"><input type="text" id="edCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
-      <div class="e-row" style="gap:12px;font-size:11px">
-        <a id="edCtAplicar" style="color:var(--azul);cursor:pointer">aplicar coords</a>
-        <a id="edCtBuscar" style="color:var(--azul);cursor:pointer">buscar endereço</a>
-      </div>
-      <div class="e-row" style="gap:12px;font-size:11px">
-        <a id="edCtMapa" style="color:var(--azul);cursor:pointer">escolher no mapa</a>
-        <a id="edCtSe" style="color:var(--azul);cursor:pointer">voltar ao Marco Zero</a>
-      </div>
+      <div data-mm-ct="ed" data-rot="Centro" data-se="1"></div>
     </details>
     <details id="secMascara"><summary>Máscara</summary>
       <div class="e-row"><label>Cor</label><input type="color" id="edMaskCor" value="#1C1917"></div>
@@ -879,15 +860,7 @@
           <input type="number" id="riMin0" min="1" max="120" step="1" value="15" title="1ª faixa">
           <input type="number" id="riMin1" min="1" max="120" step="1" value="30" title="2ª faixa">
           <label>min</label></div>
-        <div class="e-row"><label>Origem</label>
-          <input type="number" id="riCtLat" step="0.0001" value="-23.5505" title="latitude">
-          <input type="number" id="riCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
-        <div class="e-row"><input type="text" id="riCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
-        <div class="e-row" style="gap:12px;font-size:11px">
-          <a id="riCtAplicar" style="color:var(--azul);cursor:pointer">aplicar coords</a>
-          <a id="riCtBuscar" style="color:var(--azul);cursor:pointer">buscar endereço</a>
-          <a id="riCtMapa" style="color:var(--azul);cursor:pointer">escolher no mapa</a>
-        </div>
+        <div data-mm-ct="ri" data-rot="Origem"></div>
         <div class="e-row" style="margin-top:8px"><button class="rd-load" id="riCalc">Calcular isócrona</button></div>
         <div id="riFaixas"></div>
         <div class="e-row"><label><input type="checkbox" id="riFill" checked> preenchimento</label>
@@ -915,27 +888,8 @@
       <div class="e-row"><label>Raio</label><input type="number" id="rdRaioKm" value="10" min="1" max="2000" step="1"><label>km</label></div>
       <div class="e-row"><label>Cor</label><input type="color" id="rdRaioCor" value="#0E9F8A"></div>
       <div class="e-row"><label><input type="checkbox" id="rdRaioFill" checked> preenchimento</label></div>
-      <div class="e-row"><label><input type="checkbox" id="rdLblOn" checked> legenda</label>
-        <input type="text" id="rdLblTxt" placeholder="texto automático" title="deixe vazio para usar o texto automático" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
-      <div class="grid-rot grid-head"><span></span><span></span><span></span><span>Tamanho</span><span></span><span>Contorno</span></div>
-      <div class="grid-edit grid-rot">
-        <span class="e-nome" style="font-weight:600">Legenda</span>
-        <label class="lbl-halochk" title="contorno liga/desliga"><input type="checkbox" id="rdLblHalo" checked></label>
-        <input type="color" id="rdLblCor" value="#0A6E60" title="cor do texto">
-        <input type="range" id="rdLblTam" min="60" max="240" value="100" title="tamanho do texto (%)">
-        <input type="color" id="rdLblHaloCor" value="#FFFFFF" title="cor do contorno">
-        <input type="range" id="rdLblHaloW" min="0" max="40" value="16" title="espessura do contorno">
-      </div>
-      <div class="e-row"><label>Centro</label><input type="number" id="rdCtLat" step="0.0001" value="-23.5505" title="latitude"><input type="number" id="rdCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
-      <div class="e-row"><input type="text" id="rdCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
-      <div class="e-row" style="gap:12px;font-size:11px">
-        <a id="rdCtAplicar" style="color:var(--azul);cursor:pointer">aplicar coords</a>
-        <a id="rdCtBuscar" style="color:var(--azul);cursor:pointer">buscar endereço</a>
-      </div>
-      <div class="e-row" style="gap:12px;font-size:11px">
-        <a id="rdCtMapa" style="color:var(--azul);cursor:pointer">escolher no mapa</a>
-        <a id="rdCtSe" style="color:var(--azul);cursor:pointer">voltar ao Marco Zero</a>
-      </div>
+      <div data-mm-leg="rdLbl" data-cor="#0A6E60"></div>
+      <div data-mm-ct="rd" data-rot="Centro" data-se="1"></div>
       <div class="e-hint">Raio próprio do Mapa de renda, independente do raio da Edição.</div>
     </div>
     <div id="rendaAnalise" class="rd-box"></div>
@@ -973,27 +927,11 @@
         Acima de 60 minutos o serviço de roteamento pode recusar o cálculo,
         conforme o limite do plano contratado.</div>
       <div class="e-subhead">Origem</div>
-      <div class="e-row"><label>Centro</label><input type="number" id="isoCtLat" step="0.0001" value="-23.5505" title="latitude"><input type="number" id="isoCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
-      <div class="e-row"><input type="text" id="isoCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
-      <div class="e-row" style="gap:12px;font-size:11px">
-        <a id="isoCtAplicar" style="color:var(--azul);cursor:pointer">aplicar coords</a>
-        <a id="isoCtBuscar" style="color:var(--azul);cursor:pointer">buscar endereço</a>
-        <a id="isoCtMapa" style="color:var(--azul);cursor:pointer">escolher no mapa</a>
-      </div>
+      <div data-mm-ct="iso" data-rot="Origem"></div>
       <div class="e-row" style="margin-top:10px"><button class="rd-load" id="isoCalc">Calcular isócrona</button></div>
       <div class="e-subhead">Aparência</div>
       <div class="e-row"><label><input type="checkbox" id="isoFill" checked> preenchimento</label></div>
-      <div class="e-row"><label><input type="checkbox" id="isoLblOn" checked> legenda</label>
-        <input type="text" id="isoLblTxt" placeholder="texto automático" title="deixe vazio para usar o texto automático" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
-      <div class="grid-rot grid-head"><span></span><span></span><span></span><span>Tamanho</span><span></span><span>Contorno</span></div>
-      <div class="grid-edit grid-rot">
-        <span class="e-nome" style="font-weight:600">Legenda</span>
-        <label class="lbl-halochk" title="contorno liga/desliga"><input type="checkbox" id="isoLblHalo" checked></label>
-        <input type="color" id="isoLblCor" value="#6B21A8" title="cor do texto">
-        <input type="range" id="isoLblTam" min="60" max="240" value="100" title="tamanho do texto (%)">
-        <input type="color" id="isoLblHaloCor" value="#FFFFFF" title="cor do contorno">
-        <input type="range" id="isoLblHaloW" min="0" max="40" value="16" title="espessura do contorno">
-      </div>
+      <div data-mm-leg="isoLbl" data-cor="#6B21A8"></div>
       <div class="e-subhead">Legenda no mapa</div>
       <div class="e-row"><label><input type="checkbox" id="isoLegOn" checked> mostrar no mapa</label>
         <select id="isoLegCanto" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:600 11.5px 'Archivo',sans-serif">
@@ -1935,12 +1873,23 @@ const ISO_GEO = {type:'FeatureCollection', features:[]};
 // garantido — dois modos ligados ao mesmo tempo e o primeiro clique
 // definindo o centro errado.
 let pickAtivo = null;          // null | 'raio' | 'renda' | 'iso' | 'renda-iso'
+// Qual bloco de centro corresponde a cada modo de clique, para marcar o
+// botão ⌖ enquanto o modo está armado: o cursor de cruz é a única pista
+// que existia, e ela desaparece quando o ponteiro sai do mapa.
+var PICK_CT = {raio:'ed', renda:'rd', 'renda-iso':'ri', iso:'iso'};
+function pickMarcarBotao(){
+  Object.keys(PICK_CT).forEach(function(q){
+    var b = document.getElementById(PICK_CT[q]+'CtMapa');
+    if(b) b.classList.toggle('on', pickAtivo===q);
+  });
+}
 function pickLigar(qual){
   if(typeof drawing!=='undefined' && drawing) drawSetMode(false);
   pickAtivo = qual;
   if(map) map.getCanvas().style.cursor = qual ? 'crosshair' : '';
+  pickMarcarBotao();
 }
-function pickDesligar(){ pickAtivo=null; if(map) map.getCanvas().style.cursor=''; }
+function pickDesligar(){ pickAtivo=null; if(map) map.getCanvas().style.cursor=''; pickMarcarBotao(); }
 const RAIO_RENDA = {type:'FeatureCollection', features:[
   {type:'Feature', properties:{}, geometry:{type:'Polygon', coordinates:[[]]}},
   {type:'Feature', properties:{}, geometry:{type:'Point', coordinates:CENTRO_SE.slice()}}
@@ -2009,6 +1958,7 @@ function syncRaioRendaInputs(){
   g('rdLblHaloW').value = Math.round(L.haloW*10);
   g('rdCtLat').value = rendaRaio.centro[1].toFixed(5);
   g('rdCtLon').value = rendaRaio.centro[0].toFixed(5);
+  ctSync('rd');
   g('heatSuav').value = Math.round((rendaRaio.heatSuav||1)*100);
   g('heatSuavV').textContent = Math.round((rendaRaio.heatSuav||1)*100)+'%';
   g('rdIpca').checked = !!rendaRaio.ipca;
@@ -2570,6 +2520,7 @@ function syncIsoInputs(){
   if(!g('isoCtLat')) return;
   g('isoCtLat').value=iso.centro[1].toFixed(5);
   g('isoCtLon').value=iso.centro[0].toFixed(5);
+  ctSync('iso');
   var m=isoMinutos();
   for(var i=0;i<ISO_MAX_FAIXAS;i++){
     var el=g('isoMin'+i); if(el) el.value=(m[i]!=null ? m[i] : '');
@@ -2629,6 +2580,151 @@ function setCidade(m, prop, val){
 function setArea(idx, prop, val){
   DATA.features[idx].properties[prop] = val;
   refreshGlebas();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  BLOCOS REPETIDOS DA INTERFACE — gerados, não copiados (P5)
+//
+//  Dois blocos existiam escritos à mão em vários lugares, e as cópias
+//  já tinham divergido entre si:
+//
+//  • ESCOLHER O CENTRO — quatro vezes (raio da Edição, raio do Mapa de
+//    renda, origem da isócrona de renda, origem da isócrona). Cada
+//    cópia gastava cinco linhas e ~150px, duas tinham "voltar ao Marco
+//    Zero" e duas não, e os links apareciam em ordens diferentes.
+//  • EDITOR DE LEGENDA — três vezes, com os seis controles idênticos.
+//
+//  Os IDs gerados são EXATAMENTE os que já existiam (edCt*, rdCt*,
+//  riCt*, isoCt*, edRaioLbl*, rdLbl*, isoLbl*), então nenhum handler,
+//  nenhuma função de sincronismo e nenhum projeto salvo muda. O HTML
+//  estático virou um <div> com data-attribute, preenchido por
+//  montarBlocosRepetidos() ANTES de qualquer handler ser pendurado.
+//
+//  Ganho de uso, além da dedução: o campo de texto do centro passa a
+//  aceitar TAMBÉM "lat, lon" colado da área de transferência, e as duas
+//  coordenadas sobem para uma linha de leitura, recolhendo os campos
+//  numéricos atrás de "editar coordenadas".
+// ══════════════════════════════════════════════════════════════════
+var CT_IC = {
+  buscar:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>',
+  mapa:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="5.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg>',
+  casa:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3l8.5 7.5"/><path d="M5.5 9.5V20h13V9.5"/></svg>'
+};
+function blocoCentroHTML(pfx, rotulo, temSe){
+  return '<div class="e-row">'
+    + '<label>' + rotulo + '</label>'
+    + '<input type="text" id="' + pfx + 'CtEnd" placeholder="endereço, cidade ou -23.55, -46.63"'
+    + ' title="digite um endereço ou cole um par de coordenadas">'
+    + '<button type="button" class="ct-ic" id="' + pfx + 'CtBuscar" title="ir para o que está no campo">' + CT_IC.buscar + '</button>'
+    + '<button type="button" class="ct-ic" id="' + pfx + 'CtMapa" title="escolher clicando no mapa">' + CT_IC.mapa + '</button>'
+    + (temSe ? '<button type="button" class="ct-ic" id="' + pfx + 'CtSe" title="voltar ao Marco Zero (Praça da Sé)">' + CT_IC.casa + '</button>' : '')
+    + '</div>'
+    + '<div class="e-hint ct-coord"><span id="' + pfx + 'CtTxt">—</span>'
+    + '<a id="' + pfx + 'CtEditar">editar coordenadas</a></div>'
+    // Os campos numéricos continuam existindo, só recolhidos: é por eles
+    // que todo o JS atual lê e escreve o centro.
+    + '<div class="e-row" id="' + pfx + 'CtNums" style="display:none">'
+    + '<input type="number" id="' + pfx + 'CtLat" step="0.0001" value="-23.5505" title="latitude">'
+    + '<input type="number" id="' + pfx + 'CtLon" step="0.0001" value="-46.6333" title="longitude">'
+    + '<a id="' + pfx + 'CtAplicar" style="color:var(--azul);cursor:pointer;font-size:var(--fs-2);font-weight:600">aplicar</a>'
+    + '</div>';
+}
+function linhaLegendaHTML(pfx, cor){
+  return '<div class="e-row"><label><input type="checkbox" id="' + pfx + 'On" checked> legenda</label>'
+    + '<input type="text" id="' + pfx + 'Txt" placeholder="texto automático"'
+    + ' title="deixe vazio para usar o texto automático"></div>'
+    + '<div class="grid-rot grid-head"><span></span><span></span><span></span><span>Tamanho</span><span></span><span>Contorno</span></div>'
+    + '<div class="grid-edit grid-rot">'
+    + '<span class="e-nome" style="font-weight:600">Legenda</span>'
+    + '<label class="lbl-halochk" title="contorno liga/desliga"><input type="checkbox" id="' + pfx + 'Halo" checked></label>'
+    + '<input type="color" id="' + pfx + 'Cor" value="' + cor + '" title="cor do texto">'
+    + '<input type="range" id="' + pfx + 'Tam" min="60" max="240" value="100" title="tamanho do texto (%)">'
+    + '<input type="color" id="' + pfx + 'HaloCor" value="#FFFFFF" title="cor do contorno">'
+    + '<input type="range" id="' + pfx + 'HaloW" min="0" max="40" value="16" title="espessura do contorno">'
+    + '</div>';
+}
+// Repinta a linha de leitura das coordenadas a partir dos próprios campos
+// numéricos — que são a fonte da verdade de todo o resto do arquivo.
+function ctSync(pfx){
+  var t = document.getElementById(pfx+'CtTxt');
+  if(!t) return;
+  var la = document.getElementById(pfx+'CtLat'), lo = document.getElementById(pfx+'CtLon');
+  if(!la || !lo) return;
+  var a = parseFloat(la.value), o = parseFloat(lo.value);
+  t.textContent = (isFinite(a) && isFinite(o))
+    ? a.toFixed(5).replace('.',',') + ' · ' + o.toFixed(5).replace('.',',')
+    : '—';
+}
+// "lat, lon" colado em vez de endereço. Devolve [lon,lat] ou null.
+// Qualquer letra no campo significa endereço, e aí nem tentamos.
+function coordsDoTexto(q){
+  var t = String(q==null?'':q).trim();
+  if(!t || !/^[-+0-9.,;\s]+$/.test(t)) return null;
+  // Separador decimal ambíguo: se o texto tem ponto, a vírgula só pode
+  // ser separador de campo; se não tem, a vírgula pode ser o decimal e
+  // exigimos espaço (ou ponto-e-vírgula) entre os dois números.
+  var tt = t.replace(/;/g,' ');
+  if(tt.indexOf('.') >= 0) tt = tt.replace(/,/g,' ');
+  var ps = tt.split(/\s+/).filter(Boolean);
+  if(ps.length !== 2) return null;
+  var la = parseFloat(ps[0].replace(',','.')), lo = parseFloat(ps[1].replace(',','.'));
+  if(!isFinite(la) || !isFinite(lo)) return null;
+  if(la < -90 || la > 90 || lo < -180 || lo > 180) return null;
+  return [lo, la];   // no texto vem latitude primeiro, como no Google Maps
+}
+function montarBlocosRepetidos(){
+  document.querySelectorAll('[data-mm-ct]').forEach(function(el){
+    var pfx = el.getAttribute('data-mm-ct');
+    el.innerHTML = blocoCentroHTML(pfx, el.getAttribute('data-rot') || 'Centro',
+                                   el.getAttribute('data-se') === '1');
+    var nums = document.getElementById(pfx+'CtNums');
+    var link = document.getElementById(pfx+'CtEditar');
+    link.onclick = function(){
+      var abrir = nums.style.display === 'none';
+      nums.style.display = abrir ? '' : 'none';
+      link.textContent = abrir ? 'esconder coordenadas' : 'editar coordenadas';
+    };
+    // Enter no campo de texto faz o mesmo que o botão de ir.
+    document.getElementById(pfx+'CtEnd').addEventListener('keydown', function(ev){
+      if(ev.key !== 'Enter') return;
+      ev.preventDefault();
+      var b = document.getElementById(pfx+'CtBuscar');
+      if(b && b.onclick) b.onclick(ev);
+    });
+    ctSync(pfx);
+  });
+  document.querySelectorAll('[data-mm-leg]').forEach(function(el){
+    el.innerHTML = linhaLegendaHTML(el.getAttribute('data-mm-leg'),
+                                    el.getAttribute('data-cor') || '#1C1917');
+  });
+}
+montarBlocosRepetidos();
+
+// O campo de texto do centro aceita endereço OU coordenadas. A decisão
+// mora num lugar só: este envelope embrulha o onclick de cada botão de
+// ir DEPOIS que os quatro handlers de busca foram pendurados, e desvia
+// para "aplicar coords" quando o que está no campo é um par de números.
+// Por isso é chamado no fim do arquivo, não aqui.
+function ctInstalarAtalhoCoords(){
+  document.querySelectorAll('[data-mm-ct]').forEach(function(el){
+    var pfx = el.getAttribute('data-mm-ct');
+    var b = document.getElementById(pfx+'CtBuscar');
+    if(!b) return;
+    var buscarEndereco = b.onclick;
+    b.onclick = function(ev){
+      var campo = document.getElementById(pfx+'CtEnd');
+      var co = coordsDoTexto(campo && campo.value);
+      if(co){
+        document.getElementById(pfx+'CtLat').value = co[1].toFixed(5);
+        document.getElementById(pfx+'CtLon').value = co[0].toFixed(5);
+        var ap = document.getElementById(pfx+'CtAplicar');
+        if(ap && ap.onclick) ap.onclick(ev);
+        campo.value = '';
+        return;
+      }
+      if(buscarEndereco) return buscarEndereco.call(b, ev);
+    };
+  });
 }
 
 function montarEditor(){
@@ -2700,6 +2796,7 @@ function montarEditor(){
     }
     document.getElementById('edCtLat').value = centroRaio[1].toFixed(5);
     document.getElementById('edCtLon').value = centroRaio[0].toFixed(5);
+    ctSync('ed');
   }
   document.getElementById('edRaioKm').onchange = e=>{
     const km = Math.max(1, Math.min(2000, parseFloat(e.target.value)||100));
@@ -3907,6 +4004,7 @@ function syncRendaIsoInputs(){
   var por=function(id, valor){ var el=g(id); if(el && el!==foco) el.value=valor; };
   por('riCtLat', rendaIso.centro[1].toFixed(5));
   por('riCtLon', rendaIso.centro[0].toFixed(5));
+  ctSync('ri');
   var m=rendaIsoMinutos();
   for(var i=0;i<RENDA_ISO_MAX;i++) por('riMin'+i, (m[i]!=null ? m[i] : ''));
   g('riFill').checked=!!rendaIso.fill;
@@ -4113,6 +4211,12 @@ document.getElementById('isoCtMapa').onclick = function(){
   pickLigar('iso');
   toast('Clique no mapa para definir a origem da isócrona.');
 };
+
+// Com os quatro handlers de busca já pendurados, o botão de ir de cada
+// bloco de centro ganha o desvio para "aplicar coords" quando o campo
+// traz um par de números. Precisa ser AQUI: o envelope captura o
+// onclick existente, então não pode rodar antes dele existir.
+ctInstalarAtalhoCoords();
 
 // ══════════════════════════════════════════════════════════════════
 //  CENSO IBGE 2022 — análise dentro do raio do Mapa de renda
