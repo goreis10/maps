@@ -5,6 +5,30 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 2.4.1 — A isócrona voltou a funcionar
+
+_Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **A isócrona voltou a funcionar.** O serviço de roteamento que o Maker Map usa
+  mudou de endereço: o antigo foi marcado como descontinuado em abril, teve a
+  cota cortada a 10% em agosto e foi desligado no fim de setembro. Passamos a
+  usar o endereço novo — **a chave é a mesma**, não há nada a refazer. Por
+  garantia, se o endereço novo não responder, ele ainda tenta o antigo.
+- **A correção pela IPCA voltou a funcionar** para quem via *indisponível*. A
+  consulta ao Banco Central passa a sair do servidor do site, e não do seu
+  navegador, o que elimina bloqueio de origem e instabilidade da sua rede; se o
+  servidor não conseguir, o navegador ainda tenta direto, como antes. O índice
+  fica em cache por algumas horas e, quando o Banco Central está fora do ar, o
+  site serve a última série **real** já obtida — nunca um índice inventado.
+- Se o seu navegador impedir o desenho da legenda da isócrona (uma extensão de
+  privacidade basta), **o cálculo continua funcionando**. Antes, essa falha
+  derrubava a isócrona inteira e a mensagem culpava a conexão, mandando
+  investigar o lugar errado.
+
+---
+
 ## Maker Map 2.4 — Legenda da isócrona no mapa
 
 _No ar em maker-map.netlify.app._

@@ -29,9 +29,22 @@ const BRASIL = { lonMin: -74.5, lonMax: -33.5, latMin: -34.5, latMax: 6.5 };
 const MAX_FAIXAS = 4;      // faixas de tempo por chamada
 const MAX_MINUTOS = 120;   // teto por faixa
 
+// O OpenRouteService migrou de host. O antigo (api.openrouteservice.org)
+// foi marcado como descontinuado em abril/2026, teve a cota cortada a
+// 10% em agosto e desligamento anunciado para 28/09/2026 — a chave é a
+// mesma nos dois. Tentamos o atual primeiro e caímos no legado só se o
+// atual não responder ou disser que não conhece o caminho, para o caso
+// de a migração não ter sido exatamente como anunciada.
+const HOSTS = [
+  'https://api.heigit.org/openrouteservice',
+  'https://api.openrouteservice.org'
+];
+
 // A função síncrona da Netlify é cortada em 10 s. Abortamos antes para
 // devolver uma mensagem explicável em vez de um 502 cru da plataforma.
+// O orçamento é dividido entre as tentativas, nunca somado.
 const TIMEOUT_MS = 9000;
+const TIMEOUT_1 = 6000;
 
 function json(status, corpo, extra) {
   return new Response(JSON.stringify(corpo), {
@@ -117,25 +130,42 @@ export default async (req) => {
   if (!mins.length) return erro(400, 'Informe de 1 a ' + MAX_FAIXAS + ' faixas de tempo, entre 1 e ' + MAX_MINUTOS + ' minutos.');
   if (mins.length > MAX_FAIXAS) return erro(400, 'No máximo ' + MAX_FAIXAS + ' faixas de tempo por cálculo.');
 
+  const corpoPedido = JSON.stringify({
+    locations: [[lon, lat]],
+    range: mins.map((m) => m * 60),
+    range_type: 'time',
+    location_type: 'start',
+    attributes: ['area'],
+    area_units: 'km'
+  });
+
+  const pedir = (base, ms) => fetch(base + '/v2/isochrones/' + perfil, {
+    method: 'POST',
+    signal: AbortSignal.timeout(ms),
+    headers: {
+      Authorization: chave,
+      'content-type': 'application/json',
+      accept: 'application/geo+json'
+    },
+    body: corpoPedido
+  });
+
   let resp;
   try {
-    resp = await fetch('https://api.openrouteservice.org/v2/isochrones/' + perfil, {
-      method: 'POST',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: {
-        Authorization: chave,
-        'content-type': 'application/json',
-        accept: 'application/geo+json'
-      },
-      body: JSON.stringify({
-        locations: [[lon, lat]],
-        range: mins.map((m) => m * 60),
-        range_type: 'time',
-        location_type: 'start',
-        attributes: ['area'],
-        area_units: 'km'
-      })
-    });
+    try {
+      resp = await pedir(HOSTS[0], TIMEOUT_1);
+      // 404/410 = o host existe mas não conhece esta rota. Vale tentar o
+      // outro; qualquer outra resposta (200, 401, 429, 400) é resposta de
+      // verdade e deve ser respeitada, não mascarada por uma segunda
+      // tentativa que gastaria cota.
+      if (resp.status === 404 || resp.status === 410) {
+        console.error('ORS host atual devolveu', resp.status, '— tentando o legado');
+        resp = await pedir(HOSTS[1], TIMEOUT_MS - TIMEOUT_1);
+      }
+    } catch (e1) {
+      console.error('ORS host atual falhou:', e1 && (e1.name || e1.message), '— tentando o legado');
+      resp = await pedir(HOSTS[1], TIMEOUT_MS - TIMEOUT_1);
+    }
   } catch (e) {
     // O undici embrulha o abort num TypeError("fetch failed") e põe o
     // TimeoutError em .cause — olhar só e.name perderia o timeout e
