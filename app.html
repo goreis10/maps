@@ -590,8 +590,23 @@
   <div class="brand"><img src="logo-makermap.png" alt="Maker Map" class="brand-logo"
       onload="this.parentNode.querySelectorAll('.brand-mark,.brand-name').forEach(function(e){e.style.display='none'});"
       onerror="this.remove()"><div class="brand-mark"></div><div class="brand-name">Maker Map</div></div>
-  <button id="btnProjetos" class="hd-btn" style="margin-left:auto">Meus Projetos</button>
-  <div id="hdUser" style="display:flex;align-items:center;gap:10px;margin-left:16px;padding-left:16px;border-left:1px solid var(--line);font-size:12px;color:var(--ink-2)">
+  <!-- Totais (P9): são o número que o corretor fala em voz alta, e estavam
+       sendo computados por refreshStats() e jogados fora — o HTML havia
+       desaparecido e só o CSS tinha ficado. O margin-left:auto mora na
+       .hd-stats, não nos botões: dois "auto" irmãos repartem a sobra. -->
+  <div class="hd-stats">
+    <span class="st">área<b id="stHa">0</b>ha</span>
+    <span class="st">áreas<b id="stAreas">0</b></span>
+    <span class="st">municípios<b id="stMun">0</b></span>
+    <span class="st">m²<b id="stM2">0</b></span>
+  </div>
+  <!-- Salvar Projeto e Meus Projetos são o par do mesmo objeto; estavam
+       separados sem motivo, um no cabeçalho e o outro entre os chips do mapa. -->
+  <div style="display:flex;gap:8px">
+    <button id="btnSalvarProj" class="hd-btn">Salvar Projeto</button>
+    <button id="btnProjetos" class="hd-btn">Meus Projetos</button>
+  </div>
+  <div id="hdUser" style="display:flex;align-items:center;gap:10px;margin-left:16px;padding-left:16px;border-left:1px solid var(--line);font-size:var(--fs-2);color:var(--ink-2)">
     <span id="planoBadge" class="plano-badge plano-free" title="Seu plano atual">FREE</span>
     <span id="hdUserName" title="abrir configurações"></span>
     <button id="btnLogout" style="border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font:600 12px 'Archivo',sans-serif;color:var(--ink-2);cursor:pointer">Sair</button>
@@ -632,34 +647,54 @@
     <p id="failMsg">Este arquivo precisa ser <b>baixado e aberto no navegador</b> (Chrome ou Edge), com internet ativa — o fundo do mapa vem de um servidor externo. Se a mensagem persistir, a rede pode estar bloqueando <b>cdnjs.cloudflare.com</b> ou <b>tiles.openfreemap.org</b>.</p>
   </div></div>
 
+  <!-- O painel agrupa por município, mas o objeto é a ÁREA — é o vocabulário
+       de "Por área" na Edição e de "um cartão por área" no quadro. -->
   <div id="panel">
     <div class="p-head">
-      <h2>Municípios</h2>
+      <h2>Áreas</h2>
       <div class="p-actions"><a id="addKmz">+ KMZ</a> · <a id="allOn">todos</a> · <a id="allOff">nenhum</a></div>
     </div>
     <input type="file" id="fileKmz" accept=".kmz,.kml" multiple style="display:none">
+    <!-- .p-legend e .p-foot explicam CONTEÚDO: sem conteúdo são moldura.
+         sincronizarPainelVazio() as esconde junto com a lista. -->
     <div class="p-legend">Barra: tamanho da área de cada grupo em relação ao maior (100% = maior).</div>
     <div id="groups"></div>
+    <!-- Estado vazio (P8): a tela de abertura é um mapa sem nenhuma área, e
+         até aqui não dizia como começar. O "+ KMZ" acima é o atalho de quem
+         já sabe; este botão é o caminho de quem não sabe. Mesmo disparo. -->
+    <div id="groupsVazio" class="sd-empty" style="display:none">
+      Nenhuma área carregada.
+      <button class="cfg-btn" id="addKmz2" style="margin-top:12px">Importar KMZ</button>
+      <span style="display:block;margin-top:8px">ou use <b>Desenhar</b> para traçar a área no mapa.</span>
+    </div>
     <div class="p-foot">Clique para ligar/desligar · área em hectares (calculada)</div>
   </div>
 
+  <!-- Três grupos por função: compor o mapa · analisar · sair com a imagem.
+       Eram nove elementos empilhados com o mesmo espaçamento, sem dizer que
+       uns ligam camadas e outros abrem painéis. -->
   <div id="ctrl">
     <div class="seg">
       <button id="bmClaro" class="on">Maker Map</button>
       <button id="bmSat">Satélite</button>
     </div>
-    <div class="chip" id="btnSalvarProj"><span class="dot" style="background:var(--laranja)"></span>Salvar Projeto</div>
-    <div class="chip" id="chipDraw"><span class="dot"></span>Desenhar</div>
-    <div class="chip" id="chipEdit"><span class="dot"></span>Edição</div>
-    <div class="chip" id="btnCores"><span class="dot" style="background:var(--magenta)"></span>Cores</div>
-    <div class="chip" id="btnRenda"><span class="dot" style="background:#0E9F8A"></span>Mapa de renda</div>
-    <div class="chip" id="btnIso"><span class="dot" style="background:#6B21A8"></span>Isócrona</div>
-    <select id="expScale" title="Resolução da imagem exportada">
-      <option value="2">PNG 2×</option>
-      <option value="3" selected>PNG 3×</option>
-      <option value="4">PNG 4×</option>
-    </select>
-    <button id="btnExport">Exportar PNG</button>
+    <div class="ctrl-grp">
+      <div class="chip" id="chipDraw"><span class="dot"></span>Desenhar</div>
+      <div class="chip" id="chipEdit"><span class="dot"></span>Edição</div>
+      <div class="chip chip-gav" id="btnCores"><span class="dot" style="background:var(--magenta)"></span>Cores</div>
+    </div>
+    <div class="ctrl-grp">
+      <div class="chip chip-gav" id="btnRenda"><span class="dot" style="background:var(--c-renda)"></span>Mapa de renda</div>
+      <div class="chip chip-gav" id="btnIso"><span class="dot" style="background:var(--c-iso)"></span>Isócrona</div>
+    </div>
+    <div class="ctrl-grp">
+      <select id="expScale" title="Resolução da imagem exportada">
+        <option value="2">PNG 2×</option>
+        <option value="3" selected>PNG 3×</option>
+        <option value="4">PNG 4×</option>
+      </select>
+      <button id="btnExport">Exportar PNG</button>
+    </div>
   </div>
 
   <div id="editor">
@@ -1538,16 +1573,33 @@ function aplicarFiltros(){
   if (map.getSource('mascara')) map.getSource('mascara').setData(construirMascara());
 }
 
-// ── Header stats (indicadores removidos do topo; função mantida à prova de ausência) ──
+// ── Totais do cabeçalho (à prova de ausência do HTML) ──
+// Conta só os grupos LIGADOS: é o total do mapa que está sendo apresentado,
+// não o do arquivo importado.
 function refreshStats(){
   const elHa = document.getElementById('stHa');
-  if(!elHa) return;
   let n=0, ha=0, mun=0;
   Object.values(grupos).forEach(g=>{ if(g.on){ n+=g.n; ha+=g.ha; mun++; }});
-  elHa.textContent = ha.toLocaleString('pt-BR',{maximumFractionDigits:0});
-  const elM2=document.getElementById('stM2'); if(elM2) elM2.textContent = (ha*10000).toLocaleString('pt-BR',{maximumFractionDigits:0});
-  const elA=document.getElementById('stAreas'); if(elA) elA.textContent = n;
-  const elM=document.getElementById('stMun'); if(elM) elM.textContent = mun;
+  if(elHa){
+    elHa.textContent = ha.toLocaleString('pt-BR',{maximumFractionDigits:0});
+    const elM2=document.getElementById('stM2'); if(elM2) elM2.textContent = (ha*10000).toLocaleString('pt-BR',{maximumFractionDigits:0});
+    const elA=document.getElementById('stAreas'); if(elA) elA.textContent = n;
+    const elM=document.getElementById('stMun'); if(elM) elM.textContent = mun;
+  }
+  sincronizarPainelVazio();
+}
+// Estado vazio do painel. O critério é EXISTIR grupo, não estar ligado —
+// "nenhum" (allOff) desliga todos e não é um painel vazio.
+// Pendurado em refreshStats() porque é a função que todos os pontos de
+// mutação de `grupos` já chamam: importar, excluir, abrir projeto,
+// começar do zero, ligar/desligar.
+function sincronizarPainelVazio(){
+  var vazio = Object.keys(grupos).length === 0;
+  var el = document.getElementById('groupsVazio');
+  if(el) el.style.display = vazio ? '' : 'none';
+  document.querySelectorAll('#panel .p-legend,#panel .p-foot').forEach(function(e){
+    e.style.display = vazio ? 'none' : '';
+  });
 }
 
 // ── Painel ──
@@ -3536,7 +3588,7 @@ var FEATURE_ELEMENTS = {
   satelite:        ['#bmSat'],
   desenhar:        ['#chipDraw'],
   edicao:          ['#chipEdit'],
-  uploadKmz:       ['#addKmz'],
+  uploadKmz:       ['#addKmz', '#addKmz2'],
   exportar:        ['#btnExport', '#expScale'],
   cores:           ['#btnCores'],
   mapaRenda:       ['#btnRenda'],
@@ -3656,6 +3708,7 @@ function abrirEdicao(on){
   if(on){ // abrir a Edição fecha as gavetas laterais
     GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
     __wrap.classList.remove('side-open');
+    marcarChipGaveta(null);   // senão o chip continuaria marcado como aberto
   }
   ed.classList.toggle('show', on);
   __wrap.classList.toggle('editing', on);
@@ -3670,15 +3723,27 @@ document.getElementById('edFechar').onclick = function(){ abrirEdicao(false); };
 
 // ── Gavetas laterais (Salvar, Projetos, Cores, Mapa de renda) ──
 // Uma aberta por vez; abrir qualquer uma fecha a Edição e as demais.
+// Qual chip abre qual gaveta. Serve para marcar .aberta no chip: até aqui
+// nada na tela dizia QUAL das cinco gavetas estava aberta além do conteúdo
+// dela — e as três que são abridoras ficam lado a lado.
+var GAVETA_CHIP = {drawerCores:'btnCores', drawerRenda:'btnRenda', drawerIso:'btnIso'};
+function marcarChipGaveta(id){
+  Object.keys(GAVETA_CHIP).forEach(function(g){
+    var c = document.getElementById(GAVETA_CHIP[g]);
+    if(c) c.classList.toggle('aberta', g===id);
+  });
+}
 function abrirGaveta(id){
   abrirEdicao(false);
   GAVETAS_IDS.forEach(function(g){ var d=document.getElementById(g); if(d) d.classList.toggle('show', g===id); });
   __wrap.classList.add('side-open');
+  marcarChipGaveta(id);
   setTimeout(function(){ if(map) map.resize(); }, 360);
 }
 function fecharGaveta(){
   GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
   __wrap.classList.remove('side-open');
+  marcarChipGaveta(null);
   setTimeout(function(){ if(map) map.resize(); }, 360);
 }
 function gavetaAberta(){ return GAVETAS_IDS.some(function(id){ var d=document.getElementById(id); return d && d.classList.contains('show'); }); }
@@ -5378,6 +5443,8 @@ function integrarFeats(feats, grupo, fit){
 }
 
 document.getElementById('addKmz').onclick = ()=> document.getElementById('fileKmz').click();
+// Mesmo disparo do "+ KMZ": um é atalho, o outro é o caminho do estado vazio.
+document.getElementById('addKmz2').onclick = ()=> document.getElementById('fileKmz').click();
 document.getElementById('fileKmz').onchange = async e=>{
   if(!map){ toast('Aguarde o mapa carregar.'); return; }
   let total=0, erros=[];
