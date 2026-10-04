@@ -682,7 +682,7 @@
     <div class="sd-toggles">
       <div class="chip" id="chipRaioRenda"><span class="dot"></span>Raio</div>
       <div class="chip" id="chipCensoPts" title="um ponto por setor censitário, colorido pela faixa de renda"><span class="dot"></span>Pontos no mapa</div>
-      <div class="chip" id="chipCensoHeat" title="superfície suavizada dentro do raio"><span class="dot"></span>Mapa de calor</div>
+      <div class="chip" id="chipCensoHeat" title="superfície suavizada dentro do recorte escolhido"><span class="dot"></span>Mapa de calor</div>
     </div>
     <div class="sd-sec" id="heatOps" style="display:none">
       <div class="e-row" style="gap:8px">
@@ -2141,6 +2141,7 @@ async function buscarRendaIso(){
     rendaIso.on=true;
     if(rendaIso.faixaSel>=mins.length) rendaIso.faixaSel=mins.length-1;
     censoCache.chave=null;              // o recorte mudou: refaz a conta
+    aplicarRaioRenda();
     atualizarRendaIso();
     // pode ter passado a alcançar um estado ainda não baixado
     if(censoStatus!=='carregando') carregarCenso();
@@ -3671,12 +3672,16 @@ function syncRendaModo(){
 function syncRendaIsoInputs(){
   var g=function(id){ return document.getElementById(id); };
   if(!g('riCtLat')) return;
-  g('riCtLat').value=rendaIso.centro[1].toFixed(5);
-  g('riCtLon').value=rendaIso.centro[0].toFixed(5);
+  // NUNCA reescrever o campo que está sob o cursor. renderRenda() é
+  // chamada por retornos assíncronos (IPCA, Censo), e o onchange de um
+  // input só dispara no blur — sem este guarda, uma resposta que chega
+  // no meio da digitação apaga o que a pessoa escreveu.
+  var foco=document.activeElement;
+  var por=function(id, valor){ var el=g(id); if(el && el!==foco) el.value=valor; };
+  por('riCtLat', rendaIso.centro[1].toFixed(5));
+  por('riCtLon', rendaIso.centro[0].toFixed(5));
   var m=rendaIsoMinutos();
-  for(var i=0;i<RENDA_ISO_MAX;i++){
-    var el=g('riMin'+i); if(el) el.value=(m[i]!=null ? m[i] : '');
-  }
+  for(var i=0;i<RENDA_ISO_MAX;i++) por('riMin'+i, (m[i]!=null ? m[i] : ''));
   g('riFill').checked=!!rendaIso.fill;
   g('riLblOn').checked=!!rendaIso.lbl.on;
   var btn=g('riCalc');
@@ -3739,6 +3744,7 @@ function setRendaModo(m){
   if(rendaModo===m) return;
   rendaModo=m;
   censoCache.chave=null;                  // a geometria mudou
+  aplicarRaioRenda();                     // os chips seguem a geometria ativa
   aplicarRendaIso();
   renderRenda();
   // o novo recorte pode alcançar um estado ainda não baixado
@@ -4063,9 +4069,23 @@ function censoNomesCarregadas(){
   return CENSO_MAN.ufs.filter(function(u){ return censoUF[u.cod]==='ok'; })
                       .map(function(u){ return u.nome; });
 }
-// UFs que o raio alcança mas que não estão carregadas (rede falhou).
+// UFs que a ANÁLISE alcança mas que não estão carregadas (rede falhou).
+//
+// Repare que isto não é censoUFsDoRaio(): aquela devolve a união de
+// todas as faixas da isócrona, de propósito, para trocar de faixa não
+// exigir carga nova. Usar a união aqui faria o banner vermelho dizer
+// que faltam números ao analisar uma faixa pequena, inteiramente dentro
+// de um estado carregado, só porque a faixa maior raspa o vizinho.
 function censoUFsFaltando(){
-  return censoUFsDoRaio().filter(function(u){ return censoUF[u.cod]!=='ok'; });
+  var g = (typeof rendaGeomAtiva==='function') ? rendaGeomAtiva() : null;
+  var c = null;
+  if(g){ var bb=geomCaixa(g); if(bb) c=[bb[1], bb[0], bb[3], bb[2]]; }
+  if(!c) c = censoCaixaAtual();
+  if(!CENSO_MAN || !c) return [];
+  return CENSO_MAN.ufs.filter(function(u){
+    var b=u.bbox;
+    return c[2]>=b[0] && c[0]<=b[2] && c[3]>=b[1] && c[1]<=b[3] && censoUF[u.cod]!=='ok';
+  });
 }
 // Junta uma UF ao conjunto já carregado. Recusa repetir: anexar duas vezes
 // dobraria domicílios, população e a distribuição por faixa.
@@ -4288,7 +4308,10 @@ function censoConsultaPoly(geom){
   // a banda conta domicílios de fora do recorte e divide pelos de
   // dentro, então em recorte minúsculo passa de 100%; exibir 143% só
   // confunde — acima de 100 a mensagem já é "não use estes números"
-  q.margem = q.dom>0 ? Math.min(100, censoBordaPoly(geom, rs)/q.dom*100) : 100;
+  // area 0 com setores selecionados (anel degenerado) zeraria rs e daria
+  // margem 0% SEM aviso, enquanto o painel imprime domicílios e pessoas —
+  // exatamente o número confiante e errado que a margem existe para impedir
+  q.margem = (q.dom>0 && q.area>0) ? Math.min(100, censoBordaPoly(geom, rs)/q.dom*100) : 100;
   return q;
 }
 
@@ -4323,9 +4346,11 @@ function censoBordaPoly(geom, rsKm){
       vs.push(p0);
       var dx=(p1[0]-p0[0])*kx, dy=(p1[1]-p0[1])*ky;
       var L=Math.sqrt(dx*dx+dy*dy);
-      // teto por segmento: sem ele, um rs minúsculo com um segmento
-      // longo geraria milhões de pontos e travaria a aba
-      var n=Math.min(Math.floor(L/passo), 1000);
+      // Teto por segmento: sem ele, um rs minúsculo com um segmento longo
+      // geraria milhões de pontos e travaria a aba. 20 mil é folgado o
+      // bastante para o passo continuar rs/2 em qualquer contorno real
+      // (com 1000 ele degradava, e a margem subestimava em até 80%).
+      var n=Math.min(Math.floor(L/passo), 20000);
       for(var t=1;t<=n;t++){
         var f=t/(n+1);
         vs.push([p0[0]+(p1[0]-p0[0])*f, p0[1]+(p1[1]-p0[1])*f]);
@@ -4582,6 +4607,8 @@ function renderRenda(){
       '(setor sem informação de rendimento). Eles contam no total de domicílios, '+
       'de pessoas e no mapa de calor de densidade; ficam de fora da média, da '+
       'distribuição por faixa, dos pontos e do calor de renda.</div>' : '')+
+    (rendaModo==='iso' ? '<div class="rd-foot">O recorte é um tempo de deslocamento, '+
+      'calculado sobre a malha viária do OpenStreetMap <b>sem considerar trânsito</b>.</div>' : '')+
     '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
     'O Censo mede a renda <b>do responsável pelo domicílio</b>.<br>'+
     (corrigido
