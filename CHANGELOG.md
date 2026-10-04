@@ -5,58 +5,27 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 2.5 — Renda dentro da isócrona
+## Maker Map 2.4.1 — A isócrona voltou a funcionar
 
 _Aguardando publicação._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
-- **O Mapa de renda deixa de ser só por raio.** Um botão novo, na gaveta,
-  troca o recorte da análise entre **Raio** e **Isócrona**. No modo isócrona, o
-  perfil de domicílios, renda, classe e faixas passa a ser calculado dentro da
-  área que se alcança de verdade pelas estradas — e não dentro de um círculo.
-  É a diferença entre "num raio de 10 km" e "a 20 minutos de carro daqui".
-- A isócrona do Mapa de renda é **própria dela**, independente da que está no
-  botão Isócrona da barra superior — do mesmo jeito que o raio daqui já é
-  independente do raio da Edição.
-- **Duas faixas de tempo.** A análise responde por uma delas de cada vez: clique
-  na linha da faixa para escolher qual (a bolinha ao lado troca a cor). A outra continua desenhada no mapa, para
-  comparar — a de 15 e a de 30 minutos lado a lado.
-- Cada faixa mostra a **área em km²**, tem cor editável na bolinha, e a faixa
-  analisada aparece com traço mais forte no mapa.
-- Carro, caminhão, bicicleta ou a pé; origem por coordenadas, endereço ou
-  clique no mapa.
-- Os **pontos e os mapas de calor** do Censo seguem o recorte escolhido: ligados
-  no modo isócrona, desenham os setores de dentro do polígono.
-- O painel inteiro passa a falar do recorte certo — onde dizia "raio", agora diz
-  "a isócrona de 20 min" quando é esse o caso.
-
-> **A margem de erro foi refeita para polígono.** O aviso de recorte pequeno
-> demais existia com uma conta que pressupõe círculo. Num contorno irregular ela
-> não significaria nada, então agora a margem vem da área real do polígono e da
-> distância ao contorno dele. O aviso continua valendo: recorte pequeno demais
-> para a densidade local dá resultado que depende mais do acaso do que dos dados.
-
-> Os tempos continuam **sem considerar trânsito**, como na isócrona da barra
-> superior.
-
-**Correções que vêm junto, e que afetam quem já usava**
-
-- **A isócrona voltou a funcionar.** O serviço de roteamento mudou de endereço:
-  o antigo foi marcado como descontinuado em abril, teve a cota cortada a 10% em
-  agosto e foi desligado no fim de setembro. O Maker Map passou a usar o endereço
-  novo — a chave é a mesma, não há nada a refazer do seu lado. Por garantia, se o
-  endereço novo não responder, ele ainda tenta o antigo.
-- **A correção pela IPCA voltou a funcionar** para quem via "indisponível". A
+- **A isócrona voltou a funcionar.** O serviço de roteamento que o Maker Map usa
+  mudou de endereço: o antigo foi marcado como descontinuado em abril, teve a
+  cota cortada a 10% em agosto e foi desligado no fim de setembro. Passamos a
+  usar o endereço novo — **a chave é a mesma**, não há nada a refazer. Por
+  garantia, se o endereço novo não responder, ele ainda tenta o antigo.
+- **A correção pela IPCA voltou a funcionar** para quem via *indisponível*. A
   consulta ao Banco Central passa a sair do servidor do site, e não do seu
-  navegador, o que elimina bloqueio de origem e instabilidade da sua rede; se por
-  algum motivo o servidor não conseguir, o navegador ainda tenta direto, como
-  antes. O índice fica em cache por algumas horas, e quando o Banco Central está
-  fora do ar o site serve a última série **real** já obtida — nunca um índice
-  inventado.
-- Se o seu navegador impedir o desenho da legenda (extensão de privacidade, por
-  exemplo), a isócrona **continua funcionando**: antes, essa falha derrubava o
-  cálculo inteiro e culpava a conexão.
+  navegador, o que elimina bloqueio de origem e instabilidade da sua rede; se o
+  servidor não conseguir, o navegador ainda tenta direto, como antes. O índice
+  fica em cache por algumas horas e, quando o Banco Central está fora do ar, o
+  site serve a última série **real** já obtida — nunca um índice inventado.
+- Se o seu navegador impedir o desenho da legenda da isócrona (uma extensão de
+  privacidade basta), **o cálculo continua funcionando**. Antes, essa falha
+  derrubava a isócrona inteira e a mensagem culpava a conexão, mandando
+  investigar o lugar errado.
 
 ---
 
