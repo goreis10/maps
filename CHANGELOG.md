@@ -7,7 +7,7 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ## Maker Map 2.5 — Renda dentro da isócrona
 
-_Aguardando publicação._
+_No ar em maker-map.netlify.app._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
@@ -44,7 +44,7 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
 ## Maker Map 2.4.1 — A isócrona voltou a funcionar
 
-_Aguardando publicação._
+_No ar em maker-map.netlify.app._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
