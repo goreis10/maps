@@ -5,6 +5,43 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 2.5 — Renda dentro da isócrona
+
+_Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **O Mapa de renda deixa de ser só por raio.** Um botão novo, na gaveta,
+  troca o recorte da análise entre **Raio** e **Isócrona**. No modo isócrona, o
+  perfil de domicílios, renda, classe e faixas passa a ser calculado dentro da
+  área que se alcança de verdade pelas estradas — e não dentro de um círculo.
+  É a diferença entre "num raio de 10 km" e "a 20 minutos de carro daqui".
+- A isócrona do Mapa de renda é **própria dela**, independente da que está no
+  botão Isócrona da barra superior — do mesmo jeito que o raio daqui já é
+  independente do raio da Edição.
+- **Duas faixas de tempo.** A análise responde por uma delas de cada vez: clique
+  na linha da faixa para escolher qual (a bolinha ao lado troca a cor). A outra continua desenhada no mapa, para
+  comparar — a de 15 e a de 30 minutos lado a lado.
+- Cada faixa mostra a **área em km²**, tem cor editável na bolinha, e a faixa
+  analisada aparece com traço mais forte no mapa.
+- Carro, caminhão, bicicleta ou a pé; origem por coordenadas, endereço ou
+  clique no mapa.
+- Os **pontos e os mapas de calor** do Censo seguem o recorte escolhido: ligados
+  no modo isócrona, desenham os setores de dentro do polígono.
+- O painel inteiro passa a falar do recorte certo — onde dizia "raio", agora diz
+  "a isócrona de 20 min" quando é esse o caso.
+
+> **A margem de erro foi refeita para polígono.** O aviso de recorte pequeno
+> demais existia com uma conta que pressupõe círculo. Num contorno irregular ela
+> não significaria nada, então agora a margem vem da área real do polígono e da
+> distância ao contorno dele. O aviso continua valendo: recorte pequeno demais
+> para a densidade local dá resultado que depende mais do acaso do que dos dados.
+
+> Os tempos continuam **sem considerar trânsito**, como na isócrona da barra
+> superior.
+
+---
+
 ## Maker Map 2.4.1 — A isócrona voltou a funcionar
 
 _Aguardando publicação._

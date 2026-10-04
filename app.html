@@ -682,7 +682,7 @@
     <div class="sd-toggles">
       <div class="chip" id="chipRaioRenda"><span class="dot"></span>Raio</div>
       <div class="chip" id="chipCensoPts" title="um ponto por setor censitário, colorido pela faixa de renda"><span class="dot"></span>Pontos no mapa</div>
-      <div class="chip" id="chipCensoHeat" title="superfície suavizada dentro do raio"><span class="dot"></span>Mapa de calor</div>
+      <div class="chip" id="chipCensoHeat" title="superfície suavizada dentro do recorte escolhido"><span class="dot"></span>Mapa de calor</div>
     </div>
     <div class="sd-sec" id="heatOps" style="display:none">
       <div class="e-row" style="gap:8px">
@@ -698,6 +698,48 @@
       <div class="e-hint" id="heatHint"></div>
     </div>
     <div class="sd-sec">
+      <div class="e-subhead" style="padding-top:2px">Recorte da análise</div>
+      <div class="e-row">
+        <div class="seg" id="rendaModoSeg" style="box-shadow:none">
+          <button type="button" data-modo="raio" class="on">Raio</button>
+          <button type="button" data-modo="iso">Isócrona</button>
+        </div>
+      </div>
+      <div class="e-hint" id="rendaModoHint">O círculo é a distância em linha reta. A isócrona é
+        o que se alcança de verdade no tempo que você der, pelas estradas.</div>
+
+      <div id="rendaIsoBox" style="display:none">
+        <div class="e-subhead">Isócrona</div>
+        <div class="e-row">
+          <div class="seg" id="rendaIsoPerfil" style="box-shadow:none;flex-wrap:wrap">
+            <button type="button" data-perfil="driving-car" class="on">Carro</button>
+            <button type="button" data-perfil="driving-hgv">Caminhão</button>
+            <button type="button" data-perfil="cycling-regular">Bicicleta</button>
+            <button type="button" data-perfil="foot-walking">A pé</button>
+          </div>
+        </div>
+        <div class="e-row"><label>Tempos</label>
+          <input type="number" id="riMin0" min="1" max="120" step="1" value="15" title="1ª faixa">
+          <input type="number" id="riMin1" min="1" max="120" step="1" value="30" title="2ª faixa">
+          <label>min</label></div>
+        <div class="e-row"><label>Origem</label>
+          <input type="number" id="riCtLat" step="0.0001" value="-23.5505" title="latitude">
+          <input type="number" id="riCtLon" step="0.0001" value="-46.6333" title="longitude"></div>
+        <div class="e-row"><input type="text" id="riCtEnd" placeholder="endereço ou cidade" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:500 11.5px 'Archivo',sans-serif"></div>
+        <div class="e-row" style="gap:12px;font-size:11px">
+          <a id="riCtAplicar" style="color:var(--azul);cursor:pointer">aplicar coords</a>
+          <a id="riCtBuscar" style="color:var(--azul);cursor:pointer">buscar endereço</a>
+          <a id="riCtMapa" style="color:var(--azul);cursor:pointer">escolher no mapa</a>
+        </div>
+        <div class="e-row" style="margin-top:8px"><button class="rd-load" id="riCalc">Calcular isócrona</button></div>
+        <div id="riFaixas"></div>
+        <div class="e-row"><label><input type="checkbox" id="riFill" checked> preenchimento</label>
+          <label><input type="checkbox" id="riLblOn" checked> legenda</label></div>
+        <div class="e-hint">Duas faixas: a análise responde por <b>uma</b> de cada vez — clique na
+          linha da faixa para escolher qual (a bolinha troca a cor). A outra fica no mapa para comparar.
+          Tempos calculados sobre a malha viária do OpenStreetMap, <b>sem considerar trânsito</b>.</div>
+      </div>
+
       <div class="e-subhead" style="padding-top:2px">Ajuste dos valores</div>
       <div class="e-row"><label><input type="checkbox" id="rdIpca" checked> corrigir pelo IPCA</label>
         <span id="rdIpcaInfo" class="rd-mini">—</span></div>
@@ -1202,6 +1244,27 @@ function montarCamadas(){
       'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
     paint:{'text-color':'#0A6E60', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
 
+  // isócrona do Mapa de renda — mesma estrutura da isócrona própria,
+  // fonte e camadas separadas. Fica acima das camadas do Censo pelo
+  // mesmo motivo do raio de renda: o contorno precisa continuar legível
+  // sobre a nuvem de pontos.
+  map.addSource('iso-renda', {type:'geojson', data:ISO_RENDA_GEO});
+  map.addLayer({id:'isor-fill', type:'fill', source:'iso-renda',
+    filter:['!=',['geometry-type'],'Point'], layout:{visibility:'none'},
+    paint:{'fill-color':RENDA_ISO_CORES[0], 'fill-opacity':0.18}});
+  map.addLayer({id:'isor-borda', type:'line', source:'iso-renda',
+    filter:['!=',['geometry-type'],'Point'], layout:{visibility:'none'},
+    paint:{'line-color':RENDA_ISO_CORES[0], 'line-width':2}});
+  map.addLayer({id:'isor-centro', type:'circle', source:'iso-renda',
+    filter:['==',['geometry-type'],'Point'], layout:{visibility:'none'},
+    paint:{'circle-radius':5, 'circle-color':RENDA_ISO_CORES[0],
+           'circle-stroke-color':'#FFFFFF', 'circle-stroke-width':2}});
+  map.addLayer({id:'isor-rotulo', type:'symbol', source:'iso-renda',
+    filter:['all',['==',['geometry-type'],'Point'],['!=',['get','pendente'],1]],
+    layout:{visibility:'none', 'text-field':'Renda · 30 min', 'text-font':['Noto Sans Regular'],
+      'text-size':11.5, 'text-offset':[0,1.2], 'text-anchor':'top'},
+    paint:{'text-color':'#0A6E60', 'text-halo-color':'#FFFFFF', 'text-halo-width':1.6}});
+
   // isócrona — polígono de alcance por tempo de deslocamento.
   // As faixas são aninhadas e vêm na fonte da maior para a menor, então
   // o preenchimento translúcido se acumula e cria o efeito de cebola.
@@ -1289,6 +1352,7 @@ function montarCamadas(){
   if(window.__ajustarViasUI) window.__ajustarViasUI();   // mostra só os subníveis que existem
   atualizarRaioRenda();          // desenha o círculo do Mapa de renda (nasce oculto)
   atualizarIso();                // semeia o marcador de origem da isócrona (idem)
+  atualizarRendaIso();           // idem para a isócrona do Mapa de renda
   if(window.__aplicarRaioLbl) window.__aplicarRaioLbl();
   refreshStats();
   // cada sessão começa do zero; projetos são abertos manualmente em "Meus Projetos"
@@ -1620,6 +1684,33 @@ const RENDA_PADRAO = {on:false, km:10, centro:CENTRO_SE.slice(), cor:'#0E9F8A', 
 var CENSO_HEAT_CORES = ['#2C7FB8','#41B6C4','#A1DAB4','#FFFFB2','#FEB24C','#E31A1C'];
 let rendaRaio = JSON.parse(JSON.stringify(RENDA_PADRAO));
 
+// ── Isócrona do Mapa de renda ─────────────────────────────────────
+// A gaveta do Mapa de renda ganha uma isócrona PRÓPRIA, do mesmo jeito
+// que já tem um raio próprio, independente do raio da Edição. O botão
+// "Raio | Isócrona" escolhe qual geometria a análise do Censo usa.
+//
+// Duas faixas bastam aqui: a análise responde por UMA delas de cada
+// vez (um perfil de renda precisa de um recorte, não de três), e a
+// segunda existe para comparar — "e se eu esticar para 30 minutos?".
+const RENDA_ISO_MAX = 2;
+const RENDA_ISO_CORES = ['#0A6E60','#5EC8B8'];
+const RENDA_ISO_PADRAO = {
+  on:false,
+  centro:CENTRO_SE.slice(),
+  perfil:'driving-car',
+  minutos:[15,30],
+  cores:null,
+  fill:true,
+  poly:null,
+  calcCentro:null, calcPerfil:null, calcMin:null, calcEm:null,
+  faixaSel:0,             // qual faixa está sendo analisada
+  lbl:{on:true, texto:'', cor:'#0A6E60', tam:1, halo:true, haloCor:'#FFFFFF', haloW:1.6}
+};
+let rendaIso = JSON.parse(JSON.stringify(RENDA_ISO_PADRAO));
+let rendaIsoCarregando = false;
+let rendaModo = 'raio';          // 'raio' | 'iso' — a geometria da análise
+const ISO_RENDA_GEO = {type:'FeatureCollection', features:[]};
+
 // ── Isócrona ──────────────────────────────────────────────────────
 // Área alcançável em X minutos de deslocamento a partir de um ponto.
 // Não é um círculo: é um polígono recortado pelas estradas reais.
@@ -1660,7 +1751,7 @@ const ISO_GEO = {type:'FeatureCollection', features:[]};
 // aos pares; com três centros (raio, renda, isócrona) isso viraria bug
 // garantido — dois modos ligados ao mesmo tempo e o primeiro clique
 // definindo o centro errado.
-let pickAtivo = null;          // null | 'raio' | 'renda' | 'iso'
+let pickAtivo = null;          // null | 'raio' | 'renda' | 'iso' | 'renda-iso'
 function pickLigar(qual){
   if(typeof drawing!=='undefined' && drawing) drawSetMode(false);
   pickAtivo = qual;
@@ -1693,12 +1784,12 @@ function aplicarRaioRenda(){
   const chip = document.getElementById('chipRaioRenda');
   if(chip) chip.classList.toggle('on', rendaRaio.on);
   const chipP = document.getElementById('chipCensoPts');
-  if(chipP) chipP.classList.toggle('on', rendaRaio.on && rendaRaio.pts);
+  if(chipP) chipP.classList.toggle('on', rendaAtivo() && rendaRaio.pts);
   const chipH = document.getElementById('chipCensoHeat');
-  if(chipH) chipH.classList.toggle('on', rendaRaio.on && rendaRaio.heat);
+  if(chipH) chipH.classList.toggle('on', rendaAtivo() && rendaRaio.heat);
   const ops = document.getElementById('heatOps');
   if(ops){
-    ops.style.display = (rendaRaio.on && rendaRaio.heat) ? '' : 'none';
+    ops.style.display = (rendaAtivo() && rendaRaio.heat) ? '' : 'none';
     document.getElementById('heatRenda').classList.toggle('on', rendaRaio.heatModo==='renda');
     document.getElementById('heatDens').classList.toggle('on', rendaRaio.heatModo==='dens');
     document.getElementById('heatHint').innerHTML = rendaRaio.heatModo==='renda'
@@ -1749,12 +1840,14 @@ function isoCorFaixa(i){ var C=isoCores(); return C[i] || C[C.length-1]; }
 // Normaliza o que o usuário digitou: inteiros de 1 a 120, sem repetir,
 // em ordem, no máximo ISO_MAX_FAIXAS. A função no servidor aplica os
 // mesmos limites — aqui é só para não gastar uma chamada à toa.
-function isoMinutos(){
-  var m=(iso.minutos||[]).map(function(v){ return Math.round(+v); })
+function isoNormalizarMin(lista, max){
+  var m=(lista||[]).map(function(v){ return Math.round(+v); })
          .filter(function(v){ return isFinite(v) && v>=1 && v<=120; });
   m=m.filter(function(v,i,a){ return a.indexOf(v)===i; }).sort(function(a,b){ return a-b; });
-  return m.slice(0, ISO_MAX_FAIXAS);
+  return m.slice(0, max || ISO_MAX_FAIXAS);
 }
+function isoMinutos(){ return isoNormalizarMin(iso.minutos, ISO_MAX_FAIXAS); }
+function rendaIsoMinutos(){ return isoNormalizarMin(rendaIso.minutos, RENDA_ISO_MAX); }
 function isoPerfilNome(k){
   var p=ISO_PERFIS.filter(function(x){ return x.k===(k||iso.perfil); })[0];
   return p ? p.nome : 'Carro';
@@ -1779,79 +1872,110 @@ function isoDesatualizado(){
   return (iso.calcMin||[]).join(',') !== isoMinutos().join(',');
 }
 
-function atualizarIso(){
-  ISO_GEO.features = [];
-  if(iso.poly && iso.poly.features && iso.poly.features.length){
-    // O ORS devolve uma feição por faixa, com properties.value em
-    // SEGUNDOS e, porque pedimos attributes:['area'], a área em km².
-    var fs=iso.poly.features.filter(function(f){
-             // Faixa sem tempo válido pegaria a cor mais interna E
-             // ficaria por cima de todas — a pior degradação possível.
-             // O teste é "> 0", não isFinite: +null, +'' e +false são 0,
-             // que é finito, e passariam.
-             return f && f.geometry && +((f.properties||{}).value) > 0;
-           })
-           .map(function(f){
-             var p=f.properties||{};
-             return {g:f.geometry, min:Math.round((+p.value)/60), area:+p.area||0};
-           });
-    // Duas faixas que arredondam para o mesmo minuto virariam duas barras
-    // com o mesmo índice de cor, e editar uma mudaria as duas.
-    var vistos={};
-    fs=fs.filter(function(x){ if(vistos[x.min]) return false; vistos[x.min]=1; return true; });
-    // O match de cor só tem paradas 0..ISO_MAX_FAIXAS-1: uma faixa a mais
-    // cairia no fallback e seria pintada com a cor da primeira. Ordena
-    // ANTES de cortar para guardar as menores, e não as quatro primeiras
-    // da resposta — hoje o ORS manda em ordem crescente, mas depender
-    // disso faria o corte mudar de significado se ele mudasse.
-    fs.sort(function(a,b){ return a.min-b.min; });
-    fs=fs.slice(0, ISO_MAX_FAIXAS);
-    var ordem=fs.map(function(x){ return x.min; }).sort(function(a,b){ return a-b; });
+// Resposta do serviço -> feições prontas para desenhar. Usada pelas
+// DUAS isócronas (a da gaveta própria e a do Mapa de renda). Duas
+// cópias disto divergiriam, e a parte dos anéis é justamente a sutil.
+//
+// Devolve as faixas na ordem de desenho (maior primeiro), já com
+// `ordem` = posto crescente de minuto, que é o índice de cor.
+// Normaliza a resposta do serviço: faixas válidas, sem repetir minuto,
+// em ordem CRESCENTE e cortadas no máximo. Devolve o polígono CHEIO de
+// cada faixa.
+//
+// Está separada do desenho porque os dois consumidores querem coisas
+// diferentes do mesmo dado: o mapa quer anéis (para a cor bater com a
+// legenda), e a ANÁLISE do Censo quer o polígono cheio — "dentro de 30
+// min" é a área toda até 30 min, não o anel entre 15 e 30. Normalizar
+// em dois lugares faria os dois discordarem sobre quais faixas existem.
+function isoFaixas(poly, maxFaixas){
+  if(!poly || !poly.features || !poly.features.length) return [];
+  // O serviço devolve uma feição por faixa, com properties.value em
+  // SEGUNDOS e, porque pedimos attributes:['area'], a área em km².
+  var fs=poly.features.filter(function(f){
+           // Faixa sem tempo válido pegaria a cor mais interna E ficaria
+           // por cima de todas — a pior degradação possível. O teste é
+           // "> 0", não isFinite: +null, +'' e +false são 0, que é
+           // finito, e passariam.
+           return f && f.geometry && +((f.properties||{}).value) > 0;
+         })
+         .map(function(f){
+           var p=f.properties||{};
+           return {g:f.geometry, min:Math.round((+p.value)/60), area:+p.area||0};
+         });
+  // Duas faixas que arredondam para o mesmo minuto virariam duas barras
+  // com o mesmo índice de cor, e editar uma mudaria as duas.
+  var vistos={};
+  fs=fs.filter(function(x){ if(vistos[x.min]) return false; vistos[x.min]=1; return true; });
+  // O match de cor só tem paradas 0..maxFaixas-1: uma faixa a mais cairia
+  // no fallback e seria pintada com a cor da primeira. Ordena ANTES de
+  // cortar para guardar as menores, e não as primeiras da resposta — hoje
+  // o serviço manda em ordem crescente, mas depender disso faria o corte
+  // mudar de significado se ele mudasse.
+  fs.sort(function(a,b){ return a.min-b.min; });
+  return fs.slice(0, maxFaixas);
+}
 
-    // ANÉIS VERDADEIROS. O ORS devolve as faixas ANINHADAS — a de 15 min
-    // é um polígono inteiro dentro do de 30. Pintadas assim, com
-    // preenchimento translúcido, a região interna aparece como a SOMA de
-    // todas as camadas sobre ela, e a cor no mapa deixa de ser a cor da
-    // legenda. Transformando cada faixa num anel (o contorno dela mais o
-    // contorno da faixa anterior como FURO), cada região do mapa recebe
-    // exatamente uma cor, que é a da bolinha ao lado dela.
-    //
-    // Só vale para Polygon. Se alguma faixa vier MultiPolygon (área
-    // desconexa — uma ilha, o outro lado de um rio sem ponte), não dá
-    // para saber qual parte contém qual sem operação booleana de
-    // verdade, então todas voltam ao modo aninhado: pior na cor,
-    // correto na geometria.
-    var asc=fs.slice().sort(function(a,b){ return a.min-b.min; });
-    var anel=asc.every(function(x){ return x.g.type==='Polygon' && (x.g.coordinates||[]).length>=1; });
-    asc.forEach(function(x,k){
-      if(!anel){ x.gf=x.g; return; }
-      // mantém os furos próprios da faixa e acrescenta o contorno da
-      // faixa anterior como mais um furo
-      x.gf = (k===0) ? x.g
-           : {type:'Polygon', coordinates:x.g.coordinates.concat([asc[k-1].g.coordinates[0]])};
-    });
+function isoFeicoes(poly, maxFaixas){
+  var fs=isoFaixas(poly, maxFaixas);
+  if(!fs.length) return [];
+  var ordem=fs.map(function(x){ return x.min; });   // já crescente
 
-    // MAIOR PRIMEIRO: no modo aninhado, feição posterior fica em cima, e
-    // as faixas menores precisam vir depois. Com anéis não há sobreposição
-    // e a ordem é indiferente — manter a mesma regra para os dois casos
-    // evita um comportamento que depende de qual modo caiu.
-    fs.sort(function(a,b){ return b.min-a.min; }).forEach(function(x){
-      ISO_GEO.features.push({type:'Feature', geometry:x.gf,
-        properties:{min:x.min, area:x.area, ordem:ordem.indexOf(x.min)}});
-    });
-  }
-  // Dois pontos possíveis, e a diferença importa para o PNG:
-  //  · a origem CALCULADA, à qual o polígono e o rótulo correspondem;
-  //  · a origem PENDENTE (vazada), só quando os parâmetros mudaram —
-  //    é o retorno visual de "escolher no mapa" sem fazer o rótulo
-  //    descrever um ponto que não gerou o desenho.
-  var temPoly=ISO_GEO.features.length>0;
-  var base=(temPoly && iso.calcCentro) ? iso.calcCentro : iso.centro;
-  ISO_GEO.features.push({type:'Feature', properties:{centro:1, pendente:0},
+  // ANÉIS VERDADEIROS. O serviço devolve as faixas ANINHADAS — a de 15
+  // min é um polígono inteiro dentro do de 30. Pintadas assim, com
+  // preenchimento translúcido, a região interna aparece como a SOMA de
+  // todas as camadas sobre ela, e a cor no mapa deixa de ser a cor da
+  // legenda. Transformando cada faixa num anel (o contorno dela mais o
+  // contorno da faixa anterior como FURO), cada região do mapa recebe
+  // exatamente uma cor, que é a da bolinha ao lado dela.
+  //
+  // Só vale para Polygon. Se alguma faixa vier MultiPolygon (área
+  // desconexa — uma ilha, o outro lado de um rio sem ponte), não dá para
+  // saber qual parte contém qual sem operação booleana de verdade, então
+  // todas voltam ao modo aninhado: pior na cor, correto na geometria.
+  //
+  // ATENÇÃO: `gf` é só para DESENHAR. A análise do Censo usa `g`, o
+  // polígono cheio — "dentro de 30 min" é a área toda até 30 min, não o
+  // anel entre 15 e 30.
+  var asc=fs.slice();                               // isoFaixas já devolve crescente
+  var anel=asc.every(function(x){ return x.g.type==='Polygon' && (x.g.coordinates||[]).length>=1; });
+  asc.forEach(function(x,k){
+    if(!anel){ x.gf=x.g; return; }
+    // mantém os furos próprios da faixa e acrescenta o contorno da
+    // faixa anterior como mais um furo
+    x.gf = (k===0) ? x.g
+         : {type:'Polygon', coordinates:x.g.coordinates.concat([asc[k-1].g.coordinates[0]])};
+  });
+
+  // MAIOR PRIMEIRO: no modo aninhado, feição posterior fica em cima, e as
+  // faixas menores precisam vir depois. Com anéis não há sobreposição e a
+  // ordem é indiferente — manter a mesma regra para os dois casos evita um
+  // comportamento que depende de qual modo caiu.
+  return fs.slice().sort(function(a,b){ return b.min-a.min; }).map(function(x){
+    return {type:'Feature', geometry:x.gf,
+      properties:{min:x.min, area:x.area, ordem:ordem.indexOf(x.min)}};
+  });
+}
+
+// Os dois pontos de origem, comuns às duas isócronas:
+//  · a CALCULADA, à qual o polígono e o rótulo correspondem;
+//  · a PENDENTE (vazada), só quando os parâmetros mudaram — é o retorno
+//    visual de "escolher no mapa" sem fazer o rótulo descrever um ponto
+//    que não gerou o desenho.
+function isoPontos(alvo, temPoly, desatualizado){
+  var out=[];
+  var base=(temPoly && alvo.calcCentro) ? alvo.calcCentro : alvo.centro;
+  out.push({type:'Feature', properties:{centro:1, pendente:0},
     geometry:{type:'Point', coordinates:base.slice()}});
-  if(temPoly && isoDesatualizado())
-    ISO_GEO.features.push({type:'Feature', properties:{centro:1, pendente:1},
-      geometry:{type:'Point', coordinates:iso.centro.slice()}});
+  if(temPoly && desatualizado)
+    out.push({type:'Feature', properties:{centro:1, pendente:1},
+      geometry:{type:'Point', coordinates:alvo.centro.slice()}});
+  return out;
+}
+
+function atualizarIso(){
+  ISO_GEO.features = isoFeicoes(iso.poly, ISO_MAX_FAIXAS);
+  isoPontos(iso, ISO_GEO.features.length>0, isoDesatualizado())
+    .forEach(function(f){ ISO_GEO.features.push(f); });
   if(map && map.getSource('isocrona')) map.getSource('isocrona').setData(ISO_GEO);
   aplicarIso();
 }
@@ -1899,6 +2023,138 @@ function aplicarIso(){
   // que importa, já terminou acima.
   try{ pintarLegendaIso(iso.on && temDesenho && iso.legenda.on); }
   catch(e){ console.error('legenda da isócrona', e); }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ISÓCRONA DO MAPA DE RENDA
+//
+//  Geometria alternativa ao raio da gaveta: a análise do Censo passa a
+//  responder "quem mora a 20 minutos de carro daqui", que é a pergunta
+//  que o cliente faz — e não "quem mora num raio de 10 km", que é a
+//  pergunta que o mapa sabia responder.
+// ══════════════════════════════════════════════════════════════════
+function rendaIsoCores(){ return (rendaIso.cores && rendaIso.cores.length) ? rendaIso.cores : RENDA_ISO_CORES; }
+function rendaIsoCorFaixa(i){ var C=rendaIsoCores(); return C[i] || C[C.length-1]; }
+function rendaIsoDesatualizado(){
+  if(!rendaIso.poly) return false;
+  if(rendaIso.calcPerfil!==rendaIso.perfil) return true;
+  if(!rendaIso.calcCentro || Math.abs(rendaIso.calcCentro[0]-rendaIso.centro[0])>1e-6
+                          || Math.abs(rendaIso.calcCentro[1]-rendaIso.centro[1])>1e-6) return true;
+  return (rendaIso.calcMin||[]).join(',') !== rendaIsoMinutos().join(',');
+}
+// As faixas CHEIAS, em ordem crescente. É o que a análise usa.
+function rendaIsoFaixas(){ return isoFaixas(rendaIso.poly, RENDA_ISO_MAX); }
+function rendaIsoFaixaAtual(){
+  var fs=rendaIsoFaixas();
+  if(!fs.length) return null;
+  return fs[Math.min(Math.max(0, rendaIso.faixaSel|0), fs.length-1)];
+}
+function textoRendaIsoAuto(){
+  var f=rendaIsoFaixaAtual();
+  var pf=rendaIso.calcPerfil||rendaIso.perfil;
+  return f ? ('Renda · '+f.min+' min · '+isoPerfilNome(pf).toLowerCase()) : 'Renda · isócrona';
+}
+
+// A GEOMETRIA DA ANÁLISE. null quando o modo é raio, ou quando a
+// isócrona ainda não foi calculada.
+function rendaGeomAtiva(){
+  if(rendaModo!=='iso') return null;
+  var f=rendaIsoFaixaAtual();
+  return f ? f.g : null;
+}
+// "A análise tem um recorte válido ligado?" — substitui os testes
+// diretos a rendaRaio.on, que agora só valem para um dos dois modos.
+function rendaAtivo(){
+  return rendaModo==='iso' ? !!(rendaIso.on && rendaGeomAtiva()) : !!rendaRaio.on;
+}
+
+function atualizarRendaIso(){
+  ISO_RENDA_GEO.features = isoFeicoes(rendaIso.poly, RENDA_ISO_MAX);
+  isoPontos(rendaIso, ISO_RENDA_GEO.features.length>0, rendaIsoDesatualizado())
+    .forEach(function(f){ ISO_RENDA_GEO.features.push(f); });
+  if(map && map.getSource('iso-renda')) map.getSource('iso-renda').setData(ISO_RENDA_GEO);
+  aplicarRendaIso();
+}
+
+function aplicarRendaIso(){
+  if(!map || !map.getLayer('isor-borda')) return;
+  var temDesenho=ISO_RENDA_GEO.features.some(function(f){ return !f.properties.centro; });
+  var liga=(rendaModo==='iso' && rendaIso.on);
+  var vis=(liga && temDesenho) ? 'visible' : 'none';
+  ['isor-fill','isor-borda'].forEach(function(id){ map.setLayoutProperty(id,'visibility',vis); });
+  map.setLayoutProperty('isor-centro','visibility', liga ? 'visible' : 'none');
+  var L=rendaIso.lbl;
+  map.setLayoutProperty('isor-rotulo','visibility', (liga && temDesenho && L.on) ? 'visible' : 'none');
+
+  var cor=['match',['get','ordem']];
+  for(var i=0;i<RENDA_ISO_MAX;i++) cor.push(i, rendaIsoCorFaixa(i));
+  cor.push(rendaIsoCorFaixa(0));
+  map.setPaintProperty('isor-fill','fill-color',cor);
+  map.setPaintProperty('isor-fill','fill-opacity', rendaIso.fill ? 0.18 : 0);
+  map.setPaintProperty('isor-borda','line-color',cor);
+  // A faixa analisada ganha traço mais grosso. NÃO use line-dasharray
+  // para distinguir: além de ser propriedade de PAINT (chamá-la como
+  // layout lança e derruba esta função inteira), ela é cross-faded e
+  // não aceita expressão por feição — o traço valeria para a camada
+  // toda. O line-width abaixo já faz a distinção, por feição.
+  var sel=rendaIsoFaixaAtual();
+  map.setPaintProperty('isor-borda','line-width',
+    ['case',['==',['get','min'], sel?sel.min:-1], 2.6, 1.4]);
+  map.setPaintProperty('isor-centro','circle-color',
+    ['case',['==',['get','pendente'],1], '#FFFFFF', rendaIsoCorFaixa(0)]);
+  map.setPaintProperty('isor-centro','circle-stroke-color',
+    ['case',['==',['get','pendente'],1], rendaIsoCorFaixa(0), '#FFFFFF']);
+  map.setLayoutProperty('isor-rotulo','text-field', String(L.texto||'').trim() || textoRendaIsoAuto());
+  map.setLayoutProperty('isor-rotulo','text-size', 11.5*L.tam);
+  map.setPaintProperty('isor-rotulo','text-color',L.cor);
+  map.setPaintProperty('isor-rotulo','text-halo-color',L.haloCor);
+  map.setPaintProperty('isor-rotulo','text-halo-width', L.halo ? L.haloW : 0);
+}
+
+// Chamada única ao serviço, usada pelas duas isócronas. Duas cópias
+// divergiriam, e uma delas gastaria cota de um jeito que a outra não.
+async function isoPedir(alvo, mins){
+  var url='/api/isocrona?lon='+alvo.centro[0]+'&lat='+alvo.centro[1]+
+          '&perfil='+encodeURIComponent(alvo.perfil)+'&min='+mins.join(',');
+  var r=await fetch(url);
+  var js=null;
+  try{ js=await r.json(); }catch(e){}
+  if(!r.ok) throw new Error((js && js.erro) || ('Falha no cálculo (HTTP '+r.status+').'));
+  if(!js || !js.features || !js.features.length) throw new Error('O serviço não devolveu área alcançável.');
+  return js;
+}
+
+async function buscarRendaIso(){
+  if(rendaIsoCarregando) return;
+  if(!map || !map.getLayer('isor-borda')){ toast('Aguarde o mapa carregar.'); return; }
+  var mins=rendaIsoMinutos();
+  if(!mins.length){ toast('Informe ao menos uma faixa de tempo, de 1 a 120 minutos.'); return; }
+  rendaIsoCarregando=true; renderRenda();
+  try{
+    var js=await isoPedir(rendaIso, mins);
+    rendaIso.poly=js;
+    rendaIso.minutos=mins.slice();
+    rendaIso.calcCentro=rendaIso.centro.slice();
+    rendaIso.calcPerfil=rendaIso.perfil;
+    rendaIso.calcMin=mins.slice();
+    rendaIso.calcEm=Date.now();
+    rendaIso.on=true;
+    if(rendaIso.faixaSel>=mins.length) rendaIso.faixaSel=mins.length-1;
+    censoCache.chave=null;              // o recorte mudou: refaz a conta
+    aplicarRaioRenda();
+    atualizarRendaIso();
+    // pode ter passado a alcançar um estado ainda não baixado
+    if(censoStatus!=='carregando') carregarCenso();
+    else renderRenda();
+    toast('Isócrona de renda calculada: '+mins.join(' / ')+' min.');
+  }catch(err){
+    console.error('isocrona renda', err);
+    // Falha NÃO apaga o polígono anterior: perder um cálculo que deu
+    // certo por causa de uma tentativa que falhou custaria outra cota.
+    toast(err && err.message ? err.message : 'Falha de rede ao calcular a isócrona.');
+  }finally{
+    rendaIsoCarregando=false; renderRenda();
+  }
 }
 
 // ── Legenda da isócrona DENTRO do mapa ────────────────────────────
@@ -2095,18 +2351,8 @@ async function buscarIsocrona(){
   var mins=isoMinutos();
   if(!mins.length){ toast('Informe ao menos uma faixa de tempo, de 1 a 120 minutos.'); return; }
   isoCarregando=true; renderIso();
-  var url='/api/isocrona?lon='+iso.centro[0]+'&lat='+iso.centro[1]+
-          '&perfil='+encodeURIComponent(iso.perfil)+'&min='+mins.join(',');
   try{
-    var r=await fetch(url);
-    var js=null;
-    try{ js=await r.json(); }catch(e){}
-    if(!r.ok){
-      // Falha NÃO apaga o polígono anterior: perder um cálculo que deu
-      // certo por causa de uma tentativa que falhou custaria outra cota.
-      toast((js && js.erro) || ('Falha no cálculo (HTTP '+r.status+').'));
-      return;
-    }
+    var js=await isoPedir(iso, mins);
     iso.poly=js;
     iso.minutos=mins.slice();
     iso.calcCentro=iso.centro.slice();
@@ -2118,7 +2364,12 @@ async function buscarIsocrona(){
     toast('Isócrona de '+mins.join(' / ')+' min ('+isoPerfilNome().toLowerCase()+') calculada.');
   }catch(err){
     console.error('isocrona', err);
-    toast('Falha de rede ao calcular a isócrona.');
+    // A mensagem do servidor é acionável ("cota esgotada", "faixa passa
+    // do limite", "chave recusada"); trocá-la por um genérico de rede
+    // apagaria a informação de que o usuário precisa. Falha NÃO apaga o
+    // polígono anterior: perder um cálculo que deu certo por causa de
+    // uma tentativa que falhou custaria outra cota.
+    toast(err && err.message ? err.message : 'Falha de rede ao calcular a isócrona.');
   }finally{
     isoCarregando=false; renderIso();
   }
@@ -2566,6 +2817,16 @@ function montarEditor(){
     syncIsoInputs();
     atualizarIso();
     renderIso();
+    // isócrona do Mapa de renda, e o recorte volta a ser o raio
+    rendaIso = JSON.parse(JSON.stringify(RENDA_ISO_PADRAO));
+    rendaIsoCarregando = false;
+    rendaModo = 'raio';
+    var _riEnd = document.getElementById('riCtEnd');
+    if(_riEnd) _riEnd.value = '';
+    censoCache.chave = null;
+    atualizarRendaIso();
+    syncRendaModo();
+    renderRenda();
     // glebas: cores de grupo, preenchimento, filtros e rótulos
     DATA.features.forEach(f=>{
       f.properties.cor_final = CORES[f.properties.municipio] || '#8A8F98';
@@ -2796,6 +3057,8 @@ function montarEditor(){
              lbl: JSON.parse(JSON.stringify(raioLbl)) },
       renda: JSON.parse(JSON.stringify(rendaRaio)),
       iso:   JSON.parse(JSON.stringify(iso)),
+      rendaModo: rendaModo,
+      rendaIso:  JSON.parse(JSON.stringify(rendaIso)),
       mask:{ cor: document.getElementById('edMaskCor').value,
              op: +document.getElementById('edMaskOp').value,
              cobre: maskCobreGlebas },
@@ -2918,6 +3181,32 @@ function montarEditor(){
       syncIsoInputs();
       atualizarIso();
       renderIso();
+
+      // isócrona do Mapa de renda (projeto antigo não tem: cai no padrão).
+      // Mesma regra do polígono da outra: volta do projeto, nunca é
+      // recalculado — reabrir não deve gastar cota de roteamento.
+      rendaIso=JSON.parse(JSON.stringify(RENDA_ISO_PADRAO));
+      rendaModo = (s.rendaModo==='iso') ? 'iso' : 'raio';
+      if(s.rendaIso){
+        Object.assign(rendaIso, s.rendaIso);
+        rendaIso.lbl=Object.assign(JSON.parse(JSON.stringify(RENDA_ISO_PADRAO.lbl)), s.rendaIso.lbl||{});
+        rendaIso.centro=(s.rendaIso.centro&&s.rendaIso.centro.length===2)?s.rendaIso.centro.slice():CENTRO_SE.slice();
+        rendaIso.minutos=(Array.isArray(s.rendaIso.minutos)&&s.rendaIso.minutos.length)?s.rendaIso.minutos.slice():RENDA_ISO_PADRAO.minutos.slice();
+        rendaIso.cores=(Array.isArray(s.rendaIso.cores)&&s.rendaIso.cores.length)?s.rendaIso.cores.slice():null;
+        rendaIso.calcMin=Array.isArray(s.rendaIso.calcMin)?s.rendaIso.calcMin.slice():null;
+        rendaIso.calcCentro=(s.rendaIso.calcCentro&&s.rendaIso.calcCentro.length===2)?s.rendaIso.calcCentro.slice():null;
+        if(ISO_PERFIS.every(function(p){ return p.k!==rendaIso.perfil; })) rendaIso.perfil=RENDA_ISO_PADRAO.perfil;
+        if(ISO_PERFIS.every(function(p){ return p.k!==rendaIso.calcPerfil; })) rendaIso.calcPerfil=null;
+        rendaIso.faixaSel=Math.min(Math.max(0, parseInt(s.rendaIso.faixaSel,10)||0), RENDA_ISO_MAX-1);
+        if(!rendaIso.poly || !rendaIso.poly.features || !rendaIso.poly.features.length){ rendaIso.poly=null; rendaIso.on=false; }
+      }
+      // sem polígono não há recorte: o modo isócrona seria um beco sem saída
+      if(rendaModo==='iso' && !rendaIso.poly) rendaModo='raio';
+      rendaIsoCarregando=false;
+      censoCache.chave=null;
+      atualizarRendaIso();
+      syncRendaModo();          // segmentado, caixa da isócrona e lista de faixas
+      renderRenda();
 
       // glebas: cores + preenchimento
       if(s.areas){
@@ -3280,7 +3569,8 @@ document.getElementById('chipRaioRenda').onclick = function(){
 };
 document.getElementById('chipCensoPts').onclick = function(){
   if(!map || !map.getLayer('censo-pts')){ toast('Aguarde o mapa carregar.'); return; }
-  if(!rendaRaio.on){ toast('Ligue o Raio primeiro — os pontos são os setores dentro dele.'); return; }
+  if(!rendaAtivo()){ toast(rendaModo==='iso' ? 'Calcule a isócrona primeiro — os pontos são os setores dentro dela.'
+                                             : 'Ligue o Raio primeiro — os pontos são os setores dentro dele.'); return; }
   rendaRaio.pts = !rendaRaio.pts;
   aplicarRaioRenda();
   if(rendaRaio.pts && censoStatus!=='carregando') carregarCenso();
@@ -3288,7 +3578,8 @@ document.getElementById('chipCensoPts').onclick = function(){
 };
 document.getElementById('chipCensoHeat').onclick = function(){
   if(!map || !map.getLayer('censo-heat')){ toast('Aguarde o mapa carregar.'); return; }
-  if(!rendaRaio.on){ toast('Ligue o Raio primeiro — o calor é calculado dentro dele.'); return; }
+  if(!rendaAtivo()){ toast(rendaModo==='iso' ? 'Calcule a isócrona primeiro — o calor é calculado dentro dela.'
+                                             : 'Ligue o Raio primeiro — o calor é calculado dentro dele.'); return; }
   rendaRaio.heat = !rendaRaio.heat;
   aplicarRaioRenda();
   if(rendaRaio.heat && censoStatus!=='carregando') carregarCenso();
@@ -3364,6 +3655,150 @@ document.getElementById('rdCtSe').onclick = function(){
   rendaRaio.centro = CENTRO_SE.slice();
   atualizarRaioRenda();
   toast('Centro restaurado: Marco Zero, Praça da Sé.');
+};
+
+// ── Mapa de renda: troca de recorte (raio | isócrona) ──
+function syncRendaModo(){
+  var seg=document.getElementById('rendaModoSeg');
+  if(!seg) return;
+  seg.querySelectorAll('button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-modo')===rendaModo);
+  });
+  var cx=document.getElementById('rendaIsoBox');
+  if(cx) cx.style.display = rendaModo==='iso' ? '' : 'none';
+  syncRendaIsoInputs();
+  renderRendaIsoFaixas();
+}
+function syncRendaIsoInputs(){
+  var g=function(id){ return document.getElementById(id); };
+  if(!g('riCtLat')) return;
+  // NUNCA reescrever o campo que está sob o cursor. renderRenda() é
+  // chamada por retornos assíncronos (IPCA, Censo), e o onchange de um
+  // input só dispara no blur — sem este guarda, uma resposta que chega
+  // no meio da digitação apaga o que a pessoa escreveu.
+  var foco=document.activeElement;
+  var por=function(id, valor){ var el=g(id); if(el && el!==foco) el.value=valor; };
+  por('riCtLat', rendaIso.centro[1].toFixed(5));
+  por('riCtLon', rendaIso.centro[0].toFixed(5));
+  var m=rendaIsoMinutos();
+  for(var i=0;i<RENDA_ISO_MAX;i++) por('riMin'+i, (m[i]!=null ? m[i] : ''));
+  g('riFill').checked=!!rendaIso.fill;
+  g('riLblOn').checked=!!rendaIso.lbl.on;
+  var btn=g('riCalc');
+  if(btn){
+    btn.disabled=rendaIsoCarregando;
+    btn.textContent=rendaIsoCarregando ? 'Calculando…' : (rendaIso.poly ? 'Recalcular isócrona' : 'Calcular isócrona');
+  }
+  document.querySelectorAll('#rendaIsoPerfil button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-perfil')===rendaIso.perfil);
+  });
+}
+// A lista de faixas é também o seletor: clicar na linha escolhe qual
+// delas a análise responde; clicar na bolinha troca a cor. Mesma ideia
+// do gráfico de faixas de renda, em que a legenda é o editor.
+function renderRendaIsoFaixas(){
+  var box=document.getElementById('riFaixas');
+  if(!box) return;
+  var fs=rendaIsoFaixas();
+  var num=function(v){ return Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0}); };
+  if(!fs.length){
+    box.innerHTML = rendaIsoCarregando ? '<div class="rd-foot">Calculando…</div>'
+      : '<div class="rd-foot">Nenhuma isócrona calculada ainda.</div>';
+    return;
+  }
+  var sel=Math.min(Math.max(0, rendaIso.faixaSel|0), fs.length-1);
+  var h='<div class="rd-sub">Faixas · clique para analisar</div><div class="rd-fx">';
+  fs.forEach(function(f,i){
+    h+='<div class="rd-fxr" style="cursor:pointer" data-ri-sel="'+i+'">'+
+         '<input type="color" class="rd-sw" value="'+rendaIsoCorFaixa(i)+'" data-ri-cor="'+i+'" title="cor desta faixa">'+
+         '<span style="'+(i===sel?'font-weight:800;color:var(--ink)':'')+'">'+
+           (i===sel?'● ':'○ ')+f.min+' min</span></div>'+
+       '<u>'+(f.area>0 ? num(f.area)+' km²' : '—')+'</u>';
+  });
+  h+='</div>';
+  if(rendaIsoDesatualizado())
+    h+='<div class="rd-msg warn">Os parâmetros mudaram desde o cálculo. O desenho no mapa ainda é '+
+       'o anterior — clique em <b>Recalcular isócrona</b>.</div>';
+  box.innerHTML=h;
+  box.querySelectorAll('[data-ri-sel]').forEach(function(el){
+    el.onclick=function(e){
+      // clique na bolinha é escolha de cor, não de faixa
+      if(e.target && e.target.getAttribute && e.target.getAttribute('data-ri-cor')!==null) return;
+      rendaIso.faixaSel=+el.getAttribute('data-ri-sel');
+      censoCache.chave=null;              // outro recorte: refaz a conta
+      atualizarRendaIso();
+      renderRenda();
+    };
+  });
+  // oninput NÃO refaz este HTML: reconstruir fecharia o seletor de cor
+  // do navegador no meio do arraste.
+  box.querySelectorAll('[data-ri-cor]').forEach(function(inp){
+    inp.oninput=function(){
+      if(!rendaIso.cores) rendaIso.cores=RENDA_ISO_CORES.slice();
+      rendaIso.cores[+inp.getAttribute('data-ri-cor')]=inp.value;
+      aplicarRendaIso();
+    };
+  });
+}
+function setRendaModo(m){
+  if(rendaModo===m) return;
+  rendaModo=m;
+  censoCache.chave=null;                  // a geometria mudou
+  aplicarRaioRenda();                     // os chips seguem a geometria ativa
+  aplicarRendaIso();
+  renderRenda();
+  // o novo recorte pode alcançar um estado ainda não baixado
+  if(rendaAtivo() && censoStatus!=='carregando') carregarCenso();
+}
+document.querySelectorAll('#rendaModoSeg button').forEach(function(b){
+  b.onclick=function(){ setRendaModo(b.getAttribute('data-modo')); };
+});
+document.querySelectorAll('#rendaIsoPerfil button').forEach(function(b){
+  b.onclick=function(){ rendaIso.perfil=b.getAttribute('data-perfil'); atualizarRendaIso(); renderRenda(); };
+});
+for(var _ri=0; _ri<RENDA_ISO_MAX; _ri++){
+  (function(i){
+    var el=document.getElementById('riMin'+i);
+    if(!el) return;
+    el.onchange=function(){
+      var txt=(el.value||'').trim(), novo=rendaIsoMinutos();
+      while(novo.length < i) novo.push(null);
+      var v=Math.round(+txt);
+      novo[i]=(txt==='' || !isFinite(v) || v<1) ? null : Math.min(120, v);
+      novo=novo.filter(function(x){ return x!=null; });
+      if(novo.length) rendaIso.minutos=novo;
+      else toast('É preciso ao menos uma faixa de tempo.');
+      atualizarRendaIso(); renderRenda();
+    };
+  })(_ri);
+}
+document.getElementById('riCalc').onclick = function(){ buscarRendaIso(); };
+document.getElementById('riFill').onchange = function(e){ rendaIso.fill=e.target.checked; aplicarRendaIso(); };
+document.getElementById('riLblOn').onchange = function(e){ rendaIso.lbl.on=e.target.checked; aplicarRendaIso(); };
+document.getElementById('riCtAplicar').onclick = function(){
+  var la=parseFloat(document.getElementById('riCtLat').value);
+  var lo=parseFloat(document.getElementById('riCtLon').value);
+  if(!isFinite(la) || !isFinite(lo)){ toast('Coordenadas inválidas.'); return; }
+  rendaIso.centro=[+lo.toFixed(5), +la.toFixed(5)];
+  atualizarRendaIso(); renderRenda();
+  if(map) map.flyTo({center:rendaIso.centro, zoom:Math.max(map.getZoom(), 9)});
+};
+document.getElementById('riCtBuscar').onclick = async function(){
+  var q=(document.getElementById('riCtEnd').value||'').trim();
+  if(!q){ toast('Digite um endereço ou cidade.'); return; }
+  try{
+    var r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q='+encodeURIComponent(q));
+    var js=await r.json();
+    if(!js.length){ toast('Endereço não encontrado.'); return; }
+    rendaIso.centro=[+parseFloat(js[0].lon).toFixed(5), +parseFloat(js[0].lat).toFixed(5)];
+    atualizarRendaIso(); renderRenda();
+    if(map) map.flyTo({center:rendaIso.centro, zoom:Math.max(map.getZoom(), 10)});
+    toast('Origem da isócrona: '+js[0].display_name.split(',').slice(0,3).join(','));
+  }catch(err){ console.error(err); toast('Falha na busca (rede bloqueando nominatim.openstreetmap.org?).'); }
+};
+document.getElementById('riCtMapa').onclick = function(){
+  pickLigar('renda-iso');
+  toast('Clique no mapa para definir a origem da isócrona de renda.');
 };
 
 // ── Isócrona (Pro) — gaveta própria ──
@@ -3591,15 +4026,36 @@ function censoClasse(v){
 // UFs cujo retângulo é alcançado pelo círculo atual. O retângulo é
 // alargado pelo raio convertido em graus, então uma UF vizinha que
 // entra só na borda do círculo também é carregada.
-function censoUFsDoRaio(){
-  if(!CENSO_MAN) return [];
+// Caixa que a análise ATIVA alcança, em [latMin, lonMin, latMax, lonMax].
+// Generalizada na 2.5: antes só sabia de círculo.
+function censoCaixaAtual(){
+  if(rendaModo==='iso'){
+    // a caixa de todas as faixas, não só da analisada: trocar de faixa
+    // não deve exigir uma carga nova
+    var bb=null;
+    (rendaIso.poly && rendaIso.poly.features ? rendaIso.poly.features : []).forEach(function(f){
+      var c=geomCaixa(f && f.geometry);
+      if(!c) return;
+      bb = !bb ? c.slice() : [Math.min(bb[0],c[0]), Math.min(bb[1],c[1]),
+                              Math.max(bb[2],c[2]), Math.max(bb[3],c[3])];
+    });
+    return bb ? [bb[1], bb[0], bb[3], bb[2]] : null;
+  }
   var la=rendaRaio.centro[1], lo=rendaRaio.centro[0], km=rendaRaio.km;
   var dLa=km/111.32;
   var cos=Math.cos(la*Math.PI/180);
   var dLo=km/(111.32*Math.max(0.01, Math.abs(cos)));
+  return [la-dLa, lo-dLo, la+dLa, lo+dLo];
+}
+// Nome mantido porque é chamado em vários lugares; o que mudou é que
+// agora ele pergunta à geometria ativa, não ao raio.
+function censoUFsDoRaio(){
+  if(!CENSO_MAN) return [];
+  var c=censoCaixaAtual();
+  if(!c) return [];
   return CENSO_MAN.ufs.filter(function(u){
     var b=u.bbox;   // [latMin, lonMin, latMax, lonMax]
-    return (la+dLa)>=b[0] && (la-dLa)<=b[2] && (lo+dLo)>=b[1] && (lo-dLo)<=b[3];
+    return c[2]>=b[0] && c[0]<=b[2] && c[3]>=b[1] && c[1]<=b[3];
   });
 }
 // Todas as UFs que o manifesto oferece.
@@ -3613,9 +4069,23 @@ function censoNomesCarregadas(){
   return CENSO_MAN.ufs.filter(function(u){ return censoUF[u.cod]==='ok'; })
                       .map(function(u){ return u.nome; });
 }
-// UFs que o raio alcança mas que não estão carregadas (rede falhou).
+// UFs que a ANÁLISE alcança mas que não estão carregadas (rede falhou).
+//
+// Repare que isto não é censoUFsDoRaio(): aquela devolve a união de
+// todas as faixas da isócrona, de propósito, para trocar de faixa não
+// exigir carga nova. Usar a união aqui faria o banner vermelho dizer
+// que faltam números ao analisar uma faixa pequena, inteiramente dentro
+// de um estado carregado, só porque a faixa maior raspa o vizinho.
 function censoUFsFaltando(){
-  return censoUFsDoRaio().filter(function(u){ return censoUF[u.cod]!=='ok'; });
+  var g = (typeof rendaGeomAtiva==='function') ? rendaGeomAtiva() : null;
+  var c = null;
+  if(g){ var bb=geomCaixa(g); if(bb) c=[bb[1], bb[0], bb[3], bb[2]]; }
+  if(!c) c = censoCaixaAtual();
+  if(!CENSO_MAN || !c) return [];
+  return CENSO_MAN.ufs.filter(function(u){
+    var b=u.bbox;
+    return c[2]>=b[0] && c[0]<=b[2] && c[3]>=b[1] && c[1]<=b[3] && censoUF[u.cod]!=='ok';
+  });
 }
 // Junta uma UF ao conjunto já carregado. Recusa repetir: anexar duas vezes
 // dobraria domicílios, população e a distribuição por faixa.
@@ -3672,20 +4142,120 @@ function carregarCenso(){
 
 // Agregação dentro do raio. Ponderação por domicílios é obrigatória:
 // média simples entre setores faria um setor de 10 pesar igual a um de 500.
-function censoConsulta(lat, lon, raioKm){
+// ══════════════════════════════════════════════════════════════════
+//  GEOMETRIA — ponto em polígono, caixa e área
+//
+//  Existe porque a análise do Censo deixou de valer só para círculo.
+//  Nada disso havia no arquivo até a 2.5.
+// ══════════════════════════════════════════════════════════════════
+function pontoEmAnel(lon, lat, anel){
+  var dentro=false;
+  for(var i=0,j=anel.length-1;i<anel.length;j=i++){
+    var xi=anel[i][0], yi=anel[i][1], xj=anel[j][0], yj=anel[j][1];
+    if(((yi>lat)!==(yj>lat)) && (lon < (xj-xi)*(lat-yi)/(yj-yi)+xi)) dentro=!dentro;
+  }
+  return dentro;
+}
+// Dentro do contorno externo E fora de todos os furos. Trata
+// MultiPolygon porque uma isócrona longa pode voltar em pedaços.
+function pontoEmPoligono(lon, lat, geom){
+  if(!geom) return false;
+  var partes = geom.type==='MultiPolygon' ? geom.coordinates
+             : geom.type==='Polygon' ? [geom.coordinates] : [];
+  for(var p=0;p<partes.length;p++){
+    var aneis=partes[p];
+    if(!aneis.length || !pontoEmAnel(lon, lat, aneis[0])) continue;
+    var noFuro=false;
+    for(var h=1;h<aneis.length && !noFuro;h++) if(pontoEmAnel(lon, lat, aneis[h])) noFuro=true;
+    if(!noFuro) return true;
+  }
+  return false;
+}
+function aneisDe(geom){
+  var partes = !geom ? []
+             : geom.type==='MultiPolygon' ? geom.coordinates
+             : geom.type==='Polygon' ? [geom.coordinates] : [];
+  var out=[];
+  partes.forEach(function(aneis){ aneis.forEach(function(a){ if(a && a.length) out.push(a); }); });
+  return out;
+}
+// [lonMin, latMin, lonMax, latMax]
+function geomCaixa(geom){
+  var aneis=aneisDe(geom);
+  if(!aneis.length) return null;
+  var x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+  aneis.forEach(function(a){ for(var i=0;i<a.length;i++){
+    if(a[i][0]<x0) x0=a[i][0]; if(a[i][0]>x1) x1=a[i][0];
+    if(a[i][1]<y0) y0=a[i][1]; if(a[i][1]>y1) y1=a[i][1];
+  }});
+  return isFinite(x0) ? [x0,y0,x1,y1] : null;
+}
+// Área em km². Laço de sapato em grau convertido para km pela latitude
+// média — numa isócrona (dezenas de km) o erro é muito menor que a
+// incerteza do próprio recorte por centroide.
+function areaPoligonoKm2(geom){
+  var partes = !geom ? []
+             : geom.type==='MultiPolygon' ? geom.coordinates
+             : geom.type==='Polygon' ? [geom.coordinates] : [];
+  var total=0;
+  partes.forEach(function(aneis){
+    aneis.forEach(function(anel, i){
+      if(!anel || anel.length<4) return;
+      var latM=0;
+      for(var k=0;k<anel.length;k++) latM+=anel[k][1];
+      latM/=anel.length;
+      var kx=111.320*Math.cos(latM*Math.PI/180), ky=110.574, s=0;
+      for(var j=0,p=anel.length-1;j<anel.length;p=j++)
+        s += (anel[p][0]*kx)*(anel[j][1]*ky) - (anel[j][0]*kx)*(anel[p][1]*ky);
+      total += (i===0 ? 1 : -1) * Math.abs(s)/2;   // anel 0 soma, furos descontam
+    });
+  });
+  // NaN propagaria: 'NaN km²' no cabeçalho, densidade 0 e margem 0% —
+  // ou seja, o aviso de recorte ruim calado por causa de um dado ruim.
+  return isFinite(total) ? Math.max(0, total) : 0;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SELEÇÃO e AGREGAÇÃO, separadas
+//
+//  O círculo e a isócrona respondem "quem está dentro?" de formas
+//  completamente diferentes, mas somam EXATAMENTE igual. Manter duas
+//  cópias da soma é o que produziu o defeito do calor de densidade,
+//  em que uma regra mudou num lugar e não no outro, e o painel passou
+//  a discordar do mapa em 17%. Uma agregação, dois selecionadores.
+// ══════════════════════════════════════════════════════════════════
+function censoSelecionarRaio(lat, lon, raioKm){
   var S=CENSO.s, n=S.length, D=censoDist;
-  var fat=fatorRenda();       // correção IPCA × demais moradores
-  var Rt=6371.0088, rad=Math.PI/180, cos1=Math.cos(lat*rad);
-  var dentro=0, dom=0, pes=0, wMed=0, wMdn=0, domRenda=0;
-  var muns={}, faixas=[0,0,0,0,0,0,0], faixaTot=0, idx=[];
+  var Rt=6371.0088, rad=Math.PI/180, cos1=Math.cos(lat*rad), idx=[];
   for(var i=0;i<n;i++){
     var r=S[i];
     var sla=Math.sin((r[0]-lat)*rad/2), slo=Math.sin((r[1]-lon)*rad/2);
     var a=sla*sla + cos1*Math.cos(r[0]*rad)*slo*slo;
-    var d=Rt*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    D[i]=d;
-    if(d>raioKm) continue;
-    dentro++; idx.push(i);
+    D[i]=Rt*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    if(D[i]<=raioKm) idx.push(i);
+  }
+  return idx;
+}
+function censoSelecionarPoly(geom){
+  var S=CENSO.s, n=S.length, idx=[], bb=geomCaixa(geom);
+  if(!bb) return idx;
+  for(var i=0;i<n;i++){
+    var r=S[i];                       // r[0]=lat, r[1]=lon
+    if(r[1]<bb[0] || r[1]>bb[2] || r[0]<bb[1] || r[0]>bb[3]) continue;   // caixa antes do raio-casting
+    if(pontoEmPoligono(r[1], r[0], geom)) idx.push(i);
+  }
+  return idx;
+}
+
+// A soma, uma só. Ponderação por domicílios é obrigatória: média simples
+// entre setores faria um setor de 10 pesar igual a um de 500.
+function censoAgregar(idx, area){
+  if(!idx.length) return {vazio:true, idx:[]};
+  var S=CENSO.s, fat=fatorRenda();      // correção IPCA × demais moradores
+  var dom=0, pes=0, wMed=0, wMdn=0, domRenda=0;
+  var muns={}, faixas=[0,0,0,0,0,0,0], faixaTot=0;
+  for(var k=0;k<idx.length;k++){
+    var r=S[idx[k]];
     dom+=r[3]; pes+=r[3]*r[4];
     muns[r[2]]=(muns[r[2]]||0)+r[3];
     if(r[5]>0){
@@ -3694,29 +4264,123 @@ function censoConsulta(lat, lon, raioKm){
       faixas[censoFaixaIdx(rm)]+=r[3]; faixaTot+=r[3];
     }
   }
-  if(!dentro) return {vazio:true, idx:[]};
-
-  // Margem de borda: domicílios que moram a menos de um "raio de setor"
-  // da linha do círculo — ou seja, os que entram/saem por acaso do
-  // centroide. rs = R/raiz(n) vem de área_do_setor = pi*R^2 / n.
-  var rs = raioKm/Math.sqrt(dentro), domBorda=0;
-  for(var j=0;j<n;j++){ var dd=D[j]; if(dd>=raioKm-rs && dd<=raioKm+rs) domBorda+=S[j][3]; }
-
-  var area=Math.PI*raioKm*raioKm;
   var lista=Object.keys(muns).sort(function(a,b){ return muns[b]-muns[a]; });
   return {
-    vazio:false, setores:dentro, dom:dom,
+    vazio:false, setores:idx.length, dom:dom,
     pes:Math.round(pes),
     morDom: dom>0 ? pes/dom : 0,
     rendaMedia:   domRenda>0 ? wMed/domRenda : 0,
     rendaMediana: domRenda>0 ? wMdn/domRenda : 0,
     domSemRenda: dom-domRenda,
-    densDom: dom/area, densPes: pes/area, area:area,
-    margem: dom>0 ? domBorda/dom*100 : 100,
-    setorMedioM: rs*1000,
+    densDom: area>0 ? dom/area : 0, densPes: area>0 ? pes/area : 0, area:area,
+    margem: 0, setorMedioM: 0,          // preenchidos por quem chamou
     muns:lista, munNomes:lista.slice(0,3).map(function(c){ return CENSO.mun[c]||c; }),
     faixas:faixas, faixaTot:faixaTot, idx:idx
   };
+}
+
+function censoConsulta(lat, lon, raioKm){
+  var idx=censoSelecionarRaio(lat, lon, raioKm);
+  var q=censoAgregar(idx, Math.PI*raioKm*raioKm);
+  if(q.vazio) return q;
+  // Margem de borda: domicílios que moram a menos de um "raio de setor"
+  // da linha do círculo — ou seja, os que entram/saem por acaso do
+  // centroide. rs = R/raiz(n) vem de área_do_setor = pi*R^2 / n.
+  var S=CENSO.s, D=censoDist, rs=raioKm/Math.sqrt(idx.length), domBorda=0;
+  for(var j=0;j<S.length;j++){ var dd=D[j]; if(dd>=raioKm-rs && dd<=raioKm+rs) domBorda+=S[j][3]; }
+  q.setorMedioM=rs*1000;
+  q.margem = q.dom>0 ? domBorda/q.dom*100 : 100;
+  return q;
+}
+
+// Mesma pergunta, dentro de um polígono.
+//
+// A fórmula da margem NÃO pode ser a do círculo: rs = raio/raiz(n) sai
+// de "área do círculo dividida por n setores" e não significa nada num
+// contorno irregular. Aqui rs vem da área real do polígono, e a borda é
+// medida contra o contorno dele.
+function censoConsultaPoly(geom){
+  var idx=censoSelecionarPoly(geom);
+  var q=censoAgregar(idx, areaPoligonoKm2(geom));
+  if(q.vazio) return q;
+  var rs=Math.sqrt(q.area/(Math.PI*idx.length));
+  q.setorMedioM=rs*1000;
+  // a banda conta domicílios de fora do recorte e divide pelos de
+  // dentro, então em recorte minúsculo passa de 100%; exibir 143% só
+  // confunde — acima de 100 a mensagem já é "não use estes números"
+  // area 0 com setores selecionados (anel degenerado) zeraria rs e daria
+  // margem 0% SEM aviso, enquanto o painel imprime domicílios e pessoas —
+  // exatamente o número confiante e errado que a margem existe para impedir
+  q.margem = (q.dom>0 && q.area>0) ? Math.min(100, censoBordaPoly(geom, rs)/q.dom*100) : 100;
+  return q;
+}
+
+// Domicílios a menos de rs do contorno, dentro ou fora — a mesma conta
+// que o círculo faz, só que contra um polígono.
+//
+// O contorno é DENSIFICADO em passos de rs/2 antes de ir para a grade.
+// Medir só contra os vértices originais SUBESTIMA, e muito: com vértices
+// a 1,9 km e rs de 175 m, a medida saiu em 14% do valor real. Subestimar
+// aqui é o pior erro possível — o aviso de "recorte pequeno demais" cala
+// justamente quando deveria falar, e o painel apresenta número confiante
+// e errado. Densificar sai mais exato E mais rápido, porque a grade
+// deixa de ter poucas células com muitos vértices.
+//
+// A grade tem célula rs, então cada setor olha 9 células em vez do
+// contorno inteiro; e só são testados os setores dentro da caixa do
+// polígono alargada em rs — o resto está longe demais por construção.
+function censoBordaPoly(geom, rsKm){
+  var aneis=aneisDe(geom), bb=geomCaixa(geom);
+  if(!aneis.length || !bb || !(rsKm>0)) return 0;
+
+  // latitude média dos vértices originais, para converter grau em km
+  var soma=0, cont=0;
+  aneis.forEach(function(a){ for(var i=0;i<a.length;i++){ soma+=a[i][1]; cont++; } });
+  if(!cont) return 0;
+  var kx=111.320*Math.cos((soma/cont)*Math.PI/180) || 1, ky=110.574;
+
+  var vs=[], passo=rsKm/2;
+  aneis.forEach(function(a){
+    for(var i=0;i<a.length;i++){
+      var p0=a[i], p1=a[(i+1)%a.length];
+      vs.push(p0);
+      var dx=(p1[0]-p0[0])*kx, dy=(p1[1]-p0[1])*ky;
+      var L=Math.sqrt(dx*dx+dy*dy);
+      // Teto por segmento: sem ele, um rs minúsculo com um segmento longo
+      // geraria milhões de pontos e travaria a aba. 20 mil é folgado o
+      // bastante para o passo continuar rs/2 em qualquer contorno real
+      // (com 1000 ele degradava, e a margem subestimava em até 80%).
+      var n=Math.min(Math.floor(L/passo), 20000);
+      for(var t=1;t<=n;t++){
+        var f=t/(n+1);
+        vs.push([p0[0]+(p1[0]-p0[0])*f, p0[1]+(p1[1]-p0[1])*f]);
+      }
+    }
+  });
+
+  var dLon=rsKm/kx, dLat=rsKm/ky, grade={};
+  for(var v=0;v<vs.length;v++){
+    var ch=Math.floor(vs[v][0]/dLon)+'|'+Math.floor(vs[v][1]/dLat);
+    (grade[ch] || (grade[ch]=[])).push(vs[v]);
+  }
+
+  var S=CENSO.s, dom=0, r2=rsKm*rsKm;
+  var mLon=rsKm/kx, mLat=rsKm/ky;
+  for(var k=0;k<S.length;k++){
+    var r=S[k], lon=r[1], lat=r[0];
+    if(lon<bb[0]-mLon || lon>bb[2]+mLon || lat<bb[1]-mLat || lat>bb[3]+mLat) continue;
+    var cx=Math.floor(lon/dLon), cy=Math.floor(lat/dLat), perto=false;
+    for(var ax=-1;ax<=1 && !perto;ax++) for(var ay=-1;ay<=1 && !perto;ay++){
+      var cel=grade[(cx+ax)+'|'+(cy+ay)];
+      if(!cel) continue;
+      for(var p=0;p<cel.length;p++){
+        var ddx=(cel[p][0]-lon)*kx, ddy=(cel[p][1]-lat)*ky;
+        if(ddx*ddx+ddy*ddy<=r2){ perto=true; break; }
+      }
+    }
+    if(perto) dom+=r[3];
+  }
+  return dom;
 }
 
 // Camadas do Censo no mapa (pontos e mapa de calor). Um setor censitário =
@@ -3731,7 +4395,7 @@ function censoConsulta(lat, lon, raioKm){
 // Passe q=null para apagar tudo.
 function censoCamadas(q){
   if(!map || !map.getLayer('censo-pts')) return;
-  var vale   = !!(q && !q.vazio && rendaRaio.on);
+  var vale   = !!(q && !q.vazio && rendaAtivo());
   var vPts   = vale && rendaRaio.pts;
   var vHeat  = vale && rendaRaio.heat;
   var vSurf  = vHeat && rendaRaio.heatModo==='renda';
@@ -3774,21 +4438,41 @@ function censoCamadas(q){
   map.getSource('censo').setData({type:'FeatureCollection', features:feats});
 }
 
+// Como o painel chama o recorte, em cada modo. Uma função só, porque
+// o texto aparece em sete lugares e deixá-los divergir faria o painel
+// dizer "raio" enquanto o mapa desenha um polígono.
+function censoTituloOrigem(){
+  if(rendaModo!=='iso') return 'o raio';
+  var f=rendaIsoFaixaAtual();
+  return f ? ('a isócrona de '+f.min+' min') : 'a isócrona';
+}
+function censoTituloCurto(){
+  if(rendaModo!=='iso') return 'raio';
+  var f=rendaIsoFaixaAtual();
+  return f ? (f.min+' min') : 'isócrona';
+}
+
 function renderRenda(){
   var box=document.getElementById('rendaAnalise');
   if(!box) return;
   syncAjusteInfo();
   var nf=function(v,d){ return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); };
 
-  if(!rendaRaio.on){
+  syncRendaModo();
+  if(!rendaAtivo()){
     censoCamadas(null);
-    box.innerHTML='<div class="rd-msg">Ligue o <b>Raio</b> acima para ver o perfil de domicílios e renda dentro dele.</div>';
+    box.innerHTML = rendaModo==='iso'
+      ? (rendaIsoCarregando
+          ? '<div class="rd-msg">Calculando a isócrona…</div>'
+          : '<div class="rd-msg">Defina a origem e os tempos acima e clique em <b>Calcular isócrona</b> '+
+            'para ver o perfil de domicílios e renda dentro dela.</div>')
+      : '<div class="rd-msg">Ligue o <b>Raio</b> acima para ver o perfil de domicílios e renda dentro dele.</div>';
     return;
   }
   if(censoStatus==='vazio'){
     censoCamadas(null);
     box.innerHTML='<button class="rd-load" id="rdCarregar">Carregar dados do Censo</button>'+
-      '<div class="rd-foot">Baixa só o estado que o raio alcança, e só quando você pede.</div>';
+      '<div class="rd-foot">Baixa só o estado que '+censoTituloOrigem()+' alcança, e só quando você pede.</div>';
     document.getElementById('rdCarregar').onclick=carregarCenso;
     return;
   }
@@ -3799,7 +4483,7 @@ function renderRenda(){
   }
   if(censoStatus==='fora'){
     censoCamadas(null);
-    box.innerHTML='<div class="rd-msg warn">O centro do raio está <b>fora dos estados disponíveis</b>.'+
+    box.innerHTML='<div class="rd-msg warn">O centro d'+(rendaModo==='iso'?'a isócrona':'o raio')+' está <b>fora dos estados disponíveis</b>.'+
       (CENSO_MAN ? ' A base cobre hoje: <b>'+esc(censoNomesUF().join(', '))+'</b>.' : '')+
       '<br>Mova o centro para dentro de um deles, ou acrescente o arquivo daquele estado em '+
       '<code>censo/</code>.</div>';
@@ -3820,18 +4504,24 @@ function renderRenda(){
     return;
   }
 
-  // o fator entra na chave: mudar IPCA ou % dos demais refaz a conta
-  var chave=rendaRaio.km+'|'+rendaRaio.centro[0]+'|'+rendaRaio.centro[1]+'|'+fatorRenda().toFixed(6);
+  // o fator entra na chave: mudar IPCA ou % dos demais refaz a conta.
+  // No modo isócrona o recorte é identificado pelo instante do cálculo
+  // mais a faixa escolhida — o polígono só muda quando é recalculado.
+  var chave = rendaModo==='iso'
+    ? 'i|'+rendaIso.calcEm+'|'+rendaIso.faixaSel+'|'+fatorRenda().toFixed(6)
+    : 'r|'+rendaRaio.km+'|'+rendaRaio.centro[0]+'|'+rendaRaio.centro[1]+'|'+fatorRenda().toFixed(6);
   if(censoCache.chave!==chave){
-    censoCache.res=censoConsulta(rendaRaio.centro[1], rendaRaio.centro[0], rendaRaio.km);
+    censoCache.res = rendaModo==='iso'
+      ? censoConsultaPoly(rendaGeomAtiva())
+      : censoConsulta(rendaRaio.centro[1], rendaRaio.centro[0], rendaRaio.km);
     censoCache.chave=chave;
   }
   var q=censoCache.res;
   censoCamadas(q);
 
   if(q.vazio){
-    box.innerHTML='<div class="rd-h">Dentro do raio</div>'+
-      '<div class="rd-msg warn">Nenhum setor censitário neste raio.'+
+    box.innerHTML='<div class="rd-h">Dentro d'+(rendaModo==='iso'?'a isócrona':'o raio')+'</div>'+
+      '<div class="rd-msg warn">Nenhum setor censitário aqui dentro.'+
       (censoNomesCarregadas().length
         ? ' Estão carregados: <b>'+esc(censoNomesCarregadas().join(', '))+'</b>.' : '')+'</div>';
     return;
@@ -3843,7 +4533,7 @@ function renderRenda(){
   var faltando = censoUFsFaltando();
   var avisoUF = faltando.length
     ? '<div class="rd-msg bad">Faltou carregar <b>'+esc(faltando.map(function(u){ return u.nome; }).join(', '))+
-      '</b> — os números abaixo cobrem só o restante do raio. '+
+      '</b> — os números abaixo cobrem só o restante d'+(rendaModo==='iso'?'a isócrona':'o raio')+'. '+
       '<a id="rdRetentar" style="color:inherit;text-decoration:underline;cursor:pointer">tentar de novo</a></div>'
     : '';
 
@@ -3851,11 +4541,12 @@ function renderRenda(){
   var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
   var aviso='';
   if(nivel==='bad'){
-    aviso='<div class="rd-msg bad">Raio pequeno demais para a densidade local. '+
-      (q.setores<30 ? 'São apenas <b>'+q.setores+' setores</b> no raio. ' : '')+
+    aviso='<div class="rd-msg bad">Recorte pequeno demais para a densidade local. '+
+      (q.setores<30 ? 'São apenas <b>'+q.setores+' setores</b> aqui dentro. ' : '')+
       '<b>'+nf(q.margem)+'%</b> dos domicílios estão na faixa de incerteza da borda, '+
       'onde entrar ou sair do total depende de onde caiu o centroide do setor '+
-      '(setor médio aqui: '+nf(q.setorMedioM)+' m). Aumente o raio antes de usar estes números.</div>';
+      '(setor médio aqui: '+nf(q.setorMedioM)+' m). '+
+      (rendaModo==='iso' ? 'Use uma faixa de tempo maior' : 'Aumente o raio')+' antes de usar estes números.</div>';
   } else if(nivel==='warn'){
     aviso='<div class="rd-msg warn">Margem de borda de <b>'+nf(q.margem)+'%</b> dos domicílios — '+
       'suficiente para leitura de tendência, apertado para número fechado.</div>';
@@ -3891,7 +4582,9 @@ function renderRenda(){
   var baseTxt   = 'R$ de '+(corrigido ? ipcaRotulo(IPCA.ate) : 'jul/2022');
 
   box.innerHTML=
-    '<div class="rd-h">Dentro do raio <em>'+nf(rendaRaio.km)+' km · '+nf(q.area)+' km²</em></div>'+
+    '<div class="rd-h">Dentro d'+(rendaModo==='iso'?'a isócrona':'o raio')+' <em>'+
+      (rendaModo==='iso' ? esc(censoTituloCurto())+' · '+isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()
+                         : nf(rendaRaio.km)+' km')+' · '+nf(q.area)+' km²</em></div>'+
     '<div class="rd-stat big"><span>Domicílios ocupados</span><b>'+nf(q.dom)+'</b></div>'+
     '<div class="rd-stat big"><span>Pessoas (estimativa)</span><b>'+nf(q.pes)+'</b></div>'+
     '<div class="rd-stat"><span>Moradores por domicílio</span><b>'+nf(q.morDom,2)+'</b></div>'+
@@ -3914,6 +4607,8 @@ function renderRenda(){
       '(setor sem informação de rendimento). Eles contam no total de domicílios, '+
       'de pessoas e no mapa de calor de densidade; ficam de fora da média, da '+
       'distribuição por faixa, dos pontos e do calor de renda.</div>' : '')+
+    (rendaModo==='iso' ? '<div class="rd-foot">O recorte é um tempo de deslocamento, '+
+      'calculado sobre a malha viária do OpenStreetMap <b>sem considerar trânsito</b>.</div>' : '')+
     '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
     'O Censo mede a renda <b>do responsável pelo domicílio</b>.<br>'+
     (corrigido
@@ -4535,6 +5230,11 @@ function drawSetup(){
         iso.centro = pt;
         isoMudouParametro();
         toast('Origem da isócrona definida — clique em Calcular.');
+      } else if(qual==='renda-iso'){
+        rendaIso.centro = pt;
+        atualizarRendaIso();
+        renderRenda();
+        toast('Origem da isócrona de renda definida — clique em Calcular.');
       }
       return;
     }
