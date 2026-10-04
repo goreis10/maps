@@ -2423,11 +2423,10 @@ function syncAjusteInfo(){
   if(!ii) return;
   var txt='—', cls='rd-mini';
   if(!rendaRaio.ipca)                    txt='desligada';
-  else if(ipcaManual()!=null)          { txt='informado por você'; cls='rd-mini ok'; }
+  else if(ipcaManual()!=null)          { txt='informado'; cls='rd-mini ok'; }
   else if(IPCA.status==='carregando')    txt='buscando…';
   else if(IPCA.status==='erro')        { txt='indisponível'; cls='rd-mini err'; }
-  else if(IPCA.status==='ok')          { txt='→ '+ipcaRotulo(IPCA.ate)+'  +'+
-                                          ((IPCA.fator-1)*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
+  else if(IPCA.status==='ok')          { txt=ipcaRotulo(IPCA.ate)+' '+pctTxt((IPCA.fator-1)*100);
                                          cls='rd-mini ok'; }
   ii.textContent=txt; ii.className=cls;
   if(oi){
@@ -3625,6 +3624,7 @@ document.getElementById('rdRaioKm').onchange = function(e){
 document.getElementById('rdIpca').onchange = function(e){
   rendaRaio.ipca = e.target.checked;
   censoCache.chave=null;
+  syncRaioRendaInputs();          // habilita/desabilita o campo de percentual
   if(rendaRaio.ipca && ipcaManual()==null && IPCA.status!=='ok' && IPCA.status!=='carregando') carregarIPCA();
   else renderRenda();
 };
@@ -4009,16 +4009,23 @@ function carregarIPCA(){
 
 // Fator único aplicado à renda de cada setor antes de qualquer conta:
 // correção monetária × acréscimo dos demais moradores.
+// QUEM VENCEU A CORREÇÃO MONETÁRIA — autoridade única.
+//
+// O fator aplicado e o texto que anuncia esse fator precisam concordar
+// sempre. Enquanto a regra de precedência estava escrita em dois lugares,
+// eles divergiram: a linha "Base dos valores" anunciava jul/2022 enquanto
+// os números já vinham corrigidos pelo percentual informado. Agora os dois
+// LEEM daqui em vez de reescrever a regra, e não podem mais discordar.
+function fonteCorrecao(){
+  if(!rendaRaio.ipca) return {k:'off', f:1};
+  var m = ipcaManual();
+  if(m!=null)                return {k:'manual',  f:1+m/100, pct:m};
+  if(IPCA.status==='ok')     return {k:'bcb',     f:IPCA.fator};
+  return                            {k:'nenhuma', f:1};
+}
+
 function fatorRenda(){
-  var f = 1;
-  if(rendaRaio.ipca){
-    // valor informado à mão tem precedência e dispensa a busca; é a saída
-    // para quando a consulta ao BCB falha, e o rodapé diz qual valeu
-    if(ipcaManual()!=null) f *= 1 + ipcaManual()/100;
-    else if(IPCA.status==='ok') f *= IPCA.fator;
-  }
-  f *= 1 + (+rendaRaio.outros || 0)/100;
-  return f;
+  return fonteCorrecao().f * (1 + (+rendaRaio.outros || 0)/100);
 }
 // O QUE OS VALORES EM R$ REPRESENTAM, em uma linha.
 //
@@ -4028,11 +4035,16 @@ function fatorRenda(){
 // dinheiro corrigido anunciado como nominal, que é exatamente o erro que
 // esta versão existe para evitar.
 function censoBaseTxt(){
-  var man = rendaRaio.ipca ? ipcaManual() : null;
-  if(man!=null) return 'jul/2022 corrigido em '+(man<0?'':'+')+
-    Number(man).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
-  if(rendaRaio.ipca && IPCA.status==='ok') return 'R$ de '+ipcaRotulo(IPCA.ate);
+  var c = fonteCorrecao();
+  if(c.k==='manual') return 'jul/2022 corrigido em '+pctTxt(c.pct);
+  if(c.k==='bcb')    return 'R$ de '+ipcaRotulo(IPCA.ate);
   return 'R$ de jul/2022';
+}
+// Um percentual, uma formatação. Com duas, o mesmo 20 saía "+20%" na linha
+// da base e "+20,0%" no rodapé, no mesmo painel.
+function pctTxt(v){
+  return (v<0?'':'+')+Number(v).toLocaleString('pt-BR',
+    {minimumFractionDigits:1, maximumFractionDigits:1})+'%';
 }
 function censoQuemTxt(){ return ((+rendaRaio.outros||0) > 0) ? 'domiciliar (estimada)' : 'do responsável'; }
 
@@ -4651,7 +4663,7 @@ function renderRenda(){
   var corrigido = rendaRaio.ipca && IPCA.status==='ok';
   var manual = rendaRaio.ipca ? ipcaManual() : null;
   var comOutros = (+rendaRaio.outros||0) > 0;
-  var quemRenda = comOutros ? 'domiciliar (estimada)' : 'do responsável';
+  var quemRenda = censoQuemTxt();
   var baseTxt   = censoBaseTxt();
 
   box.innerHTML=
@@ -4685,7 +4697,7 @@ function renderRenda(){
     '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
     'O Censo mede a renda <b>do responsável pelo domicílio</b>.<br>'+
     (manual!=null
-      ? '<b>Corrigido em '+(manual<0?'':'+')+nf(manual,1)+'%</b> sobre julho/2022 — '+
+      ? '<b>Corrigido em '+pctTxt(manual)+'</b> sobre julho/2022 — '+
         '<b>percentual informado por você</b>, '+
         'não buscado no Banco Central.'
       : (corrigido
