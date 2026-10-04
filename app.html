@@ -92,8 +92,6 @@
   .brand-logo{height:40px;width:auto;display:block}
   .brand-logo-sm{height:30px;width:auto;display:block}
   .cfg-lbl{display:block;font-size:11.5px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
-  .hd-title{font-size:13px;color:var(--ink-2);border-left:1px solid var(--line);padding-left:16px}
-  .hd-title b{color:var(--ink);font-weight:600}
   .hd-stats{margin-left:auto;display:flex;gap:18px;font-size:12px;color:var(--ink-2)}
   .hd-stats b{display:block;font-size:16px;font-weight:700;color:var(--ink);line-height:1.1}
   .hd-stats .st:first-child b{color:var(--laranja)}
@@ -291,8 +289,15 @@
   .sd-toggles{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:12px;margin-bottom:6px;border-bottom:1px solid var(--line)}
   .sd-toggles .chip{box-shadow:none}
   .sd-sec .e-row,.sd-sec .grid-edit,.sd-sec .grid-head,.sd-sec .e-hint{padding-left:0;padding-right:0}
-  /* 4 modos de deslocamento numa gaveta estreita: aperta para caber */
-  #isoPerfil button{padding:6px 9px;font-size:11px}
+  /* 4 modos de deslocamento numa gaveta estreita: aperta para caber.
+     Vale para OS DOIS segmentados de perfil — o da gaveta Isócrona e o da
+     gaveta Mapa de renda. Só o primeiro tinha a regra, e o segundo ficava
+     no limite da coluna de 304px, quebrando linha ao estreitar a gaveta. */
+  #isoPerfil button, #rendaIsoPerfil button{padding:6px 9px;font-size:11px}
+  /* e se quebrar mesmo assim, não pode parecer defeito: o .seg tem
+     border-radius com overflow:hidden, então a 2ª linha sairia com cantos
+     retos e o preenchimento do .on atravessando errado */
+  .seg{flex-wrap:wrap}
 
   /* Análise do Censo dentro do raio do Mapa de renda */
   .rd-box{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
@@ -348,8 +353,6 @@
   .cfg-acct{background:#F6F4F1;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
   .cfg-nome{font-weight:700;font-size:14px}
   .cfg-email{color:var(--ink-2);font-size:12px;margin-top:2px}
-  .cfg-sec-tt{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:8px}
-  .cfg-status{font-size:12.5px;font-weight:600;margin-bottom:6px}
   .cfg-desc{font-size:12px;color:var(--ink-2);line-height:1.5;margin-bottom:14px}
   .cfg-btn{width:100%;border:0;border-radius:10px;padding:12px;cursor:pointer;margin-bottom:9px;
     background:var(--laranja);color:#fff;font:700 13.5px 'Archivo',sans-serif;box-shadow:0 6px 16px rgba(224,64,16,.28)}
@@ -416,24 +419,10 @@
   .e-row input[type=number]{width:70px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;
     font:600 12px 'Archivo',sans-serif;color:var(--ink)}
   .e-row input[type=range]{flex:1 1 40px;min-width:0;accent-color:var(--laranja);cursor:pointer}
-  .ord{margin-left:auto;display:flex;align-items:center;gap:4px}
-  .on-num{font-size:10px;font-weight:700;color:var(--laranja);width:12px;text-align:center}
-  .ob{border:1px solid var(--line);background:#fff;border-radius:5px;width:20px;height:20px;
-    font-size:11px;line-height:1;cursor:pointer;color:var(--ink-2);padding:0}
-  .ob:hover{border-color:var(--laranja);color:var(--laranja)}
   .e-row input[type=color]{flex:none}
   .e-row label{flex:none}
   .e-row label{font-size:11.5px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
   .e-hint{padding:2px 14px 9px;font-size:10.5px;color:var(--ink-2)}
-  .vias-cell{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
-  .vias-cell input[type=range]{flex:1;min-width:0;accent-color:var(--laranja);cursor:pointer}
-  .vias-val{font-size:10px;font-weight:700;color:var(--ink-2);flex:none;width:38px;text-align:right}
-  .vias-head-row{display:flex;align-items:center;gap:8px;padding:6px 14px 0}
-  .vias-head-row .vias-sp{flex:none}
-  .vias-head-row .vias-col{flex:1;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
-  .e-row-cont{display:flex;align-items:center;gap:8px;padding:0 14px 7px}
-  .e-row-cont label{width:64px;flex:none;font-size:10.5px;color:var(--ink-2)}
-  .e-row-cont input[type=color]{width:26px;height:22px;border:1px solid var(--line);border-radius:5px;padding:0;cursor:pointer;background:none;flex:none}
   .e-subhead{padding:8px 14px 3px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
   .grid-edit{align-items:center;gap:7px;padding:5px 14px}
   .grid-edit input[type=range]{width:100%;min-width:0;accent-color:var(--laranja);cursor:pointer}
@@ -457,7 +446,6 @@
   #toast.show{opacity:1}
 
   @media (max-width:640px){
-    .hd-title{display:none}
     .hd-stats .st:nth-child(3),.hd-stats .st:nth-child(4){display:none}
     #panel{width:220px}
   }
@@ -2691,9 +2679,10 @@ function montarEditor(){
   }
   // ordem da pilha acima da máscara (índice 0 = topo)
   const ordemAcima = ['cidades','demais','rodovia','avenida','rua'];
-  function renumerar(){
-    document.querySelectorAll('.on-num').forEach(b=> b.textContent = ordemAcima.indexOf(b.dataset.g)+1);
-  }
+  // Os botões ↑↓ numerados foram substituídos pelo arraste, e com eles
+  // sumiu o produtor de .on-num. A função fica como no-op porque ainda é
+  // chamada de vários pontos da reordenação.
+  function renumerar(){}
   // "Demais rótulos" sobre a máscara: move as camadas de rótulo diversas
   function demaisSobreMascara(on){
     if(!map || !map.getLayer('mascara')) return;
