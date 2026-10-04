@@ -5,6 +5,36 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 2.6 — Correção da renda informada por você
+
+_Aguardando publicação._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Novo campo de percentual ao lado de "corrigir pelo IPCA".** Deixando em
+  branco, o índice continua sendo buscado no Banco Central, como antes.
+  **Preenchendo, o seu valor é usado e nada é buscado** — é a saída para quando a
+  consulta ao Banco Central falha, e também serve para aplicar um índice de sua
+  escolha, não necessariamente o IPCA.
+- O **rodapé do painel sempre diz qual dos dois está valendo**: ou "Corrigido
+  pelo IPCA de jul/2022 a tal mês, série do Banco Central", ou "Corrigido em
+  +X% sobre julho/2022 — percentual informado por você". Quem olhar a análise
+  sabe de onde veio o número.
+- Valor fora da faixa de −50% a 1000% é **recusado com aviso**, em vez de
+  corrigido em silêncio. É dinheiro que vai para uma apresentação.
+- **"Indisponível" deixou de poder mentir.** Havia um caminho em que a série
+  chegava perfeita do Banco Central e, se a repintura do painel falhasse por
+  qualquer motivo, o aviso virava "indisponível" e a correção não era aplicada —
+  culpando o Banco Central por um defeito nosso de interface. O mesmo erro que a
+  isócrona já tinha cometido com a legenda.
+
+> A regra de nunca embutir uma tabela de inflação no programa **continua**. A
+> diferença é que agora existe um lugar onde **você** informa o índice, de forma
+> explícita e declarada no rodapé — o que não é a mesma coisa que o programa
+> inventar um.
+
+---
+
 ## Maker Map 2.5 — Renda dentro da isócrona
 
 _No ar em maker-map.netlify.app._
