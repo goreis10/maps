@@ -21,7 +21,13 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   +X% sobre julho/2022 — percentual informado por você". Quem olhar a análise
   sabe de onde veio o número.
 - Valor fora da faixa de −50% a 1000% é **recusado com aviso**, em vez de
-  corrigido em silêncio. É dinheiro que vai para uma apresentação.
+  corrigido em silêncio, e **vírgula decimal é entendida** (20,7 não vira 20).
+  É dinheiro que vai para uma apresentação.
+- **O popup do setor censitário parou de mentir sobre a base.** Ele mostra a
+  renda já corrigida, mas dizia "jul/2022 · responsável" — valor corrigido
+  rotulado como nominal, e estimativa domiciliar rotulada como sendo só do
+  responsável. Agora ele usa a mesma linha de base do painel. Esse defeito é
+  anterior a esta versão.
 - **"Indisponível" deixou de poder mentir.** Havia um caminho em que a série
   chegava perfeita do Banco Central e, se a repintura do painel falhasse por
   qualquer motivo, o aviso virava "indisponível" e a correção não era aplicada —

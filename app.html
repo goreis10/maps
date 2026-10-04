@@ -1348,7 +1348,8 @@ function montarCamadas(){
         <div class="pp-row"><span>Moradores/domicílio</span><b>${n(p.mor,2)}</b></div>
         <div class="pp-row"><span>Renda média</span><b>R$ ${n(p.renda)}</b></div>
         <div class="pp-row"><span>Renda mediana</span><b>R$ ${n(p.mdn)}</b></div>
-        <div class="pp-row"><span>Referência</span><b>jul/2022 · responsável</b></div>`)
+        <div class="pp-row"><span>Base</span><b>${censoBaseTxt()}</b></div>
+        <div class="pp-row"><span>Renda</span><b>${censoQuemTxt()}</b></div>`)
       .addTo(map);
   });
   map.on('mouseenter','censo-pts', ()=> map.getCanvas().style.cursor='pointer');
@@ -1837,7 +1838,13 @@ function syncRaioRendaInputs(){
   g('heatSuav').value = Math.round((rendaRaio.heatSuav||1)*100);
   g('heatSuavV').textContent = Math.round((rendaRaio.heatSuav||1)*100)+'%';
   g('rdIpca').checked = !!rendaRaio.ipca;
-  if(g('rdIpcaPct')) g('rdIpcaPct').value = (ipcaManual()==null ? '' : ipcaManual());
+  if(g('rdIpcaPct')){
+    g('rdIpcaPct').value = (ipcaManual()==null ? '' : ipcaManual());
+    // com a correção desligada o campo não vale nada, e deixá-lo ativo
+    // contradiria a dica logo abaixo dele
+    g('rdIpcaPct').disabled = !rendaRaio.ipca;
+    g('rdIpcaPct').style.opacity = rendaRaio.ipca ? '' : '.5';
+  }
   g('rdOutros').value = (+rendaRaio.outros||0);
   syncAjusteInfo();
 }
@@ -3618,12 +3625,15 @@ document.getElementById('rdRaioKm').onchange = function(e){
 document.getElementById('rdIpca').onchange = function(e){
   rendaRaio.ipca = e.target.checked;
   censoCache.chave=null;
-  if(rendaRaio.ipca && ipcaManual()==null && IPCA.status==='vazio') carregarIPCA();
+  if(rendaRaio.ipca && ipcaManual()==null && IPCA.status!=='ok' && IPCA.status!=='carregando') carregarIPCA();
   else renderRenda();
 };
 document.getElementById('rdIpcaPct').onchange = function(e){
   var txt=(e.target.value||'').trim();
-  var v=parseFloat(txt);
+  // vírgula decimal: parseFloat('20,7') devolve 20 em silêncio, e o
+  // usuário acharia que informou 20,7%. Mesmo tratamento que a série do
+  // BCB já recebe em carregarIPCA.
+  var v=parseFloat(txt.replace(',','.'));
   // vazio volta ao automático; fora da faixa é recusado em vez de
   // corrigido em silêncio — é dinheiro que vai para uma apresentação
   if(txt==='' || !isFinite(v)) rendaRaio.ipcaPct=null;
@@ -3631,7 +3641,9 @@ document.getElementById('rdIpcaPct').onchange = function(e){
   else rendaRaio.ipcaPct=v;
   censoCache.chave=null;                       // o fator mudou: refaz a conta
   syncRaioRendaInputs();
-  if(rendaRaio.ipca && ipcaManual()==null && IPCA.status==='vazio') carregarIPCA();
+  // esvaziar o campo depois de uma falha TEM de permitir nova tentativa;
+  // guardar em 'vazio' deixaria o usuário sem saída a não ser recarregar
+  if(rendaRaio.ipca && ipcaManual()==null && IPCA.status!=='ok' && IPCA.status!=='carregando') carregarIPCA();
   else renderRenda();
 };
 document.getElementById('rdOutros').onchange = function(e){
@@ -4008,6 +4020,22 @@ function fatorRenda(){
   f *= 1 + (+rendaRaio.outros || 0)/100;
   return f;
 }
+// O QUE OS VALORES EM R$ REPRESENTAM, em uma linha.
+//
+// Uma função só, porque isto aparece no painel E no popup do setor. Deixar
+// os dois montarem o texto por conta própria é como o popup passou a
+// rotular como "jul/2022" um valor que fatorRenda() já tinha corrigido —
+// dinheiro corrigido anunciado como nominal, que é exatamente o erro que
+// esta versão existe para evitar.
+function censoBaseTxt(){
+  var man = rendaRaio.ipca ? ipcaManual() : null;
+  if(man!=null) return 'jul/2022 corrigido em '+(man<0?'':'+')+
+    Number(man).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
+  if(rendaRaio.ipca && IPCA.status==='ok') return 'R$ de '+ipcaRotulo(IPCA.ate);
+  return 'R$ de jul/2022';
+}
+function censoQuemTxt(){ return ((+rendaRaio.outros||0) > 0) ? 'domiciliar (estimada)' : 'do responsável'; }
+
 // O percentual informado, ou null quando o campo está vazio/inválido.
 function ipcaManual(){
   var v = rendaRaio.ipcaPct;
@@ -4624,7 +4652,7 @@ function renderRenda(){
   var manual = rendaRaio.ipca ? ipcaManual() : null;
   var comOutros = (+rendaRaio.outros||0) > 0;
   var quemRenda = comOutros ? 'domiciliar (estimada)' : 'do responsável';
-  var baseTxt   = 'R$ de '+(corrigido ? ipcaRotulo(IPCA.ate) : 'jul/2022');
+  var baseTxt   = censoBaseTxt();
 
   box.innerHTML=
     '<div class="rd-h">Dentro d'+(rendaModo==='iso'?'a isócrona':'o raio')+' <em>'+
@@ -4657,7 +4685,8 @@ function renderRenda(){
     '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
     'O Censo mede a renda <b>do responsável pelo domicílio</b>.<br>'+
     (manual!=null
-      ? '<b>Corrigido em +'+nf(manual,1)+'%</b> sobre julho/2022 — <b>percentual informado por você</b>, '+
+      ? '<b>Corrigido em '+(manual<0?'':'+')+nf(manual,1)+'%</b> sobre julho/2022 — '+
+        '<b>percentual informado por você</b>, '+
         'não buscado no Banco Central.'
       : (corrigido
         ? '<b>Corrigido pelo IPCA</b> de jul/2022 a '+ipcaRotulo(IPCA.ate)+' (+'+
