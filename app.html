@@ -2010,12 +2010,19 @@ function aplicarIso(){
     ['case',['==',['get','pendente'],1], '#FFFFFF', isoCorFaixa(0)]);
   map.setPaintProperty('iso-centro','circle-stroke-color',
     ['case',['==',['get','pendente'],1], isoCorFaixa(0), '#FFFFFF']);
-  pintarLegendaIso(iso.on && temDesenho && iso.legenda.on);
   map.setLayoutProperty('iso-rotulo','text-field', (L.texto||'').trim() || textoIsoAuto());
   map.setLayoutProperty('iso-rotulo','text-size', 11.5*L.tam);
   map.setPaintProperty('iso-rotulo','text-color',L.cor);
   map.setPaintProperty('iso-rotulo','text-halo-color',L.haloCor);
   map.setPaintProperty('iso-rotulo','text-halo-width', L.halo ? L.haloW : 0);
+  // POR ÚLTIMO e PROTEGIDA. A legenda é um extra: se o canvas não
+  // estiver disponível (navegador endurecido, extensão anti-impressão
+  // digital, teto de memória), getContext/measureText podem lançar —
+  // e, dentro de buscarIsocrona, isso cairia no catch de rede, matando
+  // a isócrona e culpando a conexão. O desenho do polígono, que é o
+  // que importa, já terminou acima.
+  try{ pintarLegendaIso(iso.on && temDesenho && iso.legenda.on); }
+  catch(e){ console.error('legenda da isócrona', e); }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -3914,8 +3921,20 @@ function carregarIPCA(){
   IPCA.status='carregando'; renderRenda();
   // a partir de AGOSTO/2022: o IPCA de julho mede a alta ocorrida dentro
   // de julho, que já está embutida no valor de referência (31/07/2022).
-  fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/08/2022')
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  // DOIS CAMINHOS, nesta ordem, e o motivo de existirem os dois é que
+  // as duas pontas falham por razões opostas:
+  //  · /api/ipca sai da Netlify e resolve CORS e rede do visitante,
+  //    mas o egress é de nuvem no exterior, e serviço público
+  //    brasileiro às vezes recusa IP assim;
+  //  · a chamada direta sai do navegador do usuário, com IP residencial
+  //    no Brasil, mas está sujeita a CORS e à rede dele.
+  // Tentar o nosso domínio primeiro e cair para o BCB cobre os dois.
+  var direto='https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/08/2022';
+  var pegar=function(url){
+    return fetch(url).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
+  };
+  pegar('/api/ipca')
+    .catch(function(e){ console.warn('ipca por /api/ipca falhou, tentando o BCB direto:', e && e.message); return pegar(direto); })
     .then(function(js){
       if(!Array.isArray(js) || !js.length) throw new Error('série vazia');
       var alvo=ipcaAlvo(), f=1, n=0, ate=null;

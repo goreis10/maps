@@ -40,6 +40,24 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 > Os tempos continuam **sem considerar trânsito**, como na isócrona da barra
 > superior.
 
+**Correções que vêm junto, e que afetam quem já usava**
+
+- **A isócrona voltou a funcionar.** O serviço de roteamento mudou de endereço:
+  o antigo foi marcado como descontinuado em abril, teve a cota cortada a 10% em
+  agosto e foi desligado no fim de setembro. O Maker Map passou a usar o endereço
+  novo — a chave é a mesma, não há nada a refazer do seu lado. Por garantia, se o
+  endereço novo não responder, ele ainda tenta o antigo.
+- **A correção pela IPCA voltou a funcionar** para quem via "indisponível". A
+  consulta ao Banco Central passa a sair do servidor do site, e não do seu
+  navegador, o que elimina bloqueio de origem e instabilidade da sua rede; se por
+  algum motivo o servidor não conseguir, o navegador ainda tenta direto, como
+  antes. O índice fica em cache por algumas horas, e quando o Banco Central está
+  fora do ar o site serve a última série **real** já obtida — nunca um índice
+  inventado.
+- Se o seu navegador impedir o desenho da legenda (extensão de privacidade, por
+  exemplo), a isócrona **continua funcionando**: antes, essa falha derrubava o
+  cálculo inteiro e culpava a conexão.
+
 ---
 
 ## Maker Map 2.4 — Legenda da isócrona no mapa
