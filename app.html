@@ -177,7 +177,10 @@
   /* ── Kanban de Novos Negócios ── */
   .kb-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:20px 22px 14px}
   .kb-head h2{font:800 var(--fs-5) 'Archivo',sans-serif}
-  .kb-head p{font-size:var(--fs-3);color:var(--ink-2);margin-top:var(--sp-1);max-width:600px;line-height:1.55}
+  /* NÃO voltar a estilizar ".kb-head p": o parágrafo de política saiu
+     daqui para um ⓘ, e um seletor de descendente alcançaria os <p> de
+     dentro dele, devolvendo-os ao corpo de 13px. */
+  .kb-head .e-info{max-width:600px}
   .kb-resumo{flex:none;display:flex;gap:var(--sp-4);text-align:right}
   .kb-resumo div{font-size:var(--fs-1);font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
   .kb-resumo b{display:block;font:800 var(--fs-n2) 'Archivo',sans-serif;color:var(--ink);letter-spacing:0;text-transform:none}
@@ -334,6 +337,14 @@
   #wrap.side-open #edResize{display:block;right:calc(var(--drawer-w) - 5px)}
   .sd-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
   .sd-title{font:800 var(--fs-4) 'Archivo',sans-serif;color:var(--ink)}
+  /* DUAS classes de texto explicativo, e a distinção é deliberada — está
+     escrita aqui para não voltar a parecer duplicação:
+       .sd-desc  = o que ESTA GAVETA faz. Um parágrafo, corpo de leitura
+                   (--fs-3), uma vez por gaveta, no topo.
+       .e-hint   = o que ESTE CONTROLE faz. Meta (--fs-1, --ink-3), ao
+                   lado do controle, tantas quantas houver controles.
+     Unificá-las obrigaria a escolher entre encolher o parágrafo de
+     abertura para 10,5px ou inflar dezenas de dicas para 13px. */
   .sd-desc{font-size:var(--fs-3);line-height:1.55;color:var(--ink-2);margin-bottom:14px}
   /* Botões de paleta de cores */
   .pal-grid{display:flex;flex-direction:column;gap:10px}
@@ -491,6 +502,12 @@
   .cfg-nome{font-weight:700;font-size:var(--fs-4)}
   .cfg-email{color:var(--ink-2);font-size:var(--fs-2);margin-top:2px}
   .cfg-desc{font-size:var(--fs-2);color:var(--ink-2);line-height:1.5;margin-bottom:14px}
+  /* Botão primário de CONFIRMAÇÃO (laranja): "confirmar e fechar" —
+     Salvar projeto, Salvar dados. O par dele é .rd-load (tinta), que é
+     "executar algo que custa tempo ou quota" e deixa o usuário na mesma
+     tela esperando. A distinção é deliberada; está escrita nos dois
+     lugares para não ser desfeita por parecer inconsistência.
+     .ghost é SEMPRE o secundário, em qualquer janela ou gaveta. */
   .cfg-btn{width:100%;border:0;border-radius:10px;padding:var(--sp-3);cursor:pointer;margin-bottom:9px;
     background:var(--laranja);color:#fff;font:700 var(--fs-3) 'Archivo',sans-serif;box-shadow:0 6px 16px rgba(224,64,16,.28)}
   .cfg-btn:hover{filter:brightness(1.05)}
@@ -648,9 +665,20 @@
 
 <div id="viewNeg">
   <div class="kb-head">
+    <!-- A política de persistência saiu daqui (P13): quem abre o quadro
+         todos os dias quer o resumo, não o parágrafo que explica onde os
+         cartões ficam guardados. Ele continua inteiro no ⓘ abaixo e no
+         estado vazio (#kbVazio), que é onde faz falta. -->
     <div>
       <h2>Novos Negócios</h2>
-      <p>Cada área importada por KMZ ou desenhada no mapa entra aqui como cartão. Arraste entre as colunas para mudar a etapa e clique para preencher valor, contato e observações. <b>Este quadro é guardado sozinho</b> e não depende de Meus Projetos — fechar o mapa ou começar do zero não apaga os cartões.</p>
+      <details class="e-info" style="margin-top:6px"><summary>Como funciona este quadro</summary><div>
+        <p>Cada área importada por KMZ ou desenhada no mapa entra aqui como cartão — um por
+        <b>área</b>, não por arquivo. Arraste entre as colunas para mudar a etapa e clique para
+        preencher valor, contato e observações.</p>
+        <p><b>Este quadro é guardado sozinho</b> e não depende de Meus Projetos: fechar o mapa,
+        remover o KMZ ou começar do zero não apaga os cartões — eles só perdem a marca
+        “no mapa”. Sair do quadro é ação explícita, pelo “Remover do quadro” do cartão.</p>
+      </div></details>
     </div>
     <div class="kb-resumo" id="kbResumo"></div>
   </div>
@@ -778,7 +806,9 @@
     <p class="sd-desc">Dê um nome ao projeto. Um projeto guarda os <b>KMZ, desenhos e a edição do mapa</b> — o material da apresentação. O quadro de <b>Novos Negócios</b> é guardado separado e sozinho, então não precisa salvar projeto por causa dele.</p>
     <input type="text" id="saveNome" class="cfg-input" placeholder="Nome do projeto" maxlength="80">
     <button id="saveConfirmar" class="cfg-btn">Salvar</button>
-    <button id="saveCancelar" class="cfg-link">Cancelar</button>
+    <!-- Sem "Cancelar" aqui: o × do cabeçalho já fecha, está em todas as
+         gavetas e é o gesto que o usuário já tem. "Cancelar" fica nos
+         MODAIS (.cfg-overlay), onde não há × de hábito. -->
   </div>
 
   <!-- Gaveta: Meus Projetos -->
@@ -790,7 +820,6 @@
     <p class="sd-desc">Cada projeto é um mapa de apresentação: os KMZ usados e a edição aplicada. O quadro de Novos Negócios não entra aqui — ele tem guarda própria.</p>
     <div id="projLista" class="proj-list"></div>
     <button id="projNovo" class="cfg-btn ghost">Começar do zero (novo mapa)</button>
-    <button id="projFechar" class="cfg-link">Fechar</button>
   </div>
 
   <!-- Gaveta: Cores do mapa (paletas pré-definidas) -->
@@ -6176,7 +6205,6 @@ document.getElementById('btnExport').onclick = async function(){
   }
   document.getElementById('btnSalvarProj').onclick = abrirSave;
   document.getElementById('saveClose').onclick = fecharSave;
-  document.getElementById('saveCancelar').onclick = fecharSave;
   document.getElementById('saveConfirmar').onclick = confirmarSave;
   saveNome.addEventListener('keydown', function(e){ if(e.key==='Enter') confirmarSave(); });
 
@@ -6205,7 +6233,6 @@ document.getElementById('btnExport').onclick = async function(){
   function fecharProj(){ fecharGaveta(); }
   document.getElementById('btnProjetos').onclick = abrirProj;
   document.getElementById('projClose').onclick = fecharProj;
-  document.getElementById('projFechar').onclick = fecharProj;
   document.getElementById('projNovo').onclick = function(){
     if(confirm('Começar um mapa do zero? As alterações não salvas do mapa serão perdidas.\n\nO quadro de Novos Negócios não é afetado.')){
       limparProjetoAtual();
