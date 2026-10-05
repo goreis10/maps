@@ -371,12 +371,27 @@
      recolher não esconda estado: a seção fechada continua dizendo
      "carro · 15/30 min" ou "IPCA set/2026 +31,4% · demais +50%". */
   #editor details, .side-drawer details{border-top:1px solid var(--line)}
+  /* sem justify-content: o título é texto solto (caixa anônima), que não
+     dá para alinhar por seletor — então é a .sm-val que se empurra para a
+     direita com margin-left:auto, e o triângulo fica junto ao título */
   #editor summary, .side-drawer summary{padding:9px var(--sp-4);font-weight:600;cursor:pointer;font-size:var(--fs-3);
-    display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-2)}
-  #editor summary::marker, .side-drawer summary::marker{color:var(--laranja)}
+    display:flex;align-items:baseline;gap:var(--sp-2)}
   .side-drawer summary{padding-left:0;padding-right:0}
-  .sm-val{font:600 var(--fs-1) 'Archivo',sans-serif;color:var(--ink-3);white-space:nowrap;
-    overflow:hidden;text-overflow:ellipsis;min-width:0;text-align:right}
+  /* O triângulo é DESENHADO, não o nativo: com display:flex no <summary>
+     parte dos motores deixa de renderizar o ::marker, e a seção fechada
+     ficaria sem nenhum sinal de que abre. O :not(.e-info) mantém o ⓘ com
+     o marcador dele. */
+  #editor details:not(.e-info)>summary, .side-drawer details:not(.e-info)>summary{list-style:none}
+  #editor details:not(.e-info)>summary::-webkit-details-marker,
+  .side-drawer details:not(.e-info)>summary::-webkit-details-marker{display:none}
+  #editor details:not(.e-info)>summary::before,
+  .side-drawer details:not(.e-info)>summary::before{content:"";flex:none;align-self:center;
+    width:0;height:0;border:4px solid transparent;border-left-color:var(--laranja);
+    margin-right:7px;transition:transform .15s ease}
+  #editor details:not(.e-info)[open]>summary::before,
+  .side-drawer details:not(.e-info)[open]>summary::before{transform:rotate(90deg)}
+  .sm-val{margin-left:auto;font:600 var(--fs-1) 'Archivo',sans-serif;color:var(--ink-3);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;text-align:right}
   /* ── Divulgação progressiva (P3) ─────────────────────────────────
      "Como estes números são calculados". NÃO é um "mais informações":
      o rótulo diz o que há dentro, e o texto dentro é MAIOR (--fs-1)
@@ -823,24 +838,25 @@
       <div class="sd-title">Mapa de renda</div>
       <button id="rendaClose" class="e-x" title="fechar">×</button>
     </div>
+    <!-- ══════════════════════════════════════════════════════════════
+         A ORDEM DESTA GAVETA É O CONTEÚDO DELA (P1/P4).
+         Antes, a pergunta (o recorte) ficava no topo e a RESPOSTA (a
+         análise) só começava a ~870px, uma tela abaixo — e o uso é um
+         laço ajusta→lê→ajusta. Agora: camadas, recorte, resposta, e só
+         então os parâmetros, recolhidos, cada um com o valor em vigor no
+         próprio título para que recolher não esconda estado.
+         ══════════════════════════════════════════════════════════════ -->
+    <!-- ① CAMADAS NO MAPA — sempre visível, não recolhe -->
+    <div class="e-subhead" style="padding:0 0 4px">Camadas no mapa</div>
     <div class="sd-toggles">
-      <div class="chip" id="chipRaioRenda"><span class="dot"></span>Raio</div>
-      <div class="chip" id="chipCensoPts" title="um ponto por setor censitário, colorido pela faixa de renda"><span class="dot"></span>Pontos no mapa</div>
-      <div class="chip" id="chipCensoHeat" title="superfície suavizada dentro do recorte escolhido"><span class="dot"></span>Mapa de calor</div>
+      <div class="chip" id="chipRaioRenda" title="círculo próprio do Mapa de renda, independente do raio da Edição"><span class="dot"></span>Raio</div>
+      <div class="chip" id="chipCensoPts" title="um ponto por setor censitário, colorido pela faixa de renda"><span class="dot"></span>Pontos</div>
+      <div class="chip" id="chipCensoHeat" title="superfície suavizada dentro do recorte escolhido"><span class="dot"></span>Calor</div>
     </div>
-    <div class="sd-sec" id="heatOps" style="display:none">
-      <div class="e-row" style="gap:8px">
-        <div class="seg" style="box-shadow:none">
-          <button id="heatRenda" type="button">Renda</button>
-          <button id="heatDens" type="button">Densidade</button>
-        </div>
-      </div>
-      <div class="e-row"><label>Suavização</label>
-        <input type="range" id="heatSuav" min="50" max="250" value="100">
-        <span id="heatSuavV" style="width:38px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-2)">100%</span>
-      </div>
-      <div class="e-hint" id="heatHint"></div>
-    </div>
+
+    <!-- ② RECORTE DA ANÁLISE — o segmentado E o parâmetro do modo ativo
+         na mesma linha: é a linha de setup inteira, e nenhuma das duas
+         metades faz sentido sem a outra. -->
     <div class="sd-sec">
       <div class="e-subhead" style="padding-top:2px">Recorte da análise</div>
       <div class="e-row">
@@ -848,57 +864,113 @@
           <button type="button" data-modo="raio" class="on">Raio</button>
           <button type="button" data-modo="iso">Isócrona</button>
         </div>
+        <span id="rendaParamRaio" style="display:flex;align-items:center;gap:8px;margin-left:auto">
+          <input type="number" id="rdRaioKm" value="10" min="1" max="2000" step="1" title="raio em quilômetros"><label>km</label></span>
+        <span id="rendaParamIso" style="display:none;align-items:center;gap:6px;margin-left:auto">
+          <input type="number" id="riMin0" min="1" max="120" step="1" value="15" title="1ª faixa" style="width:52px">
+          <input type="number" id="riMin1" min="1" max="120" step="1" value="30" title="2ª faixa" style="width:52px">
+          <label>min</label></span>
       </div>
-      <div class="e-hint" id="rendaModoHint">O círculo é a distância em linha reta. A isócrona é
-        o que se alcança de verdade no tempo que você der, pelas estradas.</div>
+      <details class="e-info"><summary>O que é cada recorte</summary><div>
+        <p>O <b>raio</b> é a distância em linha reta: um círculo em volta do centro.</p>
+        <p>A <b>isócrona</b> é o que se alcança de verdade no tempo que você der, pelas
+        estradas — recortada pela malha viária real, não um círculo.</p>
+      </div></details>
+    </div>
 
-      <div id="rendaIsoBox" style="display:none">
-        <div class="e-subhead">Isócrona</div>
+    <!-- ③ A RESPOSTA, imediatamente abaixo da pergunta -->
+    <div id="rendaAnalise" class="rd-box"></div>
+
+    <!-- ④ Isócrona — parâmetros. Só existe no modo isócrona (o display é
+         trocado por syncRendaModo, pelo mesmo id de antes). -->
+    <details id="rendaIsoBox" style="display:none">
+      <summary>Isócrona — parâmetros <span class="sm-val" id="rendaIsoVal"></span></summary>
+      <div class="sd-sec">
+        <div class="e-subhead" style="padding-top:2px">Modo de deslocamento</div>
         <div class="e-row">
-          <div class="seg" id="rendaIsoPerfil" style="box-shadow:none;flex-wrap:wrap">
+          <div class="seg" id="rendaIsoPerfil" style="box-shadow:none">
             <button type="button" data-perfil="driving-car" class="on">Carro</button>
             <button type="button" data-perfil="driving-hgv">Caminhão</button>
             <button type="button" data-perfil="cycling-regular">Bicicleta</button>
             <button type="button" data-perfil="foot-walking">A pé</button>
           </div>
         </div>
-        <div class="e-row"><label>Tempos</label>
-          <input type="number" id="riMin0" min="1" max="120" step="1" value="15" title="1ª faixa">
-          <input type="number" id="riMin1" min="1" max="120" step="1" value="30" title="2ª faixa">
-          <label>min</label></div>
         <div data-mm-ct="ri" data-rot="Origem"></div>
         <div class="e-row" style="margin-top:8px"><button class="rd-load" id="riCalc">Calcular isócrona</button></div>
         <div id="riFaixas"></div>
         <div class="e-row"><label><input type="checkbox" id="riFill" checked> preenchimento</label>
           <label><input type="checkbox" id="riLblOn" checked> legenda</label></div>
-        <div class="e-hint">Duas faixas: a análise responde por <b>uma</b> de cada vez — clique na
-          linha da faixa para escolher qual (a bolinha troca a cor). A outra fica no mapa para comparar.
-          Tempos calculados sobre a malha viária do OpenStreetMap, <b>sem considerar trânsito</b>.</div>
+        <div class="e-hint">A análise responde por <b>uma</b> faixa; clique na linha para escolher qual.</div>
+        <details class="e-info"><summary>Como as faixas funcionam</summary><div>
+          <p>As duas faixas são <b>aninhadas</b>: a de 15 min fica dentro da de 30. A análise
+          responde por uma de cada vez (a bolinha troca a cor); a outra fica desenhada no mapa
+          para comparar.</p>
+          <p>De 1 a 120 minutos. Acima de 60 o serviço de roteamento pode recusar o cálculo,
+          conforme o limite do plano contratado.</p>
+          <p>Tempos calculados sobre a malha viária do OpenStreetMap,
+          <b>sem considerar trânsito</b> — velocidade de fluxo livre.</p>
+        </div></details>
       </div>
+    </details>
 
-      <div class="e-subhead" style="padding-top:2px">Ajuste dos valores</div>
-      <div class="e-row"><label><input type="checkbox" id="rdIpca" checked> corrigir pelo IPCA</label>
-        <input type="number" id="rdIpcaPct" step="0.1" min="-50" max="1000" placeholder="auto"
-          title="correção acumulada desde julho/2022, em %" style="width:72px">
-        <label>%</label>
-        <span id="rdIpcaInfo" class="rd-mini">—</span></div>
-      <div class="e-hint">Em branco, o percentual é buscado no Banco Central (série IPCA).
-        <b>Preenchendo, o seu valor é usado e nada é buscado</b> — é a saída quando a consulta ao
-        BCB falha, e também serve para usar um índice de sua escolha. O rodapé do painel sempre
-        diz qual dos dois está valendo.</div>
-      <div class="e-row"><label>Demais moradores</label>
-        <input type="number" id="rdOutros" value="50" min="0" max="300" step="5"><label>%</label>
-        <span id="rdOutrosInfo" class="rd-mini"></span></div>
-      <div class="e-hint">O Censo informa a renda <b>só do responsável</b> pelo domicílio. Este percentual estima quanto os <b>demais moradores</b> somam a ela: 50% significa renda domiciliar 1,5× a do responsável. Use 0% para ver apenas o responsável.</div>
-      <div class="e-subhead">Raio</div>
-      <div class="e-row"><label>Raio</label><input type="number" id="rdRaioKm" value="10" min="1" max="2000" step="1"><label>km</label></div>
-      <div class="e-row"><label>Cor</label><input type="color" id="rdRaioCor" value="#0E9F8A"></div>
-      <div class="e-row"><label><input type="checkbox" id="rdRaioFill" checked> preenchimento</label></div>
-      <div data-mm-leg="rdLbl" data-cor="#0A6E60"></div>
-      <div data-mm-ct="rd" data-rot="Centro" data-se="1"></div>
-      <div class="e-hint">Raio próprio do Mapa de renda, independente do raio da Edição.</div>
-    </div>
-    <div id="rendaAnalise" class="rd-box"></div>
+    <!-- ⑤ Ajuste dos valores. Recolher aqui é seguro porque o que está
+         valendo aparece em DOIS lugares permanentes fora deste <details>:
+         o título da seção e a faixa de Premissas do painel. -->
+    <details id="rendaSecAjuste">
+      <summary>Ajuste dos valores <span class="sm-val" id="rendaAjusteVal"></span></summary>
+      <div class="sd-sec">
+        <div class="e-row"><label><input type="checkbox" id="rdIpca" checked> corrigir pelo IPCA</label>
+          <input type="number" id="rdIpcaPct" step="0.1" min="-50" max="1000" placeholder="auto"
+            title="correção acumulada desde julho/2022, em %" style="width:72px">
+          <label>%</label>
+          <span id="rdIpcaInfo" class="rd-mini">—</span></div>
+        <div class="e-row"><label>Demais moradores</label>
+          <input type="number" id="rdOutros" value="50" min="0" max="300" step="5"><label>%</label>
+          <span id="rdOutrosInfo" class="rd-mini"></span></div>
+        <details class="e-info"><summary>O que cada ajuste faz</summary><div>
+          <p><b>Correção pelo IPCA.</b> Em branco, o percentual é buscado no Banco Central
+          (série 433). <b>Preenchendo, o seu valor é usado e nada é buscado</b> — é a saída
+          quando a consulta ao BCB falha, e também serve para usar um índice de sua escolha.
+          O painel sempre diz qual dos dois está valendo.</p>
+          <p><b>Demais moradores.</b> O Censo informa a renda <b>só do responsável</b> pelo
+          domicílio. Este percentual estima quanto os demais moradores somam a ela: 50%
+          significa renda domiciliar 1,5× a do responsável. Use 0% para ver apenas o
+          responsável. É uma estimativa sua, não um dado do Censo.</p>
+        </div></details>
+      </div>
+    </details>
+
+    <!-- ⑥ Mapa de calor — aparece quando o chip Calor está ligado
+         (aplicarRaioRenda troca o display por este mesmo id). -->
+    <details id="heatOps" style="display:none">
+      <summary>Mapa de calor <span class="sm-val" id="rendaCalorVal"></span></summary>
+      <div class="sd-sec">
+        <div class="e-row" style="gap:8px">
+          <div class="seg" style="box-shadow:none">
+            <button id="heatRenda" type="button">Renda</button>
+            <button id="heatDens" type="button">Densidade</button>
+          </div>
+        </div>
+        <div class="e-row"><label>Suavização</label>
+          <input type="range" id="heatSuav" min="50" max="250" value="100">
+          <span id="heatSuavV" style="width:38px;text-align:right;font-size:var(--fs-1);font-weight:700;color:var(--ink-2)">100%</span>
+        </div>
+        <div class="e-hint" id="heatHint"></div>
+      </div>
+    </details>
+
+    <!-- ⑦ Aparência do raio — presentação, mexida uma vez por projeto -->
+    <details id="rendaSecRaio">
+      <summary>Aparência do raio <span class="sm-val" id="rendaRaioVal"></span></summary>
+      <div class="sd-sec">
+        <div class="e-row"><label>Cor</label><input type="color" id="rdRaioCor" value="#0E9F8A"></div>
+        <div class="e-row"><label><input type="checkbox" id="rdRaioFill" checked> preenchimento</label></div>
+        <div data-mm-leg="rdLbl" data-cor="#0A6E60"></div>
+        <div data-mm-ct="rd" data-rot="Centro" data-se="1"></div>
+        <div class="e-hint">Legenda vazia = texto automático. Este é o raio próprio do Mapa de
+          renda, independente do raio da Edição.</div>
+      </div>
+    </details>
   </div>
 
   <div id="drawerIso" class="side-drawer" role="dialog" aria-modal="true">
@@ -1931,9 +2003,13 @@ function aplicarRaioRenda(){
     document.getElementById('heatRenda').classList.toggle('on', rendaRaio.heatModo==='renda');
     document.getElementById('heatDens').classList.toggle('on', rendaRaio.heatModo==='dens');
     document.getElementById('heatHint').innerHTML = rendaRaio.heatModo==='renda'
-      ? 'Cada setor pinta a vizinhança com a cor da sua faixa de renda — as cores são as mesmas do gráfico abaixo. É uma suavização visual, não uma medição por ponto do mapa.'
+      ? 'Cada setor pinta a vizinhança com a cor da sua faixa de renda — as cores são as mesmas do gráfico acima. É uma suavização visual, não uma medição por ponto do mapa.'
       : 'Concentração de <b>domicílios</b> por área, do azul (pouco) ao vermelho (muito). Mostra onde está a população, não a renda.';
+    // Nasce ABERTO na primeira vez que o chip Calor é ligado: escolher
+    // entre Renda e Densidade é a primeira dúvida de quem o liga.
+    if(ops.style.display!=='none' && secoesLer().heatOps===undefined) ops.open = true;
   }
+  syncResumoSecoes();
   if(!map || !map.getLayer('raior-borda')) return;
   const L = rendaRaio.lbl;
   ['raior-fill','raior-borda','raior-centro'].forEach(id=>
@@ -2565,6 +2641,9 @@ function syncAjusteInfo(){
     oi.textContent = f===1 ? 'só o responsável'
       : f.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'× a do responsável';
   }
+  // Os dois textos acima são também o resumo da seção recolhida, então o
+  // título dela se atualiza aqui — depois de os dois estarem escritos.
+  syncResumoSecoes();
 }
 
 function refreshGlebas(){
@@ -3851,6 +3930,34 @@ function fecharGaveta(){
 }
 function gavetaAberta(){ return GAVETAS_IDS.some(function(id){ var d=document.getElementById(id); return d && d.classList.contains('show'); }); }
 
+// ── Seções recolhíveis: lembrar aberto/fechado ─────────────────────
+// Vive no localStorage, NÃO no projeto: é preferência de ferramenta, não
+// conteúdo de apresentação — um projeto salvo em 2024 não deve reabrir
+// com o layout de 2024. Mesmo precedente de makermap.drawerW.
+//
+// Só as seções com id entram, e o ⓘ (.e-info) fica de fora: ele é
+// divulgação pontual, não seção, e o painel de análise já guarda o estado
+// dele à parte (rendaInfoAberto) porque seu HTML é refeito a cada repaint.
+var SECOES_KEY='makermap.secoes';
+function secoesLer(){
+  try{ return JSON.parse(localStorage.getItem(SECOES_KEY)||'{}') || {}; }catch(e){ return {}; }
+}
+function secoesGravar(o){ try{ localStorage.setItem(SECOES_KEY, JSON.stringify(o)); }catch(e){} }
+function ligarSecoes(){
+  var st=secoesLer();
+  document.querySelectorAll('#editor > details[id], .side-drawer > details[id]').forEach(function(d){
+    if(d.classList.contains('e-info')) return;
+    // Seção travada por plano nasce fechada e não grava: aplicarPlano()
+    // força open=false, e deixar isso virar preferência manteria a seção
+    // fechada depois de o usuário assinar.
+    if(!d.classList.contains('locked') && st[d.id]!==undefined) d.open=!!st[d.id];
+    d.addEventListener('toggle', function(){
+      if(d.classList.contains('locked')) return;
+      var s=secoesLer(); s[d.id]=d.open; secoesGravar(s);
+    });
+  });
+}
+
 // ── Cores (paletas) ──
 function marcarPaleta(){
   document.querySelectorAll('#palGrid .pal-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-pal')===paletaAtual); });
@@ -3995,9 +4102,42 @@ function syncRendaModo(){
     b.classList.toggle('on', b.getAttribute('data-modo')===rendaModo);
   });
   var cx=document.getElementById('rendaIsoBox');
-  if(cx) cx.style.display = rendaModo==='iso' ? '' : 'none';
+  if(cx){
+    cx.style.display = rendaModo==='iso' ? '' : 'none';
+    // Nasce ABERTO quando há trabalho a fazer (modo isócrona sem polígono
+    // calculado) e fechado quando já há resposta na tela — a não ser que o
+    // usuário já tenha dito o contrário, que é o que secoesLer() guarda.
+    if(rendaModo==='iso' && secoesLer().rendaIsoBox===undefined) cx.open = !rendaIso.poly;
+  }
+  // O parâmetro do modo ativo vive na mesma linha do segmentado: km no
+  // raio, os dois tempos na isócrona. Só um dos dois aparece.
+  var pr=document.getElementById('rendaParamRaio'), pi=document.getElementById('rendaParamIso');
+  if(pr) pr.style.display = rendaModo==='iso' ? 'none' : 'flex';
+  if(pi) pi.style.display = rendaModo==='iso' ? 'flex' : 'none';
   syncRendaIsoInputs();
   renderRendaIsoFaixas();
+  syncResumoSecoes();
+}
+
+// ── Valor em vigor no título de cada seção recolhível ──────────────
+// É o que torna recolher seguro: a seção fechada continua dizendo
+// "carro · 15/30 min" ou "IPCA set/2026 +31,4% · demais +50%".
+function syncResumoSecoes(){
+  var p=function(id, txt){ var e=document.getElementById(id); if(e) e.textContent=txt; };
+  // ④ Isócrona: perfil e tempos CALCULADOS quando houver, porque é o que
+  // está desenhado no mapa — não o que está nos campos ainda não aplicados.
+  var mi=rendaIsoMinutos();
+  p('rendaIsoVal', isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()+
+    (mi.length ? ' · '+mi.join('/')+' min' : ''));
+  // ⑤ Ajuste: os dois textos que syncAjusteInfo já calcula, juntos.
+  var ii=document.getElementById('rdIpcaInfo'), oi=document.getElementById('rdOutrosInfo');
+  p('rendaAjusteVal', (ii?ii.textContent:'')+(oi&&oi.textContent?' · demais '+oi.textContent:''));
+  // ⑥ Calor: qual mapa e com quanta suavização.
+  p('rendaCalorVal', (rendaRaio.heatModo==='dens'?'densidade':'renda')+
+    ' · suav. '+Math.round((rendaRaio.heatSuav||1)*100)+'%');
+  // ⑦ Aparência: o que muda a cara do círculo no mapa.
+  p('rendaRaioVal', (rendaRaio.fill?'com':'sem')+' preenchimento · legenda '+
+    (rendaRaio.lbl.on?'ligada':'desligada'));
 }
 function syncRendaIsoInputs(){
   var g=function(id){ return document.getElementById(id); };
@@ -4223,6 +4363,9 @@ document.getElementById('isoCtMapa').onclick = function(){
 // traz um par de números. Precisa ser AQUI: o envelope captura o
 // onclick existente, então não pode rodar antes dele existir.
 ctInstalarAtalhoCoords();
+// Depois de aplicarPlano(), para que uma seção travada não tenha o
+// open=false forçado por ele gravado como preferência do usuário.
+ligarSecoes();
 
 // ══════════════════════════════════════════════════════════════════
 //  CENSO IBGE 2022 — análise dentro do raio do Mapa de renda
