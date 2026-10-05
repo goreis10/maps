@@ -988,7 +988,28 @@
       </div>
     </details>
 
-    <!-- ⑦ Aparência do raio — presentação, mexida uma vez por projeto -->
+    <!-- ⑦ Legenda no mapa — a caixa que SAI NO PNG. É a lacuna que o Mapa
+         de renda tinha desde sempre: a análise honesta não chegava ao
+         lugar onde o cliente a lê. Mesmo contrato da legenda da isócrona. -->
+    <details id="rendaSecLeg">
+      <summary>Legenda no mapa <span class="sm-val" id="rendaLegVal"></span></summary>
+      <div class="sd-sec">
+        <div class="e-row"><label><input type="checkbox" id="rdLegOn" checked> mostrar no mapa</label>
+          <select id="rdLegCanto" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font:600 var(--fs-2) 'Archivo',sans-serif">
+            <option value="inf-dir">canto inferior direito</option>
+            <option value="inf-esq">canto inferior esquerdo</option>
+            <option value="sup-esq">canto superior esquerdo</option>
+            <option value="sup-dir">canto superior direito</option>
+          </select></div>
+        <div class="e-row"><input type="text" id="rdLegTit" placeholder="título automático" title="deixe vazio para usar o título automático"></div>
+        <div class="e-hint">Esta caixa <b>sai na imagem exportada</b>, ao contrário do gráfico de
+          faixas aqui na gaveta. Aparece quando <b>Pontos</b> ou o calor de <b>renda</b> estão
+          ligados — são eles que pintam as cores que ela explica. A cor de cada faixa é editada
+          na bolinha do gráfico acima.</div>
+      </div>
+    </details>
+
+    <!-- ⑧ Aparência do raio — presentação, mexida uma vez por projeto -->
     <details id="rendaSecRaio">
       <summary>Aparência do raio <span class="sm-val" id="rendaRaioVal"></span></summary>
       <div class="sd-sec">
@@ -1904,7 +1925,13 @@ const RENDA_PADRAO = {on:false, km:10, centro:CENTRO_SE.slice(), cor:'#0E9F8A', 
   heat:false,           // mapa de calor
   heatModo:'renda',     // 'renda' = superfície suavizada de renda | 'dens' = densidade de domicílios
   heatSuav:1,           // fator de suavização (0,5 a 2,5) do raio do borrão
-  lbl:{on:true, texto:'', cor:'#0A6E60', tam:1, halo:true, haloCor:'#FFFFFF', haloW:1.6}};
+  lbl:{on:true, texto:'', cor:'#0A6E60', tam:1, halo:true, haloCor:'#FFFFFF', haloW:1.6},
+  // Legenda das faixas de renda DENTRO do mapa — a que sai no PNG.
+  // Nasce ligada: ela só aparece quando há cor de renda pintada, e nesse
+  // caso o mapa sem legenda é um mapa que o cliente não sabe ler.
+  // Canto inferior DIREITO por padrão, para não disputar com a legenda da
+  // isócrona, que nasce no inferior esquerdo.
+  legenda:{on:true, canto:'inf-dir', titulo:''}};
 
 // Rampa do calor de DENSIDADE. Fria->quente, distinta da rampa de renda
 // (YlOrBr) de propósito: os dois mapas medem coisas diferentes e não devem
@@ -2070,6 +2097,11 @@ function syncRaioRendaInputs(){
   g('rdCtLat').value = rendaRaio.centro[1].toFixed(5);
   g('rdCtLon').value = rendaRaio.centro[0].toFixed(5);
   ctSync('rd');
+  if(g('rdLegOn')){
+    g('rdLegOn').checked = !!rendaRaio.legenda.on;
+    g('rdLegCanto').value = rendaRaio.legenda.canto || 'inf-dir';
+    g('rdLegTit').value = rendaRaio.legenda.titulo || '';
+  }
   g('heatSuav').value = Math.round((rendaRaio.heatSuav||1)*100);
   g('heatSuavV').textContent = Math.round((rendaRaio.heatSuav||1)*100)+'%';
   g('rdIpca').checked = !!rendaRaio.ipca;
@@ -2408,11 +2440,20 @@ async function buscarRendaIso(){
   }
 }
 
-// ── Legenda da isócrona DENTRO do mapa ────────────────────────────
-// Desenhada em CANVAS, não em HTML, e o motivo é o produto: o PNG
-// exportado é o canvas do mapa, então legenda em HTML não sai na imagem
-// — é a lacuna que o Mapa de renda tem desde sempre. Em canvas, a MESMA
-// função pinta a caixa na tela e dentro do PNG, na escala pedida.
+// ══════════════════════════════════════════════════════════════════
+//  LEGENDAS DESENHADAS NO MAPA (canvas, não HTML)
+//
+//  O motivo de serem canvas é o produto: o PNG exportado É o canvas do
+//  mapa, e nada de HTML entra nele. A MESMA função mede a caixa, pinta
+//  na tela e pinta dentro do PNG, na escala da exportação.
+//
+//  São duas, com o mesmo contrato (liga/desliga, canto, título):
+//    · isócrona    — faixas de tempo;
+//    · Mapa de renda — faixas de renda, o que faltava desde sempre e é
+//      justamente o que o cliente lê na apresentação.
+//  Um painter só, porque duas cópias divergiriam — foi exatamente isso
+//  que produziu o defeito do calor de densidade.
+// ══════════════════════════════════════════════════════════════════
 var LEG_ISO = {pad:11, sw:13, gap:9, lh:19, fTit:11.5, fTxt:12, fNota:9.5, raio:9, margem:14};
 
 function isoLegendaItens(){
@@ -2432,15 +2473,14 @@ function retanguloArredondado(ctx, x, y, w, h, r){
   ctx.closePath();
 }
 
-// Mede e, com pintar=true, desenha. Uma função só para os dois usos:
-// medir antes de dimensionar o canvas da tela, e pintar no PNG.
-function legendaIsoCaixa(ctx, esc, x, y, pintar){
-  var itens=isoLegendaItens();
+// Mede e, com pintar=true, desenha. cfg = {titulo, itens:[{txt,cor}], notas:[]}.
+// Tudo multiplicado por `esc`, então a caixa é exatamente N× na escala N.
+function legendaCaixa(ctx, esc, x, y, pintar, cfg){
+  var itens=(cfg && cfg.itens) || [];
   if(!itens.length) return null;
   var L=LEG_ISO, e=esc;
-  var tit=String(iso.legenda.titulo||'').trim() ||
-          ('Isócrona · '+isoPerfilNome(iso.calcPerfil).toLowerCase());
-  var nota='Tempo de deslocamento, sem trânsito';
+  var tit=cfg.titulo || '';
+  var notas=(cfg.notas||[]).filter(Boolean);
 
   var fTit='700 '+(L.fTit*e)+'px Archivo, sans-serif';
   var fTxt='600 '+(L.fTxt*e)+'px Archivo, sans-serif';
@@ -2449,10 +2489,12 @@ function legendaIsoCaixa(ctx, esc, x, y, pintar){
   ctx.font=fTit;  var w=ctx.measureText(tit).width;
   ctx.font=fTxt;
   itens.forEach(function(it){ w=Math.max(w, (L.sw+L.gap)*e + ctx.measureText(it.txt).width); });
-  ctx.font=fNota; w=Math.max(w, ctx.measureText(nota).width);
+  ctx.font=fNota;
+  notas.forEach(function(n){ w=Math.max(w, ctx.measureText(n).width); });
   w += L.pad*2*e;
 
-  var hTit=L.fTit*1.55*e, hNota=L.fNota*2.0*e;
+  var hTit=L.fTit*1.55*e, hLinhaNota=L.fNota*1.55*e;
+  var hNota=notas.length ? (hLinhaNota*notas.length + L.fNota*0.45*e) : 0;
   var h=L.pad*2*e + hTit + L.lh*e*itens.length + hNota;
   if(!pintar) return {w:w, h:h};
 
@@ -2484,53 +2526,125 @@ function legendaIsoCaixa(ctx, esc, x, y, pintar){
 
   ctx.font=fNota;
   ctx.fillStyle='#57534E';
-  ctx.fillText(nota, cx, cy+2*e);
+  cy += L.fNota*0.45*e;
+  notas.forEach(function(n){ ctx.fillText(n, cx, cy); cy += hLinhaNota; });
   ctx.restore();
   return {w:w, h:h};
 }
 
+function legendaIsoCfg(){
+  return {
+    titulo: String(iso.legenda.titulo||'').trim() ||
+            ('Isócrona · '+isoPerfilNome(iso.calcPerfil).toLowerCase()),
+    itens: isoLegendaItens(),
+    notas: ['Tempo de deslocamento, sem trânsito']
+  };
+}
+function legendaIsoCaixa(ctx, esc, x, y, pintar){
+  return legendaCaixa(ctx, esc, x, y, pintar, legendaIsoCfg());
+}
+
+// Só as faixas que EXISTEM no recorte. Mostrar as sete quando quatro
+// aparecem no mapa faria a legenda prometer cores que não estão lá.
+function rendaLegendaItens(){
+  var q=censoCache.res;
+  if(!q || q.vazio || !q.faixas) return [];
+  var C=censoCores(), out=[];
+  q.faixas.forEach(function(v,i){ if(v>0) out.push({txt:CENSO_FAIXAS[i].rot, cor:C[i]}); });
+  return out;
+}
+// As cores de faixa só valem no mapa quando há pontos ou calor de renda.
+function rendaUsaCorRenda(){
+  return !!(rendaRaio.pts || (rendaRaio.heat && rendaRaio.heatModo==='renda'));
+}
+function legendaRendaCfg(){
+  // As notas NÃO são enfeite: esta caixa sai do aplicativo dentro de um
+  // PNG, e um valor em reais sem o mês da moeda e sem dizer de quem é a
+  // renda é uma afirmação incompleta sobre dinheiro. Vêm das mesmas
+  // funções que o painel usa, então não podem discordar dele.
+  return {
+    titulo: String(rendaRaio.legenda.titulo||'').trim() || 'Renda média do setor',
+    itens: rendaLegendaItens(),
+    notas: ['IBGE, Censo 2022 · '+censoBaseTxt(), 'Renda '+censoQuemTxt()]
+  };
+}
+function legendaRendaCaixa(ctx, esc, x, y, pintar){
+  return legendaCaixa(ctx, esc, x, y, pintar, legendaRendaCfg());
+}
+
 // Canto -> posição dentro de um canvas de larg×alt (já em px do device).
-function legendaIsoPos(canto, cx, larg, alt, esc){
-  var m=LEG_ISO.margem*esc;
+// `desl` empilha a segunda caixa quando as duas escolhem o mesmo canto.
+function legendaIsoPos(canto, cx, larg, alt, esc, desl){
+  var m=LEG_ISO.margem*esc, d=desl||0;
   // o controle de escala da MapLibre mora no canto inferior esquerdo e
   // a bússola no inferior direito: sobe a caixa para não cobri-los
   var mb=m+30*esc;
   switch(canto){
-    case 'sup-dir': return {x:larg-cx.w-m,  y:m};
-    case 'inf-dir': return {x:larg-cx.w-m,  y:alt-cx.h-mb};
-    case 'sup-esq': return {x:m,            y:m};
-    default:        return {x:m,            y:alt-cx.h-mb};   // inf-esq
+    case 'sup-dir': return {x:larg-cx.w-m,  y:m+d};
+    case 'inf-dir': return {x:larg-cx.w-m,  y:alt-cx.h-mb-d};
+    case 'sup-esq': return {x:m,            y:m+d};
+    default:        return {x:m,            y:alt-cx.h-mb-d};   // inf-esq
   }
 }
 
-function legendaIsoEl(){
-  var el=document.getElementById('isoLegenda');
+function legendaEl(id){
+  var el=document.getElementById(id);
   if(!el){
     var cont=document.getElementById('map');
     if(!cont) return null;
     el=document.createElement('canvas');
-    el.id='isoLegenda';
+    el.id=id;
     cont.appendChild(el);
   }
   return el;
 }
 
-// Pinta a caixa na tela. O canvas é dimensionado à caixa e posicionado
+// Pinta uma caixa na tela. O canvas é dimensionado à caixa e posicionado
 // por CSS, então só o canto muda de lugar — não há layout a recalcular.
-function pintarLegendaIso(mostrar){
-  var el=legendaIsoEl();
+function pintarLegendaEl(id, cfg, canto, mostrar){
+  var el=legendaEl(id);
   if(!el) return;
   if(!mostrar){ el.style.display='none'; return; }
   var dpr=window.devicePixelRatio||1;
   var ctx=el.getContext('2d');
-  var m=legendaIsoCaixa(ctx, dpr, 0, 0, false);
+  var m=legendaCaixa(ctx, dpr, 0, 0, false, cfg);
   if(!m){ el.style.display='none'; return; }
   el.width=Math.ceil(m.w); el.height=Math.ceil(m.h);
   el.style.width=(m.w/dpr)+'px'; el.style.height=(m.h/dpr)+'px';
   ctx.clearRect(0,0,el.width,el.height);
-  legendaIsoCaixa(ctx, dpr, 0, 0, true);
-  el.className='leg-'+(iso.legenda.canto||'inf-esq');
+  legendaCaixa(ctx, dpr, 0, 0, true, cfg);
+  el.className='leg-'+(canto||'inf-esq');
   el.style.display='block';
+  empilharLegendasTela();
+}
+
+// Duas caixas no mesmo canto se sobreporiam. O canto é posicionado por
+// classe CSS, então o desempilhamento é um deslocamento inline sobre ela.
+function empilharLegendasTela(){
+  var porCanto={};
+  ['isoLegenda','rendaLegenda'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el || el.style.display==='none' || !el.className) return;
+    (porCanto[el.className] = porCanto[el.className] || []).push(el);
+  });
+  Object.keys(porCanto).forEach(function(c){
+    var desl=0, deBaixo=c.indexOf('leg-inf')===0;
+    porCanto[c].forEach(function(el){
+      el.style.marginTop = deBaixo ? '' : (desl+'px');
+      el.style.marginBottom = deBaixo ? (desl+'px') : '';
+      desl += parseFloat(el.style.height||'0') + 10;
+    });
+  });
+}
+
+function pintarLegendaIso(mostrar){
+  pintarLegendaEl('isoLegenda', legendaIsoCfg(), iso.legenda.canto, mostrar);
+}
+// Mostrada só quando há o que ela explique: recorte ativo, legenda
+// ligada e cores de renda de fato pintadas no mapa.
+function pintarLegendaRenda(){
+  var mostrar = rendaAtivo() && rendaRaio.legenda.on && rendaUsaCorRenda();
+  pintarLegendaEl('rendaLegenda', legendaRendaCfg(), rendaRaio.legenda.canto, mostrar);
 }
 
 // Mudou parâmetro: atualiza o marcador do centro e o painel, mas NÃO
@@ -3548,6 +3662,8 @@ function montarEditor(){
       if(s.renda){
         Object.assign(rendaRaio, s.renda);
         rendaRaio.lbl=Object.assign(JSON.parse(JSON.stringify(RENDA_PADRAO.lbl)), s.renda.lbl||{});
+        // legenda no mapa (projetos anteriores à 3.0 não têm: cai no padrão)
+        rendaRaio.legenda=Object.assign(JSON.parse(JSON.stringify(RENDA_PADRAO.legenda)), s.renda.legenda||{});
         rendaRaio.centro=(s.renda.centro&&s.renda.centro.length===2)?s.renda.centro.slice():CENTRO_SE.slice();
         // cores das faixas: projeto antigo (sem o campo) cai no padrão
         rendaRaio.cores=(s.renda.cores&&s.renda.cores.length===CENSO_FAIXAS.length)?s.renda.cores.slice():null;
@@ -4081,6 +4197,11 @@ document.getElementById('rdOutros').onchange = function(e){
 };
 document.getElementById('rdRaioCor').oninput   = function(e){ rendaRaio.cor = e.target.value; aplicarRaioRenda(); };
 document.getElementById('rdRaioFill').onchange = function(e){ rendaRaio.fill = e.target.checked; aplicarRaioRenda(); };
+// Legenda das faixas no mapa (a que sai no PNG). Só repinta a caixa — não
+// recalcula nada, porque nada no recorte mudou.
+document.getElementById('rdLegOn').onchange  = function(e){ rendaRaio.legenda.on = e.target.checked; pintarLegendaRenda(); syncResumoSecoes(); };
+document.getElementById('rdLegCanto').onchange = function(e){ rendaRaio.legenda.canto = e.target.value; pintarLegendaRenda(); };
+document.getElementById('rdLegTit').oninput   = function(e){ rendaRaio.legenda.titulo = e.target.value; pintarLegendaRenda(); };
 document.getElementById('rdLblOn').onchange    = function(e){ rendaRaio.lbl.on = e.target.checked; aplicarRaioRenda(); };
 document.getElementById('rdLblTxt').oninput    = function(e){ rendaRaio.lbl.texto = e.target.value; aplicarRaioRenda(); };
 document.getElementById('rdLblCor').oninput    = function(e){ rendaRaio.lbl.cor = e.target.value; aplicarRaioRenda(); };
@@ -4164,7 +4285,13 @@ function syncResumoSecoes(){
   // ⑥ Calor: qual mapa e com quanta suavização.
   p('rendaCalorVal', (rendaRaio.heatModo==='dens'?'densidade':'renda')+
     ' · suav. '+Math.round((rendaRaio.heatSuav||1)*100)+'%');
-  // ⑦ Aparência: o que muda a cara do círculo no mapa.
+  // ⑦ Legenda no mapa: ligada/desligada e em que canto.
+  var CANTO={'inf-dir':'inferior direito','inf-esq':'inferior esquerdo',
+             'sup-dir':'superior direito','sup-esq':'superior esquerdo'};
+  p('rendaLegVal', rendaRaio.legenda.on
+    ? ('canto '+(CANTO[rendaRaio.legenda.canto]||'inferior direito'))
+    : 'desligada');
+  // ⑧ Aparência: o que muda a cara do círculo no mapa.
   p('rendaRaioVal', (rendaRaio.fill?'com':'sem')+' preenchimento · legenda '+
     (rendaRaio.lbl.on?'ligada':'desligada'));
 }
@@ -4993,7 +5120,19 @@ function censoBordaPoly(geom, rsKm){
 // domicílio e precisa enxergar os mesmos domicílios que o painel soma.
 //
 // Passe q=null para apagar tudo.
+// A legenda no mapa acompanha as camadas: o que ela explica são exatamente
+// estas cores. Repintar fica num envoltório com try/catch próprio porque a
+// legenda é um EXTRA — num navegador onde o canvas 2D não está disponível
+// (configuração endurecida, extensão anti-fingerprinting), um throw aqui
+// derrubaria o desenho das camadas, que é o principal. Mesma precaução de
+// pintarLegendaIso() em aplicarIso(), e pelo mesmo motivo.
 function censoCamadas(q){
+  try{ censoCamadasInterno(q); }
+  finally{
+    try{ pintarLegendaRenda(); }catch(e){ console.error('legenda de renda', e); }
+  }
+}
+function censoCamadasInterno(q){
   if(!map || !map.getLayer('censo-pts')) return;
   var vale   = !!(q && !q.vazio && rendaAtivo());
   var vPts   = vale && rendaRaio.pts;
@@ -5168,7 +5307,7 @@ function renderRenda(){
   }).join('');
 
   // as cores das faixas valem no mapa quando há pontos ou calor de renda
-  var usaCorRenda = rendaRaio.pts || (rendaRaio.heat && rendaRaio.heatModo==='renda');
+  var usaCorRenda = rendaUsaCorRenda();
   var legendaDens = (rendaRaio.heat && rendaRaio.heatModo==='dens')
     ? '<div class="rd-sub">Calor: domicílios por área</div>'+
       '<div class="rd-grad" style="background:linear-gradient(90deg,'+CENSO_HEAT_CORES.join(',')+')"></div>'+
@@ -5960,14 +6099,22 @@ document.getElementById('btnExport').onclick = async function(){
     map.resize();
     await new Promise(res=> map.once('idle', res));
 
-    // A legenda da isócrona é desenhada POR CIMA do canvas do mapa, aqui,
-    // na escala da exportação. É o único jeito de ela sair na imagem: o
+    // As legendas são desenhadas POR CIMA do canvas do mapa, aqui, na
+    // escala da exportação. É o único jeito de elas saírem na imagem: o
     // PNG é o canvas do mapa, e nada de HTML entra nele. Se não houver
-    // legenda a mostrar, exporta o canvas direto, como sempre foi.
+    // nenhuma a mostrar, exporta o canvas direto, como sempre foi.
+    //
+    // São DUAS desde a 3.0 (isócrona e faixas de renda), e o laço trata as
+    // duas igual em vez de repetir o bloco — inclusive o empilhamento
+    // quando as duas escolhem o mesmo canto.
     const base = map.getCanvas();
     let url = null;
-    const temLeg = iso.on && iso.legenda.on && ISO_GEO.features.some(f=> !f.properties.centro);
-    if(temLeg){
+    const legs = [];
+    if(iso.on && iso.legenda.on && ISO_GEO.features.some(f=> !f.properties.centro))
+      legs.push({cfg: legendaIsoCfg(), canto: iso.legenda.canto || 'inf-esq'});
+    if(rendaAtivo() && rendaRaio.legenda.on && rendaUsaCorRenda())
+      legs.push({cfg: legendaRendaCfg(), canto: rendaRaio.legenda.canto || 'inf-dir'});
+    if(legs.length){
       // A ESCALA REAL não é a pedida. A MapLibre limita o canvas a
       // maxCanvasSize (4096 por padrão), então pedir 4× numa janela
       // grande entrega bem menos. Pintar a legenda com o número pedido
@@ -5981,11 +6128,15 @@ document.getElementById('btnExport').onclick = async function(){
         out.width = base.width; out.height = base.height;
         const ctx = out.getContext('2d');
         ctx.drawImage(base, 0, 0);
-        const cx = legendaIsoCaixa(ctx, escReal, 0, 0, false);
-        if(cx){
-          const p = legendaIsoPos(iso.legenda.canto, cx, out.width, out.height, escReal);
-          legendaIsoCaixa(ctx, escReal, p.x, p.y, true);
-        }
+        const desl = {};   // deslocamento acumulado por canto
+        legs.forEach(function(L){
+          const cx = legendaCaixa(ctx, escReal, 0, 0, false, L.cfg);
+          if(!cx) return;
+          const d = desl[L.canto] || 0;
+          const p = legendaIsoPos(L.canto, cx, out.width, out.height, escReal, d);
+          legendaCaixa(ctx, escReal, p.x, p.y, true, L.cfg);
+          desl[L.canto] = d + cx.h + 10*escReal;
+        });
         url = out.toDataURL('image/png');
       }catch(e){
         // Compor é um extra. Falhar nele não pode custar o PNG inteiro:
