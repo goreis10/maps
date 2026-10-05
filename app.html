@@ -408,7 +408,11 @@
      o rótulo diz o que há dentro, e o texto dentro é MAIOR (--fs-1)
      que a prosa de rodapé que ele substitui (9,5px). Recolhido por
      padrão, aberto por quem decidiu ler. */
-  .e-info{border:0;margin-top:10px}
+  /* A borda tem de ser removida com a MESMA especificidade que a põe:
+     ".side-drawer details" é (0,1,1) e ".e-info" é (0,1,0), então o
+     border-top vencia e o ⓘ ganhava o filete que marca seção recolhível —
+     justamente a distinção que o :not(.e-info) existe para preservar. */
+  #editor details.e-info, .side-drawer details.e-info, .e-info{border:0;margin-top:10px}
   .e-info>summary{list-style:none;padding:0;font:600 var(--fs-1) 'Archivo',sans-serif;
     color:var(--azul);cursor:pointer;display:block}
   .e-info>summary::-webkit-details-marker{display:none}
@@ -448,8 +452,13 @@
   .rd-prem span{background:#FBFAF9;padding:6px 7px;min-width:0}
   .rd-prem u{display:block;text-decoration:none;font:700 var(--fs-m) 'Archivo',sans-serif;
     letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+  /* SEM corte por elipse. Numa coluna de ~87px "IPCA +31,4% · BCB" não
+     cabe numa linha, e text-overflow só funciona com white-space:nowrap —
+     ou seja, para a elipse aparecer seria preciso esconder parte da fonte
+     da correção. Esta faixa é a declaração permanente da base do dinheiro:
+     ela quebra linha, não trunca. */
   .rd-prem b{display:block;font:700 11px 'Archivo',sans-serif;color:var(--ink);
-    margin-top:1px;overflow:hidden;text-overflow:ellipsis}
+    margin-top:1px;line-height:1.3;overflow-wrap:break-word}
   .rd-fx{display:grid;grid-template-columns:1fr 46px;gap:var(--sp-1) var(--sp-2);align-items:center;font-size:var(--fs-1)}
   .rd-fx>i{display:block;height:5px;border-radius:3px;background:var(--c-renda);min-width:1px}
   .rd-fx>u{text-decoration:none;color:var(--ink-3);font-size:var(--fs-1);font-variant-numeric:tabular-nums;text-align:right}
@@ -2039,6 +2048,12 @@ function atualizarRaioRenda(){
   const la = document.getElementById('rdCtLat'), lo = document.getElementById('rdCtLon');
   if(la) la.value = rendaRaio.centro[1].toFixed(5);
   if(lo) lo.value = rendaRaio.centro[0].toFixed(5);
+  // E a linha de LEITURA das coordenadas, que desde a 3.0 é o único lugar
+  // onde o centro aparece (os dois campos acima nascem recolhidos atrás de
+  // "editar coordenadas"). Sem isto, os quatro caminhos que passam por aqui
+  // — clique no mapa, aplicar, buscar endereço e voltar ao Marco Zero —
+  // moviam o círculo e deixavam o texto afirmando o centro anterior.
+  ctSync('rd');
   aplicarRaioRenda();
   renderRenda();          // raio ou centro mudou: refaz a análise do Censo
   // ...e pode ter passado a alcançar um estado ainda não baixado. Sem esta
@@ -2063,7 +2078,7 @@ function aplicarRaioRenda(){
       : 'Concentração de <b>domicílios</b> por área, do azul (pouco) ao vermelho (muito). Mostra onde está a população, não a renda.';
     // Nasce ABERTO na primeira vez que o chip Calor é ligado: escolher
     // entre Renda e Densidade é a primeira dúvida de quem o liga.
-    if(ops.style.display!=='none' && secoesLer().heatOps===undefined) ops.open = true;
+    if(ops.style.display!=='none' && secoesLer().heatOps===undefined) secaoAbrirAuto(ops, true);
   }
   syncResumoSecoes();
   if(!map || !map.getLayer('raior-borda')) return;
@@ -2604,11 +2619,13 @@ function legendaEl(id){
 function pintarLegendaEl(id, cfg, canto, mostrar){
   var el=legendaEl(id);
   if(!el) return;
-  if(!mostrar){ el.style.display='none'; return; }
+  // Esconder uma caixa também precisa re-empilhar: a outra pode estar com
+  // a margem desta reservada e ficaria flutuando sobre um vão vazio.
+  if(!mostrar){ el.style.display='none'; empilharLegendasTela(); return; }
   var dpr=window.devicePixelRatio||1;
   var ctx=el.getContext('2d');
   var m=legendaCaixa(ctx, dpr, 0, 0, false, cfg);
-  if(!m){ el.style.display='none'; return; }
+  if(!m){ el.style.display='none'; empilharLegendasTela(); return; }
   el.width=Math.ceil(m.w); el.height=Math.ceil(m.h);
   el.style.width=(m.w/dpr)+'px'; el.style.height=(m.h/dpr)+'px';
   ctx.clearRect(0,0,el.width,el.height);
@@ -4088,6 +4105,17 @@ function secoesLer(){
   try{ return JSON.parse(localStorage.getItem(SECOES_KEY)||'{}') || {}; }catch(e){ return {}; }
 }
 function secoesGravar(o){ try{ localStorage.setItem(SECOES_KEY, JSON.stringify(o)); }catch(e){} }
+// Abrir uma seção POR CONTA DO PROGRAMA ("nasce aberta quando há trabalho a
+// fazer") não é preferência do usuário e não pode ser gravada como tal —
+// senão a heurística valeria uma única vez por navegador, e a preferência
+// guardada seria uma que ninguém expressou. A marca é um data-attribute, e
+// não um sinalizador síncrono, porque o evento `toggle` do <details> é
+// despachado em outra tarefa: um flag já teria sido limpo quando ele chega.
+function secaoAbrirAuto(d, abrir){
+  if(!d || d.open===abrir) return;
+  d.dataset.auto='1';
+  d.open=abrir;
+}
 function ligarSecoes(){
   var st=secoesLer();
   document.querySelectorAll('#editor > details[id], .side-drawer > details[id]').forEach(function(d){
@@ -4097,6 +4125,7 @@ function ligarSecoes(){
     // fechada depois de o usuário assinar.
     if(!d.classList.contains('locked') && st[d.id]!==undefined) d.open=!!st[d.id];
     d.addEventListener('toggle', function(){
+      if(d.dataset.auto){ delete d.dataset.auto; return; }
       if(d.classList.contains('locked')) return;
       var s=secoesLer(); s[d.id]=d.open; secoesGravar(s);
     });
@@ -4257,7 +4286,7 @@ function syncRendaModo(){
     // Nasce ABERTO quando há trabalho a fazer (modo isócrona sem polígono
     // calculado) e fechado quando já há resposta na tela — a não ser que o
     // usuário já tenha dito o contrário, que é o que secoesLer() guarda.
-    if(rendaModo==='iso' && secoesLer().rendaIsoBox===undefined) cx.open = !rendaIso.poly;
+    if(rendaModo==='iso' && secoesLer().rendaIsoBox===undefined) secaoAbrirAuto(cx, !rendaIso.poly);
   }
   // O parâmetro do modo ativo vive na mesma linha do segmentado: km no
   // raio, os dois tempos na isócrona. Só um dos dois aparece.
@@ -4276,9 +4305,15 @@ function syncResumoSecoes(){
   var p=function(id, txt){ var e=document.getElementById(id); if(e) e.textContent=txt; };
   // ④ Isócrona: perfil e tempos CALCULADOS quando houver, porque é o que
   // está desenhado no mapa — não o que está nos campos ainda não aplicados.
-  var mi=rendaIsoMinutos();
-  p('rendaIsoVal', isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()+
-    (mi.length ? ' · '+mi.join('/')+' min' : ''));
+  // Os tempos vêm de calcMin, nunca de rendaIsoMinutos(): esta última é o
+  // DIGITADO, e misturar as duas fontes produzia um título que anunciava uma
+  // combinação inexistente ("carro · 45/60 min" com 15/30 desenhado).
+  // E o aviso de parâmetro pendente mora dentro do <details>, então com a
+  // seção fechada ele não apareceria em lugar nenhum: entra aqui também.
+  var mc=(rendaIso.poly && (rendaIso.calcMin||[]).length) ? rendaIso.calcMin : rendaIsoMinutos();
+  p('rendaIsoVal', isoPerfilNome(rendaIso.poly ? (rendaIso.calcPerfil||rendaIso.perfil) : rendaIso.perfil).toLowerCase()+
+    (mc.length ? ' · '+mc.join('/')+' min' : '')+
+    (rendaIsoDesatualizado() ? ' · parâmetros mudaram' : ''));
   // ⑤ Ajuste: os dois textos que syncAjusteInfo já calcula, juntos.
   var ii=document.getElementById('rdIpcaInfo'), oi=document.getElementById('rdOutrosInfo');
   p('rendaAjusteVal', (ii?ii.textContent:'')+(oi&&oi.textContent?' · demais '+oi.textContent:''));
@@ -5127,6 +5162,14 @@ function censoBordaPoly(geom, rsKm){
 // derrubaria o desenho das camadas, que é o principal. Mesma precaução de
 // pintarLegendaIso() em aplicarIso(), e pelo mesmo motivo.
 function censoCamadas(q){
+  // censoCamadas(null) significa "nada desenhado": raio desligado, Censo
+  // ainda não carregado, centro fora dos estados disponíveis, falha de
+  // rede. Nesses casos o resultado guardado deixa de valer, e precisa ser
+  // DESCARTADO — não só invalidado pela chave. Enquanto só a chave era
+  // limpa, censoCache.res sobrevivia ao estado 'fora' e a legenda do mapa
+  // continuava explicando as faixas do recorte anterior sobre um mapa sem
+  // nenhum ponto, inclusive dentro do PNG exportado.
+  if(!q){ censoCache.chave=null; censoCache.res=null; }
   try{ censoCamadasInterno(q); }
   finally{
     try{ pintarLegendaRenda(); }catch(e){ console.error('legenda de renda', e); }
@@ -5206,7 +5249,11 @@ function renderRenda(){
     box.innerHTML = rendaModo==='iso'
       ? (rendaIsoCarregando
           ? '<div class="rd-msg">Calculando a isócrona…</div>'
-          : '<div class="rd-msg">Defina a origem e os tempos acima e clique em <b>Calcular isócrona</b> '+
+          // "acima" estava errado desde a reorganização: os tempos ficaram
+          // acima, na linha do recorte, mas a origem e o botão Calcular
+          // estão ABAIXO deste painel, na seção "Isócrona — parâmetros".
+          : '<div class="rd-msg">Informe os tempos na linha do recorte, defina a origem em '+
+            '<b>Isócrona — parâmetros</b>, logo abaixo, e clique em <b>Calcular isócrona</b> '+
             'para ver o perfil de domicílios e renda dentro dela.</div>')
       : '<div class="rd-msg">Ligue o <b>Raio</b> acima para ver o perfil de domicílios e renda dentro dele.</div>';
     return;
