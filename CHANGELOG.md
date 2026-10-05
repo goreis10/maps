@@ -5,6 +5,95 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.0 — Interface reorganizada e legenda de renda na imagem
+
+_Em revisão._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+### A legenda de renda agora sai na imagem exportada
+
+- **As faixas de renda ganharam legenda dentro do mapa**, com liga/desliga,
+  escolha de canto e título próprio — e, ao contrário do gráfico que fica na
+  gaveta, **esta caixa sai no PNG exportado**. Era a maior lacuna do produto:
+  o trabalho de análise não chegava ao lugar onde o cliente o lê.
+- Ela lista **só as faixas que existem no recorte**, para não prometer cores
+  que não estão no mapa, e carrega sempre **o mês da moeda e de quem é a
+  renda** — um valor em reais numa apresentação, sem essas duas informações,
+  é uma afirmação incompleta sobre dinheiro.
+- Aparece quando **Pontos** ou o calor de **renda** estão ligados, que são as
+  camadas cujas cores ela explica. Se você escolher para ela o mesmo canto da
+  legenda da isócrona, as duas se empilham em vez de se sobrepor.
+- **A cor padrão das faixas passou de semáforo para tons de âmbar.** O motivo
+  não é estético: o produto é uma imagem que vai para slide, papel e projetor,
+  e a escala semáforo desaparece em preto e branco e confunde quem tem
+  daltonismo vermelho-verde. O semáforo continua a um clique, no mesmo lugar,
+  e projetos já salvos com cores escolhidas por você não mudam.
+
+### A gaveta Mapa de renda foi reorganizada
+
+- **A análise agora vem antes dos parâmetros.** Ela ficava uma tela abaixo dos
+  controles que a alimentam, e o uso é um laço ajusta→lê→ajusta.
+- **O recorte é uma linha só:** Raio ou Isócrona e, ao lado, o parâmetro do
+  modo escolhido — os km no raio, os dois tempos na isócrona.
+- **Os parâmetros ficam em seções que abrem e fecham**, cada uma mostrando no
+  título o que está valendo: "carro · 15/30 min", "set/2026 +31,4% · demais
+  1,50× a do responsável", "canto inferior direito". Recolher não esconde
+  estado, e o seu arranjo de seções é lembrado na próxima visita.
+- **As premissas que mexem no valor em reais** — moeda, correção e de quem é a
+  renda — subiram para uma faixa fixa ao lado dos totais, em corpo legível, no
+  lugar da antiga linha "Base dos valores".
+- **A metodologia virou "Como estes números são calculados"**, a um clique, e
+  com o texto *maior* do que era no rodapé. Nenhuma palavra foi removida.
+- **Os avisos de margem de borda não mudaram de lugar nem de tamanho.** São os
+  únicos textos que aparecem só quando há algo errado e que dizem para não usar
+  os números.
+- Três linhas economizadas sem perder nada: a classe socioeconômica foi para a
+  mesma linha da renda média, as duas linhas de densidade viraram uma, e
+  **"domicílios sem renda informada" virou um número** na lista — antes só
+  existia a frase que o explicava.
+
+### Mapa, cabeçalho e painel
+
+- **Os totais voltaram para o cabeçalho**: hectares, número de áreas,
+  municípios e m². Estavam sendo calculados e descartados.
+- **Salvar Projeto foi para o cabeçalho**, ao lado de Meus Projetos.
+- **Os botões do canto do mapa foram agrupados por função**: compor o mapa,
+  analisar, e sair com a imagem. **A gaveta aberta agora marca o botão dela**,
+  e os botões que abrem gaveta pararam de nascer apagados como se estivessem
+  desligados.
+- **O painel de áreas ganhou tela de abertura**: "Importar KMZ" e a dica de
+  Desenhar, em vez de uma caixa vazia sem instrução. O título passou de
+  "Municípios" para "Áreas".
+
+### Escolher o centro
+
+- **Um bloco só, nos quatro lugares** onde se escolhe um centro ou uma origem.
+  **O campo aceita endereço ou um par de coordenadas colado** ("-23.5505,
+  -46.6333" e as variações com vírgula decimal, espaço ou ponto-e-vírgula), as
+  coordenadas atuais ficam visíveis numa linha e os campos numéricos ficam a um
+  clique em "editar coordenadas".
+- **O botão de escolher no mapa fica marcado enquanto espera o seu clique.** O
+  cursor de cruz era a única pista, e ela desaparece quando o ponteiro sai do
+  mapa — com três centros possíveis, era fácil esquecer qual estava armado.
+
+### Correções
+
+- **O selo de classe socioeconômica saía em cinza sobre o verde** em vez de
+  branco, por uma regra de estilo que o alcançava sem querer.
+- **Os quatro modos de deslocamento quebravam linha** no segmentado da gaveta
+  Mapa de renda ao estreitar a gaveta; a regra que os aperta só valia para o
+  segmentado gêmeo da gaveta Isócrona.
+- **O texto de letra miúda do produto subiu de 9,5px para 10,5px**, e com ele o
+  rodapé onde o programa declara em que moeda estão os valores.
+- Saíram os botões "Cancelar"/"Fechar" do pé das gavetas: o × do cabeçalho já
+  fecha, e está em todas elas.
+- A política de guarda dos cartões saiu do topo do quadro de Novos Negócios
+  para um "Como funciona este quadro" — quem abre o quadro todo dia quer o
+  resumo.
+
+---
+
 ## Maker Map 2.6 — Correção da renda informada por você
 
 _No ar em maker-map.netlify.app._
