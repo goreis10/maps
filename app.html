@@ -397,7 +397,10 @@
     color:var(--ink);margin:0 0 var(--sp-2);display:flex;justify-content:space-between;align-items:baseline;gap:var(--sp-2)}
   .rd-h em{font-style:normal;font-weight:600;font-size:var(--fs-1);color:var(--ink-2);letter-spacing:0;text-transform:none}
   .rd-stat{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:3px 0;font-size:var(--fs-2)}
-  .rd-stat span{color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ">span:first-child" e não "span": o seletor antigo alcançava também o
+     selo de classe dentro do <b>, e com especificidade MAIOR que .rd-cls,
+     então o "C" saía em cinza sobre o verde em vez de branco. */
+  .rd-stat>span:first-child{color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .rd-stat b{font-weight:700;color:var(--ink);flex:none;font-variant-numeric:tabular-nums}
   .rd-stat.big b{font-size:var(--fs-n1)}
   .rd-stat .rd-par{flex:none;display:flex;align-items:baseline;gap:7px}
@@ -413,6 +416,9 @@
      O que explica o método, e não altera o número, vai para o ⓘ. */
   .rd-prem{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin:10px 0 2px;
     border:1px solid var(--line);border-radius:var(--sp-2);overflow:hidden;background:var(--line)}
+  /* no modo isócrona entra uma quarta premissa ("sem trânsito"), e aí 2×2 —
+     com 3 colunas a quarta célula ficaria sozinha numa linha de 1/3 */
+  .rd-prem.q4{grid-template-columns:repeat(2,1fr)}
   .rd-prem span{background:#FBFAF9;padding:6px 7px;min-width:0}
   .rd-prem u{display:block;text-decoration:none;font:700 var(--fs-m) 'Archivo',sans-serif;
     letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
@@ -1790,7 +1796,7 @@ function gerarCirculo(km, centro){
 // Mora na gaveta "Mapa de renda"; as futuras análises de renda usam este círculo.
 const RENDA_PADRAO = {on:false, km:10, centro:CENTRO_SE.slice(), cor:'#0E9F8A', fill:true,
   pts:false,            // pontos do Censo (um por setor, colorido por faixa de renda)
-  cores:null,           // cor por faixa de renda; null = CENSO_CORES_PADRAO
+  cores:null,           // cor por faixa de renda; null = CENSO_CORES_SEGURA
   ipca:true,            // corrigir a renda de jul/2022 até 2 meses atrás
   ipcaPct:null,         // % acumulado informado à mão; null = buscar no BCB
   outros:50,            // % que os demais moradores somam à renda do responsável
@@ -4340,6 +4346,46 @@ function pctTxt(v){
 }
 function censoQuemTxt(){ return ((+rendaRaio.outros||0) > 0) ? 'domiciliar (estimada)' : 'do responsável'; }
 
+// AS PREMISSAS QUE MUDAM O VALOR EM REAIS, como pares rótulo/valor.
+//
+// Substituem a linha "Base dos valores" no painel: dizem a mesma coisa, mas
+// ao lado do número que elas qualificam e em 11px, em vez de no fim de um
+// rodapé de 9,5px que ninguém lê. O que NÃO muda o valor (de onde vem o
+// dado, como a média foi tomada) é que foi para o ⓘ.
+//
+// Terceira função a LER de fonteCorrecao(), junto com fatorRenda() (o
+// número) e censoBaseTxt() (a frase do popup). Nenhuma delas reescreve a
+// regra de precedência — foi escrevê-la duas vezes que fez o painel
+// anunciar jul/2022 sobre valores já corrigidos.
+function censoPremissas(){
+  var c = fonteCorrecao(), moeda, corr;
+  // A célula "Moeda" diz "R$ jul/2022" EXATAMENTE quando o fator monetário
+  // é 1 — nunca sobre valor corrigido, nunca omitindo correção aplicada.
+  // No caminho informado não há mês a nomear (o usuário declarou um
+  // percentual, não uma data), então ela diz "corrigido" e o número fica
+  // na célula ao lado. 0% informado é jul/2022 de verdade.
+  if(c.k==='bcb'){         moeda = 'R$ ' + ipcaRotulo(IPCA.ate);        corr = 'IPCA ' + pctTxt((IPCA.fator-1)*100) + ' · BCB'; }
+  else if(c.k==='manual'){ moeda = c.pct===0 ? 'R$ jul/2022' : 'R$ corrigido';
+                                                                        corr = pctTxt(c.pct) + ' · informada'; }
+  else if(c.k==='nenhuma'){moeda = 'R$ jul/2022';                       corr = 'IPCA indisponível'; }
+  else {                   moeda = 'R$ jul/2022';                       corr = 'desligada'; }
+  var out = [['Moeda', moeda], ['Correção', corr],
+    ['Renda', (+rendaRaio.outros||0) > 0
+      ? 'domiciliar · ' + pctTxt(+rendaRaio.outros)
+      : 'só do responsável']];
+  // No recorte por tempo, "sem trânsito" é premissa do mesmo peso: um tempo
+  // de deslocamento sem essa qualificação, numa apresentação comercial, é
+  // afirmação falsa sobre o ativo. Não depende do ⓘ.
+  if(rendaModo==='iso') out.push(['Tempos', 'sem trânsito · OSM']);
+  return out;
+}
+function premissasHTML(){
+  var ps = censoPremissas();
+  return '<div class="rd-prem' + (ps.length>3 ? ' q4' : '') + '">' +
+    ps.map(function(p){ return '<span><u>'+p[0]+'</u><b title="'+esc(p[1])+'">'+esc(p[1])+'</b></span>'; }).join('') +
+    '</div>';
+}
+
 // O percentual informado, ou null quando o campo está vazio/inválido.
 function ipcaManual(){
   var v = rendaRaio.ipcaPct;
@@ -4371,16 +4417,22 @@ var CENSO_FAIXAS = [
   {rot:'R$ 15.000 a 30.000',  max:30000},
   {rot:'Acima de R$ 30.000',  max:Infinity}
 ];
-// Padrão: escala semáforo — vermelho na renda baixa, ciano na alta.
+// Escala semáforo — vermelho na renda baixa, ciano na alta. Foi o padrão
+// até a 3.0 e continua a um clique, porque numa tela colorida é a mais
+// imediata de ler.
 var CENSO_CORES_PADRAO = ['#FF4444','#FF8844','#FFAA44','#FFD700','#AAFF44','#00FF88','#00DDFF'];
-// Alternativa YlOrBr (ColorBrewer): clara -> escura de forma monotônica, então
-// sobrevive a impressão em preto e branco e a daltonismo, o que a escala
-// semáforo não faz (vermelho x verde é justamente o par problemático).
+// PADRÃO desde a 3.0: YlOrBr (ColorBrewer), clara -> escura de forma
+// monotônica. O argumento não é estético: o produto deste software é um PNG
+// que vai para slide, papel e projetor. A escala semáforo não tem
+// luminosidade monotônica — some em preto e branco e confunde em daltonismo
+// vermelho-verde (~8% dos homens), que é justamente o par que ela usa nas
+// duas pontas. A âmbar sobrevive às duas.
+// Projetos salvos com cores customizadas (rendaRaio.cores) não mudam.
 var CENSO_CORES_SEGURA = ['#FFF7BC','#FEE391','#FEC44F','#FB9A29','#EC7014','#CC4C02','#8C2D04'];
 
 function censoCores(){
   var c = rendaRaio && rendaRaio.cores;
-  return (c && c.length===CENSO_FAIXAS.length) ? c : CENSO_CORES_PADRAO;
+  return (c && c.length===CENSO_FAIXAS.length) ? c : CENSO_CORES_SEGURA;
 }
 // Expressão de cor por faixa, usada pelos pontos e pelo calor de renda.
 // step: valor < 1500 -> c[0]; 1500..3000 -> c[1]; ... >= 30000 -> c[6],
@@ -4828,6 +4880,9 @@ function censoTituloCurto(){
   return f ? (f.min+' min') : 'isócrona';
 }
 
+// O ⓘ "Como estes números são calculados" fica aberto entre repaints.
+// renderRenda() refaz o HTML do painel a cada ajuste de parâmetro.
+var rendaInfoAberto = false;
 function renderRenda(){
   var box=document.getElementById('rendaAnalise');
   if(!box) return;
@@ -4956,39 +5011,18 @@ function renderRenda(){
   var manual = rendaRaio.ipca ? ipcaManual() : null;
   var comOutros = (+rendaRaio.outros||0) > 0;
   var quemRenda = censoQuemTxt();
-  var baseTxt   = censoBaseTxt();
 
-  box.innerHTML=
-    '<div class="rd-h">Dentro d'+(rendaModo==='iso'?'a isócrona':'o raio')+' <em>'+
-      (rendaModo==='iso' ? esc(censoTituloCurto())+' · '+isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()
-                         : nf(rendaRaio.km)+' km')+' · '+nf(q.area)+' km²</em></div>'+
-    '<div class="rd-stat big"><span>Domicílios ocupados</span><b>'+nf(q.dom)+'</b></div>'+
-    '<div class="rd-stat big"><span>Pessoas (estimativa)</span><b>'+nf(q.pes)+'</b></div>'+
-    '<div class="rd-stat"><span>Moradores por domicílio</span><b>'+nf(q.morDom,2)+'</b></div>'+
-    '<div class="rd-stat"><span>Renda média '+quemRenda+'</span><b>R$ '+nf(q.rendaMedia)+'</b></div>'+
-    '<div class="rd-stat"><span>Renda mediana '+quemRenda+'</span><b>R$ '+nf(q.rendaMediana)+'</b></div>'+
-    '<div class="rd-stat"><span>Base dos valores</span><b style="font-weight:600;font-size:10.5px">'+baseTxt+'</b></div>'+
-    '<div class="rd-stat"><span>Classe socioeconômica</span><b><span class="rd-cls">'+censoClasse(q.rendaMedia)+'</span></b></div>'+
-    '<div class="rd-stat"><span>Densidade</span><b>'+nf(q.densDom)+' dom/km²</b></div>'+
-    '<div class="rd-stat"><span>Densidade</span><b>'+nf(q.densPes)+' pess/km²</b></div>'+
-    '<div class="rd-stat"><span>Setores censitários</span><b>'+nf(q.setores)+'</b></div>'+
-    '<div class="rd-stat"><span>Municípios ('+q.muns.length+')</span><b style="font-weight:600;font-size:10.5px">'+munTxt+'</b></div>'+
-    avisoUF+aviso+
-    '<div class="rd-sub">Domicílios por faixa de renda'+
-      (usaCorRenda ? ' <em style="font-weight:600;text-transform:none;letter-spacing:0">· cores no mapa</em>' : '')+'</div>'+
-    '<div class="rd-fx">'+faixasHtml+'</div>'+
-    '<div class="rd-corlinks">Clique na bolinha para trocar a cor · '+
-      '<a id="rdCorPadrao">semáforo</a> · <a id="rdCorSegura">tons de âmbar</a></div>'+
-    legendaDens+
-    (q.domSemRenda>0 ? '<div class="rd-foot">'+nf(q.domSemRenda)+' domicílios ficam fora do cálculo de renda '+
-      '(setor sem informação de rendimento). Eles contam no total de domicílios, '+
-      'de pessoas e no mapa de calor de densidade; ficam de fora da média, da '+
-      'distribuição por faixa, dos pontos e do calor de renda.</div>' : '')+
-    (rendaModo==='iso' ? '<div class="rd-foot">O recorte é um tempo de deslocamento, '+
-      'calculado sobre a malha viária do OpenStreetMap <b>sem considerar trânsito</b>.</div>' : '')+
-    '<div class="rd-foot"><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
-    'O Censo mede a renda <b>do responsável pelo domicílio</b>.<br>'+
-    (manual!=null
+  // ── A metodologia, recolhida atrás de um rótulo que diz o que há dentro.
+  // Nenhuma palavra foi cortada: o que saiu de vista é o que NÃO altera o
+  // valor em reais (de onde vem o dado, como a média foi tomada). O que
+  // altera — moeda, correção, de quem é a renda — está na faixa de
+  // Premissas, permanente, em corpo maior, ao lado do número.
+  // E aqui o texto é MAIOR que era no rodapé: 10,5px contra 9,5px.
+  var comoHtml =
+    '<details class="e-info"><summary>Como estes números são calculados</summary><div>'+
+    '<p><b>Fonte:</b> IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
+    'O Censo mede a renda <b>do responsável pelo domicílio</b>.</p>'+
+    '<p>'+(manual!=null
       ? '<b>Corrigido em '+pctTxt(manual)+'</b> sobre julho/2022 — '+
         '<b>percentual informado por você</b>, '+
         'não buscado no Banco Central.'
@@ -4998,12 +5032,59 @@ function renderRenda(){
         : (rendaRaio.ipca
             ? '<b>Sem correção monetária</b> — não foi possível obter o IPCA, e nenhum percentual foi '+
               'informado. Os valores estão em R$ de julho/2022.'
-            : '<b>Correção pelo IPCA desligada</b> — valores em R$ de julho/2022.')))+'<br>'+
-    (comOutros
+            : '<b>Correção pelo IPCA desligada</b> — valores em R$ de julho/2022.')))+'</p>'+
+    '<p>'+(comOutros
       ? '<b>Renda domiciliar estimada</b>: a do responsável mais '+nf(+rendaRaio.outros)+'% atribuídos aos '+
         'demais moradores. É uma <b>estimativa sua</b>, não um dado do Censo.'
-      : 'Mostrando apenas a renda do responsável. A renda domiciliar costuma ser 1,5 a 2× maior.')+'<br>'+
-    'Média condicional: responsáveis sem rendimento não entram. Corte por centroide do setor.</div>';
+      : 'Mostrando apenas a renda do responsável. A renda domiciliar costuma ser 1,5 a 2× maior.')+'</p>'+
+    (q.domSemRenda>0 ? '<p>Os '+nf(q.domSemRenda)+' domicílios sem renda informada '+
+      '(setor sem informação de rendimento) contam no total de domicílios, '+
+      'de pessoas e no mapa de calor de densidade; ficam de fora da média, da '+
+      'distribuição por faixa, dos pontos e do calor de renda.</p>' : '')+
+    (rendaModo==='iso' ? '<p>O recorte é um tempo de deslocamento, '+
+      'calculado sobre a malha viária do OpenStreetMap <b>sem considerar trânsito</b>.</p>' : '')+
+    '<p>Média condicional: responsáveis sem rendimento não entram. '+
+    'Corte por centroide do setor.</p>'+
+    '</div></details>';
+
+  box.innerHTML=
+    '<div class="rd-h">Dentro d'+(rendaModo==='iso'?'a isócrona':'o raio')+' <em>'+
+      (rendaModo==='iso' ? esc(censoTituloCurto())+' · '+isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()
+                         : nf(rendaRaio.km)+' km')+' · '+nf(q.area)+' km²</em></div>'+
+    '<div class="rd-stat big"><span>Domicílios ocupados</span><b>'+nf(q.dom)+'</b></div>'+
+    '<div class="rd-stat big"><span>Pessoas (estimativa)</span><b>'+nf(q.pes)+'</b></div>'+
+    premissasHTML()+
+    // A classe é atributo da renda média, não fato independente: mesma linha.
+    '<div class="rd-stat"><span>Renda média '+quemRenda+'</span>'+
+      '<span class="rd-par"><b>R$ '+nf(q.rendaMedia)+'</b>'+
+      '<span class="rd-cls" title="classe socioeconômica">'+censoClasse(q.rendaMedia)+'</span></span></div>'+
+    '<div class="rd-stat"><span>Renda mediana '+quemRenda+'</span><b>R$ '+nf(q.rendaMediana)+'</b></div>'+
+    '<div class="rd-stat"><span>Moradores por domicílio</span><b>'+nf(q.morDom,2)+'</b></div>'+
+    // Duas linhas "Densidade" com o mesmo rótulo e unidades diferentes eram
+    // duas afirmações sobre a mesma coisa: uma linha, as duas unidades.
+    '<div class="rd-stat"><span>Densidade por km²</span><b>'+nf(q.densDom)+' dom · '+nf(q.densPes)+' pess</b></div>'+
+    '<div class="rd-stat"><span>Setores censitários</span><b>'+nf(q.setores)+'</b></div>'+
+    (q.domSemRenda>0
+      ? '<div class="rd-stat"><span>Sem renda informada</span><b>'+nf(q.domSemRenda)+' dom.</b></div>'
+      : '')+
+    '<div class="rd-stat"><span>Municípios ('+q.muns.length+')</span><b style="font-weight:600;font-size:var(--fs-1)">'+esc(munTxt)+'</b></div>'+
+    avisoUF+aviso+
+    '<div class="rd-sub">Domicílios por faixa de renda'+
+      (usaCorRenda ? ' <em style="font-weight:600;text-transform:none;letter-spacing:0">· cores no mapa</em>' : '')+'</div>'+
+    '<div class="rd-fx">'+faixasHtml+'</div>'+
+    '<div class="rd-corlinks">Clique na bolinha para trocar a cor · '+
+      '<a id="rdCorPadrao">tons de âmbar</a> · <a id="rdCorSemaforo">semáforo</a></div>'+
+    legendaDens+
+    comoHtml;
+
+  // O ⓘ sobrevive ao repaint. renderRenda() refaz este HTML a cada ajuste
+  // de parâmetro, e sem isto abrir a metodologia e mexer no raio fecharia
+  // o texto na cara de quem estava lendo.
+  var inf=box.querySelector('.e-info');
+  if(inf){
+    inf.open = rendaInfoAberto;
+    inf.ontoggle = function(){ rendaInfoAberto = inf.open; };
+  }
 
   // Edição das cores das faixas. NÃO chama renderRenda() no oninput: refazer o
   // HTML fecharia o seletor de cor do navegador no meio do arraste. Aplica no
@@ -5024,9 +5105,11 @@ function renderRenda(){
     Object.keys(censoUF).forEach(function(k){ if(censoUF[k]!=='ok') delete censoUF[k]; });
     carregarCenso();
   };
-  var pad=box.querySelector('#rdCorPadrao'), seg=box.querySelector('#rdCorSegura');
+  // "tons de âmbar" é o PADRÃO, então limpa a customização (null); o
+  // semáforo passa a ser a escolha explícita.
+  var pad=box.querySelector('#rdCorPadrao'), sem=box.querySelector('#rdCorSemaforo');
   if(pad) pad.onclick=function(){ rendaRaio.cores=null; censoCamadas(censoCache.res); renderRenda(); };
-  if(seg) seg.onclick=function(){ rendaRaio.cores=CENSO_CORES_SEGURA.slice(); censoCamadas(censoCache.res); renderRenda(); };
+  if(sem) sem.onclick=function(){ rendaRaio.cores=CENSO_CORES_PADRAO.slice(); censoCamadas(censoCache.res); renderRenda(); };
 }
 
 // ══════════════════════════════════════════════════════════════════
