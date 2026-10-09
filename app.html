@@ -459,9 +459,16 @@
      ela quebra linha, não trunca. */
   .rd-prem b{display:block;font:700 11px 'Archivo',sans-serif;color:var(--ink);
     margin-top:1px;line-height:1.3;overflow-wrap:break-word}
-  .rd-fx{display:grid;grid-template-columns:1fr 46px;gap:var(--sp-1) var(--sp-2);align-items:center;font-size:var(--fs-1)}
+  /* A coluna da direita era fixa em 46px, quando só havia o percentual.
+     Com o número de domicílios entre parênteses ela passa a "auto": mede
+     o conteúdo mais largo e não corta número de domicílio nenhum. Quem
+     cede é o rótulo da faixa, que já tem elipse e um title com o texto
+     inteiro — e mesmo em recorte grande ("38,1% (128.904)") sobram
+     ~190px para ele, mais que os ~110px do rótulo mais comprido. */
+  .rd-fx{display:grid;grid-template-columns:1fr auto;gap:var(--sp-1) var(--sp-2);align-items:center;font-size:var(--fs-1)}
   .rd-fx>i{display:block;height:5px;border-radius:3px;background:var(--c-renda);min-width:1px}
-  .rd-fx>u{text-decoration:none;color:var(--ink-3);font-size:var(--fs-1);font-variant-numeric:tabular-nums;text-align:right}
+  .rd-fx>u{text-decoration:none;color:var(--ink-3);font-size:var(--fs-1);font-variant-numeric:tabular-nums;
+    text-align:right;white-space:nowrap}
   .rd-fxr{color:var(--ink-2);display:flex;align-items:center;gap:5px;min-width:0}
   .rd-fxr>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   /* bolinha de cor editável de cada faixa (é um input[type=color] redondo) */
@@ -5023,7 +5030,17 @@ function censoAgregar(idx, area){
     if(r[5]>0){
       var rm=r[5]*fat, rd=r[6]*fat;
       wMed+=rm*r[3]; wMdn+=rd*r[3]; domRenda+=r[3];
-      faixas[censoFaixaIdx(rm)]+=r[3]; faixaTot+=r[3];
+      // A FAIXA É DECIDIDA SOBRE O VALOR ARREDONDADO, que é exatamente o
+      // que censoCamadas() grava em 'renda' e o que censoStepCor() usa para
+      // escolher a cor do ponto no mapa. Decidir aqui sobre o valor cheio
+      // punha um setor numa faixa no gráfico e noutra cor no mapa: no
+      // padrão (demais moradores 50% → fator 1,5), uma renda de 3.333 dá
+      // 4.999,5 — contado em "3.000 a 5.000", pintado como "5.000 a 8.000".
+      // Eram 31 setores e 4.957 domicílios em SP+MG+BA. O gráfico É a
+      // legenda das cores do mapa, então os dois têm de concordar.
+      // A MÉDIA continua sobre o valor cheio: arredondar cada setor antes
+      // de ponderar introduziria viés na conta de dinheiro.
+      faixas[censoFaixaIdx(Math.round(rm))]+=r[3]; faixaTot+=r[3];
     }
   }
   var lista=Object.keys(muns).sort(function(a,b){ return muns[b]-muns[a]; });
@@ -5341,17 +5358,40 @@ function renderRenda(){
       'suficiente para leitura de tendência, apertado para número fechado.</div>';
   }
 
+  // Recorte em que o IBGE reteve a renda de TODOS os setores: há domicílios
+  // e pessoas, não há renda. É diferente de q.vazio (nenhum setor).
+  var semRenda = q.faixaTot===0;
   var cores=censoCores();
   var maxFx=Math.max.apply(null, q.faixas)||1;
+  // O percentual e, entre parênteses, o número de domicílios da faixa.
+  // q.faixas[i] é soma de r[3] (domicílios do setor), então é contagem
+  // inteira e exata, não valor ponderado.
+  //
+  // O número também desfaz uma ambiguidade do percentual sozinho: "0,0%"
+  // tanto podia ser faixa vazia quanto 12 domicílios num recorte de
+  // 300 mil. Agora dá para ver qual dos dois é.
   var faixasHtml=q.faixas.map(function(v,i){
     var pct=q.faixaTot>0 ? v/q.faixaTot*100 : 0;
     return '<span class="rd-fxr">'+
              '<input type="color" class="rd-sw" data-fx="'+i+'" value="'+cores[i]+'" '+
                'title="cor da faixa '+CENSO_FAIXAS[i].rot+'">'+
              '<span title="'+CENSO_FAIXAS[i].rot+'">'+CENSO_FAIXAS[i].rot+'</span></span>'+
-           '<u>'+nf(pct,1)+'%</u>'+
+           '<u title="'+nf(v)+' de '+nf(q.faixaTot)+' domicílios com renda informada">'+
+             nf(pct,1)+'% ('+nf(v)+')</u>'+
            '<i data-fx="'+i+'" style="width:'+(v/maxFx*100).toFixed(1)+'%;background:'+cores[i]+'"></i><u></u>';
   }).join('');
+  // A base do gráfico tem de estar escrita assim que os números absolutos
+  // aparecem: com percentuais ninguém soma as linhas, com domicílios soma —
+  // e a soma dá q.faixaTot, não "Domicílios ocupados", porque os setores
+  // sem renda informada ficam de fora. Só aparece quando há diferença.
+  var baseFx = q.domSemRenda>0
+    // Em --ink-2 e com o número em negrito, e não na tinta de meta: logo
+    // abaixo vem a dica de interface ("clique na bolinha…"), no mesmo corpo,
+    // e uma afirmação sobre a base dos números não pode ser lida como
+    // enfeite por quem está justamente somando as linhas.
+    ? '<div class="rd-foot" style="margin-top:7px;color:var(--ink-2)">Base: <b>'+
+      nf(q.faixaTot)+'</b> domicílios com renda informada.</div>'
+    : '';
 
   // as cores das faixas valem no mapa quando há pontos ou calor de renda
   var usaCorRenda = rendaUsaCorRenda();
@@ -5412,11 +5452,24 @@ function renderRenda(){
     '<div class="rd-stat big"><span>Domicílios ocupados</span><b>'+nf(q.dom)+'</b></div>'+
     '<div class="rd-stat big"><span>Pessoas (estimativa)</span><b>'+nf(q.pes)+'</b></div>'+
     premissasHTML()+
-    // A classe é atributo da renda média, não fato independente: mesma linha.
-    '<div class="rd-stat"><span>Renda média '+quemRenda+'</span>'+
-      '<span class="rd-par"><b>R$ '+nf(q.rendaMedia)+'</b>'+
-      '<span class="rd-cls" title="classe socioeconômica">'+censoClasse(q.rendaMedia)+'</span></span></div>'+
-    '<div class="rd-stat"><span>Renda mediana '+quemRenda+'</span><b>R$ '+nf(q.rendaMediana)+'</b></div>'+
+    // SEM NENHUM SETOR COM RENDA, NÃO HÁ RENDA A IMPRIMIR.
+    // censoAgregar devolve 0 quando domRenda é 0, e o painel imprimia
+    // "R$ 0" com o selo de classe "E" sobre dezenas de milhares de
+    // domicílios reais — um número confiante e errado, que é o pior
+    // resultado possível aqui. Acontece de verdade: 244 setores e 43.852
+    // domicílios num raio de 3 km em Campinas têm a renda retida pelo
+    // IBGE. Os domicílios, as pessoas e a densidade continuam valendo e
+    // continuam na tela; o que falta é só a renda, e o painel diz isso.
+    (semRenda
+      ? '<div class="rd-msg warn">O IBGE <b>não informa a renda</b> de nenhum '+
+        'dos setores deste recorte, então não há renda média, mediana nem '+
+        'classe a apresentar. Os totais de domicílios e de pessoas acima '+
+        'continuam valendo.</div>'
+      // A classe é atributo da renda média, não fato independente: mesma linha.
+      : '<div class="rd-stat"><span>Renda média '+quemRenda+'</span>'+
+        '<span class="rd-par"><b>R$ '+nf(q.rendaMedia)+'</b>'+
+        '<span class="rd-cls" title="classe socioeconômica">'+censoClasse(q.rendaMedia)+'</span></span></div>'+
+        '<div class="rd-stat"><span>Renda mediana '+quemRenda+'</span><b>R$ '+nf(q.rendaMediana)+'</b></div>')+
     '<div class="rd-stat"><span>Moradores por domicílio</span><b>'+nf(q.morDom,2)+'</b></div>'+
     // Duas linhas "Densidade" com o mesmo rótulo e unidades diferentes eram
     // duas afirmações sobre a mesma coisa: uma linha, as duas unidades.
@@ -5427,11 +5480,15 @@ function renderRenda(){
       : '')+
     '<div class="rd-stat"><span>Municípios ('+q.muns.length+')</span><b style="font-weight:600;font-size:var(--fs-1)">'+esc(munTxt)+'</b></div>'+
     avisoUF+aviso+
-    '<div class="rd-sub">Domicílios por faixa de renda'+
-      (usaCorRenda ? ' <em style="font-weight:600;text-transform:none;letter-spacing:0">· cores no mapa</em>' : '')+'</div>'+
-    '<div class="rd-fx">'+faixasHtml+'</div>'+
-    '<div class="rd-corlinks">Clique na bolinha para trocar a cor · '+
-      '<a id="rdCorPadrao">tons de âmbar</a> · <a id="rdCorSemaforo">semáforo</a></div>'+
+    // Sem nenhum setor com renda, o gráfico seria sete linhas "0,0% (0)" e
+    // um "Base: 0" — ruído sobre uma informação que o aviso acima já deu.
+    (semRenda ? '' :
+      '<div class="rd-sub">Domicílios por faixa de renda'+
+        (usaCorRenda ? ' <em style="font-weight:600;text-transform:none;letter-spacing:0">· cores no mapa</em>' : '')+'</div>'+
+      '<div class="rd-fx">'+faixasHtml+'</div>'+
+      baseFx+
+      '<div class="rd-corlinks">Clique na bolinha para trocar a cor · '+
+        '<a id="rdCorPadrao">tons de âmbar</a> · <a id="rdCorSemaforo">semáforo</a></div>')+
     legendaDens+
     comoHtml;
 

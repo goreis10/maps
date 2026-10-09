@@ -5,9 +5,40 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 3.0 — Interface reorganizada e legenda de renda na imagem
+## Maker Map 3.1 — Domicílios por faixa, em número
 
 _Em revisão._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **O gráfico de faixas de renda passa a mostrar o número de domicílios ao lado
+  do percentual**, entre parênteses: "38,1% (44.976)". O percentual responde
+  "que parte do recorte", o número responde "quantas famílias" — e é o número
+  que se fala numa reunião.
+- Isso também desfaz uma ambiguidade que o percentual sozinho tinha: **"0,0%"
+  podia ser uma faixa vazia ou doze domicílios num recorte de trezentos mil.**
+  Agora dá para ver qual dos dois é.
+- Quando há domicílios em setores **sem renda informada**, o gráfico passa a
+  declarar a sua base logo abaixo — "Base: 117.933 domicílios com renda
+  informada". Com percentuais ninguém somava as linhas; com números absolutos
+  vai somar, e a soma fecha com essa base, não com o total de domicílios
+  ocupados.
+- **Correção: a faixa contada no gráfico e a cor pintada no mapa podiam
+  discordar.** Em alguns setores, o gráfico contava o domicílio numa faixa e o
+  ponto no mapa saía com a cor da faixa seguinte — inclusive na imagem
+  exportada. O gráfico é a legenda das cores do mapa, então os dois agora
+  decidem a faixa pelo mesmo número.
+- **Correção: recorte sem nenhuma renda informada apresentava "R$ 0" e classe
+  "E" como se fossem dados.** Acontece de verdade — há um bloco de 244 setores
+  e 43.852 domicílios num raio de 3 km em Campinas cuja renda o IBGE não
+  divulga. Agora o painel diz que não há renda a apresentar ali, e mantém os
+  totais de domicílios e de pessoas, que continuam valendo.
+
+---
+
+## Maker Map 3.0 — Interface reorganizada e legenda de renda na imagem
+
+_No ar em maker-map.netlify.app._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
