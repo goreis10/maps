@@ -5,9 +5,38 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
-## Maker Map 3.1 — Domicílios por faixa, em número
+## Maker Map 3.2 — Exportar em mais formatos e tamanhos
 
 _Em revisão._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **O botão Exportar abre uma gaveta** com formato e tamanho, no lugar da
+  caixinha que só oferecia PNG em 2×, 3× ou 4×.
+- **Três formatos.** **PNG** sem perda nenhuma, para apresentação e impressão;
+  **JPEG**, que abre em qualquer programa e pesa uma fração disso; e **WebP**,
+  que pesa menos ainda na mesma qualidade. JPEG e WebP ganham um controle de
+  qualidade. Se o navegador não souber gravar um dos formatos, ele aparece
+  desativado em vez de entregar um arquivo com a extensão errada.
+- **Duas formas de escolher o tamanho:** o **múltiplo da tela** de sempre, de
+  1× a 4×, ou a **largura exata** em pixels, para quando o destino pede um
+  número — com atalhos para 1280, 1920, 2560 e 3840.
+- **A gaveta diz quanto vai sair antes de exportar**: as dimensões em pixels,
+  os megapixels e a proporção. **E avisa quando o navegador vai limitar o
+  pedido** — nenhum navegador desenha um quadro maior que 4.096 px de lado, e
+  até aqui pedir 4× numa janela grande entregava bem menos sem avisar.
+- A gaveta de exportação **não empurra o mapa** como as outras. Aqui o tamanho
+  do mapa é o tamanho do arquivo: empurrá-lo faria a imagem sair mais estreita,
+  com outro enquadramento, só porque a gaveta está aberta.
+- O aviso depois do download agora diz também **o tamanho do arquivo**, e o
+  nome do arquivo traz as dimensões em vez do múltiplo.
+- Sua escolha de formato e tamanho **fica guardada** para a próxima exportação.
+
+---
+
+## Maker Map 3.1 — Domicílios por faixa, em número
+
+_No ar em maker-map.netlify.app._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 

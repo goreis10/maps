@@ -41,7 +41,9 @@
   • Upload KMZ/KML ...... kmlParaFeats(), integrarFeats()
   • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
   • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
-  • Exportar PNG ........ btnExport (devicePixelRatio × escala)
+  • Exportar imagem ..... btnExport abre #drawerExport; expGerar()
+                          (PNG/JPEG/WebP, múltiplo ou largura exata,
+                          expPrever() diz o tamanho antes de gerar)
   • Telas / menu ........ irPara('mapa'|'negocios'), #nav, #navBtn
   • Novos Negócios ...... NEGOCIOS (guarda própria em localStorage),
                           negSincronizar(), carregarNegocios(),
@@ -278,8 +280,10 @@
     box-shadow:0 6px 18px rgba(224,64,16,.38);display:flex;align-items:center;gap:var(--sp-2)}
   #btnExport:hover{filter:brightness(1.06)}
   #btnExport:disabled{opacity:.6;cursor:wait}
-  #expScale{border:1px solid var(--line);border-radius:10px;padding:7px 9px;font:600 var(--fs-2) 'Archivo',sans-serif;
-    color:var(--ink-2);background:rgba(255,255,255,.96);box-shadow:0 4px 14px rgba(28,25,23,.12)}
+  /* Abridor da gaveta de exportação. Mantém o peso de primário — não vira
+     .chip-gav como os outros abridores — porque é a saída do funil: o
+     produto deste software é a imagem, e este é o botão que a entrega. */
+  #btnExport.aberta{box-shadow:0 0 0 3px rgba(224,64,16,.25),0 6px 18px rgba(224,64,16,.38)}
 
   .maplibregl-popup-content{border-radius:10px;box-shadow:0 10px 30px rgba(28,25,23,.22);
     font-family:'Archivo',sans-serif;padding:14px var(--sp-4)}
@@ -335,6 +339,32 @@
   #wrap.side-open #map{right:var(--drawer-w)}
   #wrap.side-open #ctrl{right:calc(var(--drawer-w) + 14px)}
   #wrap.side-open #edResize{display:block;right:calc(var(--drawer-w) - 5px)}
+  /* A GAVETA DE EXPORTAÇÃO SOBREPÕE O MAPA EM VEZ DE EMPURRÁ-LO.
+     Em todas as outras encolher o mapa é só um incômodo; nesta o tamanho do
+     mapa É o tamanho do arquivo — a imagem sairia ~340px mais estreita, com
+     outro enquadramento, só porque a gaveta está aberta. Mesma
+     especificidade da regra acima, então vale por vir depois. */
+  #wrap.exp-open #map{right:0}
+  /* O mapa vai até a borda, então a gaveta cobre os cantos direitos: as
+     caixas de legenda em canvas (a de renda nasce em inf-dir desde a 3.0)
+     sumiriam da tela justamente no momento de exportá-las. Saem de baixo
+     dela — no arquivo a posição não muda, porque lá quem desenha é
+     expComporLegendas sobre o quadro inteiro. */
+  #wrap.exp-open .leg-sup-dir,
+  #wrap.exp-open .leg-inf-dir{right:calc(var(--drawer-w) + 14px)}
+  /* E a alça de redimensionar fica sobre o mapa VIVO em vez de na emenda,
+     capturando o arraste de quem queria mover o mapa. Nesta gaveta ela não
+     serve para nada: a largura dela não muda o tamanho da imagem. */
+  #wrap.exp-open #edResize{display:none}
+  .exp-at{color:var(--azul);cursor:pointer;font-weight:600}
+  .exp-at:hover{text-decoration:underline}
+  .exp-at.on{color:var(--ink);text-decoration:underline}
+  /* O que vai sair, antes de sair */
+  .exp-res{margin-top:var(--sp-3);border:1px solid var(--line);border-radius:var(--sp-2);
+    background:#FBFAF9;padding:10px var(--sp-3);text-align:center}
+  .exp-res b{display:block;font:700 var(--fs-n1) 'Archivo',sans-serif;color:var(--ink);
+    font-variant-numeric:tabular-nums}
+  .exp-res span{display:block;font-size:var(--fs-1);color:var(--ink-3);margin-top:2px}
   .sd-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
   .sd-title{font:800 var(--fs-4) 'Archivo',sans-serif;color:var(--ink)}
   /* DUAS classes de texto explicativo, e a distinção é deliberada — está
@@ -753,12 +783,10 @@
       <div class="chip chip-gav" id="btnIso"><span class="dot" style="background:var(--c-iso)"></span>Isócrona</div>
     </div>
     <div class="ctrl-grp">
-      <select id="expScale" title="Resolução da imagem exportada">
-        <option value="2">PNG 2×</option>
-        <option value="3" selected>PNG 3×</option>
-        <option value="4">PNG 4×</option>
-      </select>
-      <button id="btnExport">Exportar PNG</button>
+      <!-- Abre a gaveta de exportação. Continua laranja, e não .chip-gav como
+           os outros abridores, porque é a saída do funil: o produto deste
+           software é a imagem, e este é o botão que a entrega. -->
+      <button id="btnExport">Exportar imagem</button>
     </div>
   </div>
 
@@ -1091,6 +1119,87 @@
     <div id="isoPainel" class="rd-box"></div>
   </div>
 
+  <!-- Gaveta: Exportar imagem.
+       ESTA GAVETA NÃO ENCOLHE O MAPA (#wrap.exp-open), ao contrário de todas
+       as outras. O motivo é que aqui o tamanho do mapa É o tamanho do
+       arquivo: empurrar o mapa para a esquerda faria a imagem sair mais
+       estreita só porque a gaveta está aberta, e o enquadramento que o
+       usuário escolheu antes de clicar seria outro no arquivo. Ela sobrepõe. -->
+  <div id="drawerExport" class="side-drawer" role="dialog" aria-modal="true">
+    <div class="sd-head">
+      <div class="sd-title">Exportar imagem</div>
+      <button id="expClose" class="e-x" title="fechar">×</button>
+    </div>
+
+    <div class="sd-sec">
+      <div class="e-subhead" style="padding-top:2px">Formato</div>
+      <div class="e-row">
+        <div class="seg" id="expFmt" style="box-shadow:none">
+          <button type="button" data-fmt="png" class="on">PNG</button>
+          <button type="button" data-fmt="jpeg">JPEG</button>
+          <button type="button" data-fmt="webp">WebP</button>
+        </div>
+      </div>
+      <div class="e-hint" id="expFmtHint"></div>
+
+      <div id="expQualBox" style="display:none">
+        <div class="e-row"><label>Qualidade</label>
+          <input type="range" id="expQual" min="50" max="100" step="1" value="92">
+          <span id="expQualV" style="width:38px;text-align:right;font-size:var(--fs-1);font-weight:700;color:var(--ink-2)">92%</span>
+        </div>
+        <div class="e-hint">Abaixo de 80% o texto dos rótulos começa a borrar nas bordas.</div>
+      </div>
+
+      <div class="e-subhead">Tamanho</div>
+      <div class="e-row">
+        <div class="seg" id="expModo" style="box-shadow:none">
+          <button type="button" data-modo="mult" class="on">Múltiplo da tela</button>
+          <button type="button" data-modo="larg">Largura exata</button>
+        </div>
+      </div>
+      <div class="e-row" id="expMultBox">
+        <div class="seg" id="expMult" style="box-shadow:none">
+          <button type="button" data-mult="1">1×</button>
+          <button type="button" data-mult="2">2×</button>
+          <button type="button" data-mult="3" class="on">3×</button>
+          <button type="button" data-mult="4">4×</button>
+        </div>
+      </div>
+      <div id="expLargBox" style="display:none">
+        <div class="e-row"><label>Largura</label>
+          <input type="number" id="expLarg" min="320" max="8000" step="10" value="1920"><label>px</label></div>
+        <div class="e-row" style="gap:10px;font-size:var(--fs-1)">
+          <a class="exp-at" data-larg="1280">1280</a>
+          <a class="exp-at" data-larg="1920">1920</a>
+          <a class="exp-at" data-larg="2560">2560</a>
+          <a class="exp-at" data-larg="3840">3840</a>
+        </div>
+      </div>
+
+      <!-- O que vai sair, antes de sair. Era a informação que faltava: a
+           escala pedida nunca foi a entregue, porque o navegador limita o
+           canvas, e isso só aparecia no aviso DEPOIS do download. -->
+      <div class="exp-res" id="expRes"></div>
+      <div id="expAviso"></div>
+
+      <div class="e-row" style="margin-top:10px">
+        <button class="rd-load" id="expGerar">Exportar imagem</button></div>
+      <div class="e-hint">A imagem sai com <b>o enquadramento que está na tela</b> — a
+        proporção é a da janela do mapa, não do formato escolhido. Enquadre antes de exportar.</div>
+      <details class="e-info"><summary>Como escolher formato e tamanho</summary><div>
+        <p><b>PNG</b> não perde nada e é o certo para apresentação e impressão; é também o
+        arquivo maior. <b>JPEG</b> abre em tudo e pesa uma fração disso, ao custo de borrões
+        onde há texto fino. <b>WebP</b> pesa menos que o JPEG com a mesma qualidade, mas
+        programas antigos de escritório não abrem.</p>
+        <p>O <b>múltiplo</b> multiplica os pixels da janela do mapa como ela está agora: 3×
+        numa janela de 1.280 px dá 3.840 px de largura. A <b>largura exata</b> faz a conta ao
+        contrário, para quando o destino pede um número.</p>
+        <p>O navegador não desenha um quadro maior que <b>4.096 px</b> de lado, então pedir
+        mais que isso entrega 4.096 — o quadro acima sempre diz o que de fato vai sair.</p>
+      </div></details>
+    </div>
+  </div>
+
   <div id="edResize" title="arraste para ajustar a largura"></div>
   <div id="toast"></div>
 </div>
@@ -1364,6 +1473,13 @@ RAIO.features[0].geometry.coordinates[0].forEach(c=>{
 const matchCor = ['match', ['get','municipio'],
   ...Object.entries(CORES).flatMap(([m,c])=>[m,c]), '#8A8F98'];
 
+// Lado máximo, em pixels, do quadro que o navegador desenha. É o teto da
+// imagem exportada: a MapLibre reduz a escala até o canvas caber nele.
+// Fica aqui, e é passado explicitamente ao construtor, porque a gaveta de
+// exportação prevê o tamanho do arquivo a partir deste número — deixá-lo
+// implícito faria a previsão depender de um padrão da biblioteca.
+var EXPORT_MAX = 4096;
+
 let map;
 fetch('https://tiles.openfreemap.org/styles/positron')
   .then(r=>{ if(!r.ok) throw new Error('estilo '+r.status); return r.json(); })
@@ -1374,6 +1490,11 @@ fetch('https://tiles.openfreemap.org/styles/positron')
       bounds: [[minX,minY],[maxX,maxY]],
       fitBoundsOptions:{padding:60},
       preserveDrawingBuffer:true,
+      // Declarado, e não deixado no padrão da biblioteca, porque a gaveta de
+      // exportação PREVÊ o tamanho do arquivo a partir deste número. Com o
+      // padrão implícito, a previsão seria um palpite sobre a MapLibre que
+      // uma atualização dela poderia desmentir em silêncio.
+      maxCanvasSize:[EXPORT_MAX, EXPORT_MAX],
       attributionControl:{compact:true}
     });
     map.addControl(new maplibregl.NavigationControl({showCompass:true, visualizePitch:false}), 'bottom-right');
@@ -1387,6 +1508,12 @@ fetch('https://tiles.openfreemap.org/styles/positron')
       if(agora - ultimoErroToast > 5000){ ultimoErroToast = agora; toast('Aviso do mapa: '+msg.slice(0,120)); }
     });
     map.on('load', montarCamadas);
+    // A previsão da gaveta de exportação é uma conta sobre a LARGURA ATUAL
+    // do mapa, então ela tem de ser refeita toda vez que o mapa muda de
+    // tamanho: abrir/fechar gaveta, abrir a Edição, redimensionar a janela.
+    // Sem isto a gaveta mostrava o tamanho de antes e deixava de avisar do
+    // corte — que é justamente o que ela existe para dizer.
+    map.on('resize', function(){ if(!expExportando) expSync(); });
   })
   .catch(err=>{ console.error(err); fail(); });
 
@@ -3876,7 +4003,7 @@ var FEATURE_PLANS = {
   desenhar:        'free',   // ferramenta "Desenhar"
   edicao:          'free',   // abrir a aba de "Edição" (seções restritas lá)
   uploadKmz:       'basic',  // enviar arquivos KMZ/KML — Basic+ apenas
-  exportar:        'free',   // exportar imagem PNG (botão + resolução)
+  exportar:        'free',   // exportar a imagem (formato e tamanho)
   cores:           'free',   // paletas de cores pré-definidas
   mapaRenda:       'pro',    // "Mapa de renda" — Pro+ apenas
   isocrona:        'pro',    // "Isócrona" — Pro+ apenas
@@ -3906,7 +4033,7 @@ var FEATURE_ROTULOS = {
   secMascara:      'Máscara de destaque (spotlight)',
   cores:           'Paletas de cores do mapa',
   satelite:        'Fundo de satélite',
-  exportar:        'Exportar imagem PNG (até 4×)',
+  exportar:        'Exportar imagem (PNG, JPEG e WebP, até 4×)',
   editarDados:     'Editar os dados da conta',
   uploadKmz:       'Importar arquivos KMZ/KML',
   secMapa:         'Cores do fundo do mapa',
@@ -3940,7 +4067,7 @@ var FEATURE_ELEMENTS = {
   desenhar:        ['#chipDraw'],
   edicao:          ['#chipEdit'],
   uploadKmz:       ['#addKmz', '#addKmz2'],
-  exportar:        ['#btnExport', '#expScale'],
+  exportar:        ['#btnExport'],
   cores:           ['#btnCores'],
   mapaRenda:       ['#btnRenda'],
   isocrona:        ['#btnIso'],
@@ -4053,12 +4180,16 @@ window.MakerPlano = { get: getUserPlano, temAcesso: temAcesso, aplicar: aplicarP
 aplicarPlano();
 
 const __wrap = document.getElementById('wrap');
-var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda','drawerIso'];
+var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda','drawerIso','drawerExport'];
 function abrirEdicao(on){
+  if(on && typeof expExportando!=='undefined' && expExportando){
+    toast('Aguarde a exportação terminar.'); return;
+  }
   const ed = document.getElementById('editor');
   if(on){ // abrir a Edição fecha as gavetas laterais
     GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
     __wrap.classList.remove('side-open');
+    __wrap.classList.remove('exp-open');
     marcarChipGaveta(null);   // senão o chip continuaria marcado como aberto
   }
   ed.classList.toggle('show', on);
@@ -4077,23 +4208,37 @@ document.getElementById('edFechar').onclick = function(){ abrirEdicao(false); };
 // Qual chip abre qual gaveta. Serve para marcar .aberta no chip: até aqui
 // nada na tela dizia QUAL das cinco gavetas estava aberta além do conteúdo
 // dela — e as três que são abridoras ficam lado a lado.
-var GAVETA_CHIP = {drawerCores:'btnCores', drawerRenda:'btnRenda', drawerIso:'btnIso'};
+var GAVETA_CHIP = {drawerCores:'btnCores', drawerRenda:'btnRenda', drawerIso:'btnIso', drawerExport:'btnExport'};
 function marcarChipGaveta(id){
   Object.keys(GAVETA_CHIP).forEach(function(g){
     var c = document.getElementById(GAVETA_CHIP[g]);
     if(c) c.classList.toggle('aberta', g===id);
   });
 }
+// A gaveta de exportação SOBREPÕE o mapa (exp-open) em vez de empurrá-lo.
+// Nas outras, encolher o mapa é só um incômodo; nesta o tamanho do mapa é o
+// tamanho do arquivo, e a imagem sairia mais estreita, com outro
+// enquadramento, só porque a gaveta está aberta.
+var GAVETAS_SOBREPOEM = {drawerExport:true};
 function abrirGaveta(id){
+  // Durante a exportação o mapa está com a escala sobrescrita e esperando o
+  // 'idle'. Trocar de gaveta aqui removeria exp-open, encolheria o mapa e o
+  // arquivo sairia mais estreito, com outro enquadramento — exatamente o
+  // que GAVETAS_SOBREPOEM existe para impedir.
+  if(typeof expExportando!=='undefined' && expExportando){
+    toast('Aguarde a exportação terminar.'); return;
+  }
   abrirEdicao(false);
   GAVETAS_IDS.forEach(function(g){ var d=document.getElementById(g); if(d) d.classList.toggle('show', g===id); });
   __wrap.classList.add('side-open');
+  __wrap.classList.toggle('exp-open', !!GAVETAS_SOBREPOEM[id]);
   marcarChipGaveta(id);
   setTimeout(function(){ if(map) map.resize(); }, 360);
 }
 function fecharGaveta(){
   GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
   __wrap.classList.remove('side-open');
+  __wrap.classList.remove('exp-open');
   marcarChipGaveta(null);
   setTimeout(function(){ if(map) map.resize(); }, 360);
 }
@@ -6192,79 +6337,343 @@ document.getElementById('chipLbl').onclick = function(){
   this.classList.toggle('on', on);
 };
 
-// ── Exportar PNG em alta resolução ──
-document.getElementById('btnExport').onclick = async function(){
-  if(!map){ toast('O mapa ainda não carregou.'); return; }
-  const btn=this; btn.disabled=true; btn.textContent='Gerando…';
-  const scale = parseInt(document.getElementById('expScale').value,10);
-  const dprDesc = Object.getOwnPropertyDescriptor(window,'devicePixelRatio');
-  try{
-    Object.defineProperty(window,'devicePixelRatio',{get:()=>scale, configurable:true});
-    map.resize();
-    await new Promise(res=> map.once('idle', res));
+// ══════════════════════════════════════════════════════════════════
+//  EXPORTAR IMAGEM — gaveta de formato e tamanho
+//
+//  O que sai é o CANVAS DO MAPA, com as legendas compostas por cima na
+//  escala da exportação. Daí as duas consequências que a gaveta existe
+//  para tornar visíveis, e que antes só apareciam depois do download:
+//
+//  1. A PROPORÇÃO É A DA JANELA DO MAPA. Não dá para pedir "16:9" sem
+//     reenquadrar o mapa, e reenquadrar por conta própria entregaria
+//     uma imagem diferente da que a pessoa compôs.
+//  2. A ESCALA PEDIDA NÃO É SEMPRE A ENTREGUE. O navegador não desenha
+//     um quadro maior que EXPORT_MAX de lado, então 4× numa janela
+//     grande vira menos — e em silêncio.
+//
+//  expPrever() calcula as duas coisas ANTES de exportar, com a mesma
+//  conta que a MapLibre faz, e o quadro de resultado mostra o que de
+//  fato vai sair.
+// ══════════════════════════════════════════════════════════════════
+var EXP_FMT = {
+  png:  {mime:'image/png',  ext:'png',  q:false,
+         hint:'Sem perda nenhuma. É o formato para apresentação e impressão, e o arquivo maior.'},
+  jpeg: {mime:'image/jpeg', ext:'jpg',  q:true,
+         hint:'Abre em qualquer programa e pesa uma fração do PNG. Borra um pouco onde há texto fino.'},
+  webp: {mime:'image/webp', ext:'webp', q:true,
+         hint:'Pesa menos que o JPEG na mesma qualidade. Programas antigos de escritório não abrem.'}
+};
+var EXP_PADRAO = {fmt:'png', qual:92, modo:'mult', mult:3, larg:1920};
+var exp = Object.assign({}, EXP_PADRAO);
+// Leitor único da tabela de formatos. "EXP_FMT[k]" cru não serve como
+// validação: EXP_FMT['constructor'] e EXP_FMT['toString'] são truthy,
+// herdados de Object.prototype, então um localStorage com
+// {"fmt":"constructor"} passava pela checagem, chegava em .ext undefined
+// e derrubava expSync() DENTRO do onclick — o botão Exportar parava de
+// responder, para sempre, sem como sair sem devtools.
+function expFmtDe(k){
+  return Object.prototype.hasOwnProperty.call(EXP_FMT, k) ? EXP_FMT[k] : null;
+}
+// Enquanto a exportação roda, o mapa é redimensionado duas vezes (com o
+// devicePixelRatio sobrescrito e de volta). Sem esta trava, o 'resize'
+// repintaria o painel e apagaria o "Gerando…" do botão no meio do caminho,
+// e abrir outra gaveta encolheria o mapa com a escala ainda trocada.
+var expExportando = false;
 
-    // As legendas são desenhadas POR CIMA do canvas do mapa, aqui, na
-    // escala da exportação. É o único jeito de elas saírem na imagem: o
-    // PNG é o canvas do mapa, e nada de HTML entra nele. Se não houver
-    // nenhuma a mostrar, exporta o canvas direto, como sempre foi.
-    //
-    // São DUAS desde a 3.0 (isócrona e faixas de renda), e o laço trata as
-    // duas igual em vez de repetir o bloco — inclusive o empilhamento
-    // quando as duas escolhem o mesmo canto.
-    const base = map.getCanvas();
-    let url = null;
-    const legs = [];
-    if(iso.on && iso.legenda.on && ISO_GEO.features.some(f=> !f.properties.centro))
-      legs.push({cfg: legendaIsoCfg(), canto: iso.legenda.canto || 'inf-esq'});
-    if(rendaAtivo() && rendaRaio.legenda.on && rendaUsaCorRenda())
-      legs.push({cfg: legendaRendaCfg(), canto: rendaRaio.legenda.canto || 'inf-dir'});
-    if(legs.length){
-      // A ESCALA REAL não é a pedida. A MapLibre limita o canvas a
-      // maxCanvasSize (4096 por padrão), então pedir 4× numa janela
-      // grande entrega bem menos. Pintar a legenda com o número pedido
-      // faria a caixa sair inflada — até 3,75× — justamente no arquivo
-      // que ela existe para ilustrar. A razão de fato aplicada é a
-      // largura do canvas dividida pela largura em px de tela.
-      const escReal = base.width / (base.clientWidth || base.width);
-      let out = null;
-      try{
-        out = document.createElement('canvas');
-        out.width = base.width; out.height = base.height;
-        const ctx = out.getContext('2d');
-        ctx.drawImage(base, 0, 0);
-        const desl = {};   // deslocamento acumulado por canto
-        legs.forEach(function(L){
-          const cx = legendaCaixa(ctx, escReal, 0, 0, false, L.cfg);
-          if(!cx) return;
-          const d = desl[L.canto] || 0;
-          const p = legendaIsoPos(L.canto, cx, out.width, out.height, escReal, d);
-          legendaCaixa(ctx, escReal, p.x, p.y, true, L.cfg);
-          desl[L.canto] = d + cx.h + 10*escReal;
-        });
-        url = out.toDataURL('image/png');
-      }catch(e){
-        // Compor é um extra. Falhar nele não pode custar o PNG inteiro:
-        // antes da legenda existir, o usuário receberia o mapa.
-        console.error('legenda no PNG', e);
-        url = null;
-      }finally{
-        if(out){ out.width = 0; out.height = 0; }   // libera o buffer
-      }
-    }
-    if(url === null) url = base.toDataURL('image/png');
-    const a=document.createElement('a');
-    a.download = `MakerMap_mapa_${new Date().toISOString().slice(0,10)}_${scale}x.png`;
-    a.href = url; a.click();
-    const c = map.getCanvas();
-    toast(`PNG exportado em ${c.width}×${c.height}px — enquadre antes de exportar.`);
+// Preferência de FERRAMENTA, não conteúdo de projeto: quem exporta em
+// JPEG a 1920 quer isso no próximo mapa também, e um projeto de 2024 não
+// deve reabrir impondo o formato de 2024. Mesmo precedente de
+// makermap.secoes e makermap.drawerW.
+var EXP_KEY='makermap.export';
+function expLer(){
+  try{
+    var o=JSON.parse(localStorage.getItem(EXP_KEY)||'{}')||{};
+    var e=Object.assign({}, EXP_PADRAO);
+    if(expFmtDe(o.fmt)) e.fmt=o.fmt;
+    if(o.modo==='larg'||o.modo==='mult') e.modo=o.modo;
+    if(isFinite(+o.qual)) e.qual=Math.min(100, Math.max(50, Math.round(+o.qual)));
+    if(isFinite(+o.mult)) e.mult=Math.min(4, Math.max(1, Math.round(+o.mult)));
+    if(isFinite(+o.larg)) e.larg=Math.min(8000, Math.max(320, Math.round(+o.larg)));
+    return e;
+  }catch(err){ return Object.assign({}, EXP_PADRAO); }
+}
+function expGravar(){ try{ localStorage.setItem(EXP_KEY, JSON.stringify(exp)); }catch(e){} }
+
+// Um navegador sem codificador para o formato NÃO devolve erro: devolve
+// um PNG. Sem esta checagem o arquivo sairia chamado .webp sendo um PNG
+// por dentro — o pior tipo de falha, porque só aparece no destino.
+var expSuportado = {png:true, jpeg:true, webp:false};
+(function(){
+  try{
+    var c=document.createElement('canvas'); c.width=c.height=1;
+    expSuportado.jpeg = c.toDataURL('image/jpeg').indexOf('data:image/jpeg')===0;
+    expSuportado.webp = c.toDataURL('image/webp').indexOf('data:image/webp')===0;
+  }catch(e){}
+})();
+
+function expEscalaPedida(){
+  var c = map && map.getCanvas();
+  var lw = (c && c.clientWidth) || 0;
+  if(exp.modo==='larg') return lw>0 ? exp.larg/lw : 1;
+  return exp.mult;
+}
+// A MESMA conta da MapLibre: ela reduz o pixelRatio até o quadro caber em
+// maxCanvasSize NOS DOIS LADOS, e depois trunca. Reproduzi-la aqui é o que
+// permite dizer o tamanho antes de gerar.
+function expPrever(){
+  var c = map && map.getCanvas();
+  if(!c) return null;
+  var lw = c.clientWidth || c.width, lh = c.clientHeight || c.height;
+  if(!lw || !lh) return null;
+  var pedida = expEscalaPedida();
+  var real = Math.min(pedida, EXPORT_MAX/lw, EXPORT_MAX/lh);
+  return {pedida:pedida, real:real,
+          w:Math.floor(lw*real), h:Math.floor(lh*real),
+          limitado: real < pedida - 1e-9};
+}
+
+function expSync(){
+  var g=function(id){ return document.getElementById(id); };
+  if(!g('expFmt')) return;
+  var F=expFmtDe(exp.fmt) || EXP_FMT.png;
+  g('expFmt').querySelectorAll('button').forEach(function(b){
+    var k=b.getAttribute('data-fmt');
+    b.classList.toggle('on', k===exp.fmt);
+    b.disabled = !expSuportado[k];
+    b.title = expSuportado[k] ? '' : 'Este navegador não sabe gravar '+k.toUpperCase()+'.';
+    b.style.opacity = expSuportado[k] ? '' : '.45';
+  });
+  g('expFmtHint').textContent = F.hint;
+  // Antes do retorno cedo de "mapa ainda não carregado": o rótulo do botão
+  // não depende da previsão e ficava preso em "Exportar imagem".
+  g('expGerar').textContent = 'Exportar '+F.ext.toUpperCase();
+  g('expQualBox').style.display = F.q ? '' : 'none';
+  g('expQual').value = exp.qual;
+  g('expQualV').textContent = exp.qual+'%';
+  g('expModo').querySelectorAll('button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-modo')===exp.modo);
+  });
+  g('expMultBox').style.display = exp.modo==='mult' ? '' : 'none';
+  g('expLargBox').style.display = exp.modo==='larg' ? '' : 'none';
+  g('expMult').querySelectorAll('button').forEach(function(b){
+    b.classList.toggle('on', +b.getAttribute('data-mult')===exp.mult);
+  });
+  if(document.activeElement!==g('expLarg')) g('expLarg').value = exp.larg;
+  document.querySelectorAll('.exp-at').forEach(function(a){
+    a.classList.toggle('on', +a.getAttribute('data-larg')===exp.larg);
+  });
+
+  var p=expPrever();
+  var res=g('expRes'), av=g('expAviso');
+  if(!p){
+    res.innerHTML='<b>—</b><span>aguardando o mapa carregar</span>';
+    av.innerHTML=''; return;
+  }
+  var mp=(p.w*p.h/1e6);
+  res.innerHTML='<b>'+nfInt(p.w)+' × '+nfInt(p.h)+' px</b>'+
+    '<span>'+mp.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+
+    ' MP · '+expProporcao(p.w,p.h)+' · '+p.real.toLocaleString('pt-BR',{maximumFractionDigits:2})+'× a tela</span>';
+  av.innerHTML = p.limitado
+    ? '<div class="rd-msg warn">O navegador não desenha um quadro maior que <b>'+
+      nfInt(EXPORT_MAX)+' px</b> de lado, então o pedido de '+
+      p.pedida.toLocaleString('pt-BR',{maximumFractionDigits:2})+'× sai como '+
+      p.real.toLocaleString('pt-BR',{maximumFractionDigits:2})+'×. Para ganhar resolução, '+
+      'diminua a janela do navegador antes de exportar.</div>'
+    : '';
+
+}
+function nfInt(v){ return Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0}); }
+// Proporção aproximada, para a pessoa reconhecer o formato do quadro.
+function expProporcao(w,h){
+  var r=w/h;
+  var tab=[[16/9,'16:9'],[4/3,'4:3'],[3/2,'3:2'],[1,'1:1'],[9/16,'9:16'],[2/3,'2:3'],[3/4,'3:4']];
+  for(var i=0;i<tab.length;i++) if(Math.abs(r-tab[i][0])<0.03) return tab[i][1];
+  return r.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+':1';
+}
+
+document.getElementById('btnExport').onclick = function(){
+  if(!map){ toast('O mapa ainda não carregou.'); return; }
+  if(expExportando){ toast('Aguarde a exportação em andamento.'); return; }
+  exp = expLer();
+  // A GAVETA ABRE ANTES DE PREVER. A previsão é uma conta sobre a largura
+  // atual do mapa, e abrir esta gaveta DEVOLVE ao mapa a largura que outra
+  // gaveta (ou a Edição) estivesse ocupando. Prevendo antes, o número era o
+  // do mapa encolhido: numa janela de 1600px com o Mapa de renda aberto,
+  // mostrava 3.780×2.700 e saía 4096×2304 — e, pior, não acusava o corte,
+  // porque na largura menor o pedido ainda caberia.
+  // O deslize do mapa leva 320ms, então o 'resize' da MapLibre refaz a
+  // conta quando ele termina; esta chamada é só para a gaveta não abrir em
+  // branco.
+  abrirGaveta('drawerExport');
+  expSync();
+};
+document.getElementById('expClose').onclick = fecharGaveta;
+
+document.querySelectorAll('#expFmt button').forEach(function(b){
+  b.onclick = function(){
+    var k=b.getAttribute('data-fmt');
+    if(!expSuportado[k]){ toast('Este navegador não sabe gravar '+k.toUpperCase()+'.'); return; }
+    exp.fmt=k; expGravar(); expSync();
+  };
+});
+// oninput repinta, onchange grava: o arrasto do slider gerava ~50 escritas
+// em localStorage.
+document.getElementById('expQual').oninput = function(e){
+  exp.qual=Math.round(+e.target.value); expSync();
+};
+document.getElementById('expQual').onchange = function(){ expGravar(); };
+document.querySelectorAll('#expModo button').forEach(function(b){
+  b.onclick = function(){ exp.modo=b.getAttribute('data-modo'); expGravar(); expSync(); };
+});
+document.querySelectorAll('#expMult button').forEach(function(b){
+  b.onclick = function(){ exp.mult=+b.getAttribute('data-mult'); expGravar(); expSync(); };
+});
+document.getElementById('expLarg').oninput = function(e){
+  var v=parseInt(e.target.value,10);
+  if(!isFinite(v)) return;                       // campo em edição, ainda vazio
+  exp.larg=Math.min(8000, Math.max(320, v)); expGravar(); expSync();
+};
+document.getElementById('expLarg').onchange = function(e){
+  var v=parseInt(e.target.value,10);
+  exp.larg = isFinite(v) ? Math.min(8000, Math.max(320, v)) : EXP_PADRAO.larg;
+  e.target.value = exp.larg; expGravar(); expSync();
+};
+document.querySelectorAll('.exp-at').forEach(function(a){
+  a.onclick = function(){ exp.larg=+a.getAttribute('data-larg'); expGravar(); expSync(); };
+});
+
+// Compõe as legendas sobre uma cópia do canvas. Devolve o canvas a usar e
+// se ele é uma cópia (para o chamador liberar o buffer). Falhar aqui é
+// perder as legendas, nunca a imagem.
+function expComporLegendas(base){
+  var legs=[];
+  if(iso.on && iso.legenda.on && ISO_GEO.features.some(function(f){ return !f.properties.centro; }))
+    legs.push({cfg: legendaIsoCfg(), canto: iso.legenda.canto || 'inf-esq'});
+  if(rendaAtivo() && rendaRaio.legenda.on && rendaUsaCorRenda())
+    legs.push({cfg: legendaRendaCfg(), canto: rendaRaio.legenda.canto || 'inf-dir'});
+  if(!legs.length) return null;
+  // A ESCALA REAL não é a pedida: a MapLibre limita o quadro a
+  // EXPORT_MAX, então pintar a legenda com o número pedido faria a caixa
+  // sair inflada justamente no arquivo que ela existe para ilustrar.
+  var escReal = base.width / (base.clientWidth || base.width);
+  var out=null;
+  try{
+    out = document.createElement('canvas');
+    out.width = base.width; out.height = base.height;
+    var ctx = out.getContext('2d');
+    ctx.drawImage(base, 0, 0);
+    var desl = {};                      // deslocamento acumulado por canto
+    legs.forEach(function(L){
+      var cx = legendaCaixa(ctx, escReal, 0, 0, false, L.cfg);
+      if(!cx) return;
+      var d = desl[L.canto] || 0;
+      var p = legendaIsoPos(L.canto, cx, out.width, out.height, escReal, d);
+      legendaCaixa(ctx, escReal, p.x, p.y, true, L.cfg);
+      desl[L.canto] = d + cx.h + 10*escReal;
+    });
+    return out;
+  }catch(e){
+    console.error('legenda na imagem', e);
+    if(out){ out.width=0; out.height=0; }
+    return null;
+  }
+}
+// toBlob e não toDataURL: um quadro de 4096×2160 vira ~35 MB de string
+// base64 no caminho do dataURL, tudo na memória da aba ao mesmo tempo.
+function expParaBlob(canvas, mime, qual){
+  return new Promise(function(res, rej){
+    try{ canvas.toBlob(function(b){ b ? res(b) : rej(new Error('toBlob vazio')); }, mime, qual); }
+    catch(e){ rej(e); }
+  });
+}
+// O object URL NÃO pode morrer num cronômetro. Com "perguntar onde salvar
+// cada arquivo" ligado, o download só começa quando a pessoa escolhe a
+// pasta; revogar em 60s fazia o arquivo falhar depois de o aviso já ter
+// dito "exportado", que é falha silenciosa no único entregável do produto.
+// O dataURL de antes não expirava nunca. Então: solta-se o anterior quando
+// um novo é criado (um blob vivo por vez, no máximo) e o último no
+// fechamento da aba.
+var expUrlAtual = null;
+function expSoltarUrl(){
+  if(expUrlAtual){ try{ URL.revokeObjectURL(expUrlAtual); }catch(e){} expUrlAtual=null; }
+}
+window.addEventListener('beforeunload', expSoltarUrl);
+
+function expExtDe(mime){
+  var k=Object.keys(EXP_FMT);
+  for(var i=0;i<k.length;i++) if(EXP_FMT[k[i]].mime===mime) return k[i];
+  return null;
+}
+function expTamanhoTxt(bytes){
+  if(bytes >= 1048576) return (bytes/1048576).toLocaleString('pt-BR',{maximumFractionDigits:1})+' MB';
+  return Math.max(1, Math.round(bytes/1024)).toLocaleString('pt-BR')+' KB';
+}
+
+document.getElementById('expGerar').onclick = async function(){
+  if(!map){ toast('O mapa ainda não carregou.'); return; }
+  var btn=this, rotulo=btn.textContent;
+  btn.disabled=true; btn.textContent='Gerando…';
+  var F = expFmtDe(exp.fmt) || EXP_FMT.png;
+  var escala = expEscalaPedida();
+  var dprDesc = Object.getOwnPropertyDescriptor(window,'devicePixelRatio');
+  var copia=null;
+  expExportando = true;
+  try{
+    Object.defineProperty(window,'devicePixelRatio',{get:function(){ return escala; }, configurable:true});
+    map.resize();
+    // Com teto de tempo. Se o 'idle' nunca chegasse — tile que não termina,
+    // rede que cai no meio — o finally nunca rodava e o devicePixelRatio
+    // ficava sobrescrito PARA SEMPRE: todo resize posterior passava a
+    // produzir um canvas N×. Antes dava para ver o botão preso em
+    // "Gerando…" no cabeçalho; agora ele está dentro de uma gaveta que se
+    // fecha e esquece.
+    await new Promise(function(res){
+      var t=setTimeout(res, 20000);
+      map.once('idle', function(){ clearTimeout(t); res(); });
+    });
+
+    var base = map.getCanvas();
+    copia = expComporLegendas(base);
+    var blob = await expParaBlob(copia || base, F.mime, F.q ? exp.qual/100 : undefined);
+
+    // O navegador que não sabe gravar o formato devolve um PNG em vez de
+    // erro. expSuportado sonda isso na carga com toDataURL, mas quem grava
+    // é o toBlob: se as duas APIs discordarem, o arquivo sairia .webp sendo
+    // PNG por dentro — a falha que a sonda existe para evitar, pela outra
+    // porta. O blob diz o que ele é; basta perguntar.
+    var saida = (blob.type && blob.type !== F.mime) ? (expFmtDe(expExtDe(blob.type)) || F) : F;
+    if(saida !== F) toast('Este navegador gravou em '+saida.ext.toUpperCase()+
+                          ' — não sabe gerar '+F.ext.toUpperCase()+'.');
+
+    var dim = base.width+'x'+base.height;
+    var a=document.createElement('a');
+    a.download = 'MakerMap_mapa_'+new Date().toISOString().slice(0,10)+'_'+dim+'.'+saida.ext;
+    expSoltarUrl();
+    expUrlAtual = URL.createObjectURL(blob);
+    a.href = expUrlAtual; a.click();
+    if(saida === F) toast(F.ext.toUpperCase()+' exportado · '+nfInt(base.width)+'×'+nfInt(base.height)+
+          ' px · '+expTamanhoTxt(blob.size));
   }catch(err){
     console.error(err);
-    toast('Falha ao exportar. Tente uma escala menor (2×).');
+    // Nem toda falha é de tamanho. Mandar diminuir a imagem quando o
+    // navegador bloqueou a leitura do canvas (configuração endurecida,
+    // extensão anti-impressão digital) culpa a coisa errada, que é o pior
+    // modo de falha — o mesmo cuidado que pintarLegendaIso() já tomava.
+    var nome = err && err.name;
+    toast(nome==='SecurityError' || nome==='InvalidStateError'
+      ? 'Este navegador bloqueou a leitura do mapa para gerar a imagem.'
+      : 'Falha ao exportar. Tente um tamanho menor.');
   }finally{
+    expExportando = false;
+    // Ordem importa: devolver o devicePixelRatio e redimensionar ANTES de
+    // soltar o buffer, para a tela voltar ao normal mesmo se algo acima
+    // tiver falhado no meio.
     if(dprDesc) Object.defineProperty(window,'devicePixelRatio',dprDesc);
     else delete window.devicePixelRatio;
     map.resize();
-    btn.disabled=false; btn.textContent='Exportar PNG';
+    if(copia){ copia.width=0; copia.height=0; }
+    btn.disabled=false; btn.textContent=rotulo;
+    expSync();
   }
 };
 
