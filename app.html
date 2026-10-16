@@ -345,6 +345,17 @@
      outro enquadramento, só porque a gaveta está aberta. Mesma
      especificidade da regra acima, então vale por vir depois. */
   #wrap.exp-open #map{right:0}
+  /* O mapa vai até a borda, então a gaveta cobre os cantos direitos: as
+     caixas de legenda em canvas (a de renda nasce em inf-dir desde a 3.0)
+     sumiriam da tela justamente no momento de exportá-las. Saem de baixo
+     dela — no arquivo a posição não muda, porque lá quem desenha é
+     expComporLegendas sobre o quadro inteiro. */
+  #wrap.exp-open .leg-sup-dir,
+  #wrap.exp-open .leg-inf-dir{right:calc(var(--drawer-w) + 14px)}
+  /* E a alça de redimensionar fica sobre o mapa VIVO em vez de na emenda,
+     capturando o arraste de quem queria mover o mapa. Nesta gaveta ela não
+     serve para nada: a largura dela não muda o tamanho da imagem. */
+  #wrap.exp-open #edResize{display:none}
   .exp-at{color:var(--azul);cursor:pointer;font-weight:600}
   .exp-at:hover{text-decoration:underline}
   .exp-at.on{color:var(--ink);text-decoration:underline}
@@ -1497,6 +1508,12 @@ fetch('https://tiles.openfreemap.org/styles/positron')
       if(agora - ultimoErroToast > 5000){ ultimoErroToast = agora; toast('Aviso do mapa: '+msg.slice(0,120)); }
     });
     map.on('load', montarCamadas);
+    // A previsão da gaveta de exportação é uma conta sobre a LARGURA ATUAL
+    // do mapa, então ela tem de ser refeita toda vez que o mapa muda de
+    // tamanho: abrir/fechar gaveta, abrir a Edição, redimensionar a janela.
+    // Sem isto a gaveta mostrava o tamanho de antes e deixava de avisar do
+    // corte — que é justamente o que ela existe para dizer.
+    map.on('resize', function(){ if(!expExportando) expSync(); });
   })
   .catch(err=>{ console.error(err); fail(); });
 
@@ -4165,6 +4182,9 @@ aplicarPlano();
 const __wrap = document.getElementById('wrap');
 var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda','drawerIso','drawerExport'];
 function abrirEdicao(on){
+  if(on && typeof expExportando!=='undefined' && expExportando){
+    toast('Aguarde a exportação terminar.'); return;
+  }
   const ed = document.getElementById('editor');
   if(on){ // abrir a Edição fecha as gavetas laterais
     GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
@@ -4201,6 +4221,13 @@ function marcarChipGaveta(id){
 // enquadramento, só porque a gaveta está aberta.
 var GAVETAS_SOBREPOEM = {drawerExport:true};
 function abrirGaveta(id){
+  // Durante a exportação o mapa está com a escala sobrescrita e esperando o
+  // 'idle'. Trocar de gaveta aqui removeria exp-open, encolheria o mapa e o
+  // arquivo sairia mais estreito, com outro enquadramento — exatamente o
+  // que GAVETAS_SOBREPOEM existe para impedir.
+  if(typeof expExportando!=='undefined' && expExportando){
+    toast('Aguarde a exportação terminar.'); return;
+  }
   abrirEdicao(false);
   GAVETAS_IDS.forEach(function(g){ var d=document.getElementById(g); if(d) d.classList.toggle('show', g===id); });
   __wrap.classList.add('side-open');
@@ -6338,6 +6365,20 @@ var EXP_FMT = {
 };
 var EXP_PADRAO = {fmt:'png', qual:92, modo:'mult', mult:3, larg:1920};
 var exp = Object.assign({}, EXP_PADRAO);
+// Leitor único da tabela de formatos. "EXP_FMT[k]" cru não serve como
+// validação: EXP_FMT['constructor'] e EXP_FMT['toString'] são truthy,
+// herdados de Object.prototype, então um localStorage com
+// {"fmt":"constructor"} passava pela checagem, chegava em .ext undefined
+// e derrubava expSync() DENTRO do onclick — o botão Exportar parava de
+// responder, para sempre, sem como sair sem devtools.
+function expFmtDe(k){
+  return Object.prototype.hasOwnProperty.call(EXP_FMT, k) ? EXP_FMT[k] : null;
+}
+// Enquanto a exportação roda, o mapa é redimensionado duas vezes (com o
+// devicePixelRatio sobrescrito e de volta). Sem esta trava, o 'resize'
+// repintaria o painel e apagaria o "Gerando…" do botão no meio do caminho,
+// e abrir outra gaveta encolheria o mapa com a escala ainda trocada.
+var expExportando = false;
 
 // Preferência de FERRAMENTA, não conteúdo de projeto: quem exporta em
 // JPEG a 1920 quer isso no próximo mapa também, e um projeto de 2024 não
@@ -6348,7 +6389,7 @@ function expLer(){
   try{
     var o=JSON.parse(localStorage.getItem(EXP_KEY)||'{}')||{};
     var e=Object.assign({}, EXP_PADRAO);
-    if(EXP_FMT[o.fmt]) e.fmt=o.fmt;
+    if(expFmtDe(o.fmt)) e.fmt=o.fmt;
     if(o.modo==='larg'||o.modo==='mult') e.modo=o.modo;
     if(isFinite(+o.qual)) e.qual=Math.min(100, Math.max(50, Math.round(+o.qual)));
     if(isFinite(+o.mult)) e.mult=Math.min(4, Math.max(1, Math.round(+o.mult)));
@@ -6394,7 +6435,7 @@ function expPrever(){
 function expSync(){
   var g=function(id){ return document.getElementById(id); };
   if(!g('expFmt')) return;
-  var F=EXP_FMT[exp.fmt] || EXP_FMT.png;
+  var F=expFmtDe(exp.fmt) || EXP_FMT.png;
   g('expFmt').querySelectorAll('button').forEach(function(b){
     var k=b.getAttribute('data-fmt');
     b.classList.toggle('on', k===exp.fmt);
@@ -6403,6 +6444,9 @@ function expSync(){
     b.style.opacity = expSuportado[k] ? '' : '.45';
   });
   g('expFmtHint').textContent = F.hint;
+  // Antes do retorno cedo de "mapa ainda não carregado": o rótulo do botão
+  // não depende da previsão e ficava preso em "Exportar imagem".
+  g('expGerar').textContent = 'Exportar '+F.ext.toUpperCase();
   g('expQualBox').style.display = F.q ? '' : 'none';
   g('expQual').value = exp.qual;
   g('expQualV').textContent = exp.qual+'%';
@@ -6436,7 +6480,7 @@ function expSync(){
       p.real.toLocaleString('pt-BR',{maximumFractionDigits:2})+'×. Para ganhar resolução, '+
       'diminua a janela do navegador antes de exportar.</div>'
     : '';
-  g('expGerar').textContent = 'Exportar '+(EXP_FMT[exp.fmt]||EXP_FMT.png).ext.toUpperCase();
+
 }
 function nfInt(v){ return Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0}); }
 // Proporção aproximada, para a pessoa reconhecer o formato do quadro.
@@ -6449,9 +6493,19 @@ function expProporcao(w,h){
 
 document.getElementById('btnExport').onclick = function(){
   if(!map){ toast('O mapa ainda não carregou.'); return; }
+  if(expExportando){ toast('Aguarde a exportação em andamento.'); return; }
   exp = expLer();
-  expSync();
+  // A GAVETA ABRE ANTES DE PREVER. A previsão é uma conta sobre a largura
+  // atual do mapa, e abrir esta gaveta DEVOLVE ao mapa a largura que outra
+  // gaveta (ou a Edição) estivesse ocupando. Prevendo antes, o número era o
+  // do mapa encolhido: numa janela de 1600px com o Mapa de renda aberto,
+  // mostrava 3.780×2.700 e saía 4096×2304 — e, pior, não acusava o corte,
+  // porque na largura menor o pedido ainda caberia.
+  // O deslize do mapa leva 320ms, então o 'resize' da MapLibre refaz a
+  // conta quando ele termina; esta chamada é só para a gaveta não abrir em
+  // branco.
   abrirGaveta('drawerExport');
+  expSync();
 };
 document.getElementById('expClose').onclick = fecharGaveta;
 
@@ -6462,9 +6516,12 @@ document.querySelectorAll('#expFmt button').forEach(function(b){
     exp.fmt=k; expGravar(); expSync();
   };
 });
+// oninput repinta, onchange grava: o arrasto do slider gerava ~50 escritas
+// em localStorage.
 document.getElementById('expQual').oninput = function(e){
-  exp.qual=Math.round(+e.target.value); expGravar(); expSync();
+  exp.qual=Math.round(+e.target.value); expSync();
 };
+document.getElementById('expQual').onchange = function(){ expGravar(); };
 document.querySelectorAll('#expModo button').forEach(function(b){
   b.onclick = function(){ exp.modo=b.getAttribute('data-modo'); expGravar(); expSync(); };
 });
@@ -6529,6 +6586,24 @@ function expParaBlob(canvas, mime, qual){
     catch(e){ rej(e); }
   });
 }
+// O object URL NÃO pode morrer num cronômetro. Com "perguntar onde salvar
+// cada arquivo" ligado, o download só começa quando a pessoa escolhe a
+// pasta; revogar em 60s fazia o arquivo falhar depois de o aviso já ter
+// dito "exportado", que é falha silenciosa no único entregável do produto.
+// O dataURL de antes não expirava nunca. Então: solta-se o anterior quando
+// um novo é criado (um blob vivo por vez, no máximo) e o último no
+// fechamento da aba.
+var expUrlAtual = null;
+function expSoltarUrl(){
+  if(expUrlAtual){ try{ URL.revokeObjectURL(expUrlAtual); }catch(e){} expUrlAtual=null; }
+}
+window.addEventListener('beforeunload', expSoltarUrl);
+
+function expExtDe(mime){
+  var k=Object.keys(EXP_FMT);
+  for(var i=0;i<k.length;i++) if(EXP_FMT[k[i]].mime===mime) return k[i];
+  return null;
+}
 function expTamanhoTxt(bytes){
   if(bytes >= 1048576) return (bytes/1048576).toLocaleString('pt-BR',{maximumFractionDigits:1})+' MB';
   return Math.max(1, Math.round(bytes/1024)).toLocaleString('pt-BR')+' KB';
@@ -6538,30 +6613,58 @@ document.getElementById('expGerar').onclick = async function(){
   if(!map){ toast('O mapa ainda não carregou.'); return; }
   var btn=this, rotulo=btn.textContent;
   btn.disabled=true; btn.textContent='Gerando…';
-  var F = EXP_FMT[exp.fmt] || EXP_FMT.png;
+  var F = expFmtDe(exp.fmt) || EXP_FMT.png;
   var escala = expEscalaPedida();
   var dprDesc = Object.getOwnPropertyDescriptor(window,'devicePixelRatio');
-  var copia=null, url=null;
+  var copia=null;
+  expExportando = true;
   try{
     Object.defineProperty(window,'devicePixelRatio',{get:function(){ return escala; }, configurable:true});
     map.resize();
-    await new Promise(function(res){ map.once('idle', res); });
+    // Com teto de tempo. Se o 'idle' nunca chegasse — tile que não termina,
+    // rede que cai no meio — o finally nunca rodava e o devicePixelRatio
+    // ficava sobrescrito PARA SEMPRE: todo resize posterior passava a
+    // produzir um canvas N×. Antes dava para ver o botão preso em
+    // "Gerando…" no cabeçalho; agora ele está dentro de uma gaveta que se
+    // fecha e esquece.
+    await new Promise(function(res){
+      var t=setTimeout(res, 20000);
+      map.once('idle', function(){ clearTimeout(t); res(); });
+    });
 
     var base = map.getCanvas();
     copia = expComporLegendas(base);
     var blob = await expParaBlob(copia || base, F.mime, F.q ? exp.qual/100 : undefined);
 
+    // O navegador que não sabe gravar o formato devolve um PNG em vez de
+    // erro. expSuportado sonda isso na carga com toDataURL, mas quem grava
+    // é o toBlob: se as duas APIs discordarem, o arquivo sairia .webp sendo
+    // PNG por dentro — a falha que a sonda existe para evitar, pela outra
+    // porta. O blob diz o que ele é; basta perguntar.
+    var saida = (blob.type && blob.type !== F.mime) ? (expFmtDe(expExtDe(blob.type)) || F) : F;
+    if(saida !== F) toast('Este navegador gravou em '+saida.ext.toUpperCase()+
+                          ' — não sabe gerar '+F.ext.toUpperCase()+'.');
+
     var dim = base.width+'x'+base.height;
     var a=document.createElement('a');
-    a.download = 'MakerMap_mapa_'+new Date().toISOString().slice(0,10)+'_'+dim+'.'+F.ext;
-    url = URL.createObjectURL(blob);
-    a.href = url; a.click();
-    toast(F.ext.toUpperCase()+' exportado · '+nfInt(base.width)+'×'+nfInt(base.height)+
+    a.download = 'MakerMap_mapa_'+new Date().toISOString().slice(0,10)+'_'+dim+'.'+saida.ext;
+    expSoltarUrl();
+    expUrlAtual = URL.createObjectURL(blob);
+    a.href = expUrlAtual; a.click();
+    if(saida === F) toast(F.ext.toUpperCase()+' exportado · '+nfInt(base.width)+'×'+nfInt(base.height)+
           ' px · '+expTamanhoTxt(blob.size));
   }catch(err){
     console.error(err);
-    toast('Falha ao exportar. Tente um tamanho menor.');
+    // Nem toda falha é de tamanho. Mandar diminuir a imagem quando o
+    // navegador bloqueou a leitura do canvas (configuração endurecida,
+    // extensão anti-impressão digital) culpa a coisa errada, que é o pior
+    // modo de falha — o mesmo cuidado que pintarLegendaIso() já tomava.
+    var nome = err && err.name;
+    toast(nome==='SecurityError' || nome==='InvalidStateError'
+      ? 'Este navegador bloqueou a leitura do mapa para gerar a imagem.'
+      : 'Falha ao exportar. Tente um tamanho menor.');
   }finally{
+    expExportando = false;
     // Ordem importa: devolver o devicePixelRatio e redimensionar ANTES de
     // soltar o buffer, para a tela voltar ao normal mesmo se algo acima
     // tiver falhado no meio.
@@ -6569,7 +6672,6 @@ document.getElementById('expGerar').onclick = async function(){
     else delete window.devicePixelRatio;
     map.resize();
     if(copia){ copia.width=0; copia.height=0; }
-    if(url) setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
     btn.disabled=false; btn.textContent=rotulo;
     expSync();
   }
