@@ -41,6 +41,8 @@
   • Upload KMZ/KML ...... kmlParaFeats(), integrarFeats()
   • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
   • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
+  • Planilha da renda ... rdXlsx -> xlsxLivro() (.xlsx é ZIP de XML;
+                          o JSZip já está na página para os KMZ)
   • Exportar imagem ..... btnExport abre #drawerExport; expGerar()
                           (PNG/JPEG/WebP, múltiplo ou largura exata,
                           expPrever() diz o tamanho antes de gerar)
@@ -5635,6 +5637,12 @@ function renderRenda(){
       '<div class="rd-corlinks">Clique na bolinha para trocar a cor · '+
         '<a id="rdCorPadrao">tons de âmbar</a> · <a id="rdCorSemaforo">semáforo</a></div>')+
     legendaDens+
+    // Baixar a análise como planilha. Fica AQUI, junto dos números que
+    // exporta, e não na gaveta de exportação — aquela é da imagem.
+    '<button class="rd-load" id="rdXlsx" style="margin-top:14px">Baixar planilha (.xlsx)</button>'+
+    '<div class="e-hint" style="padding:6px 0 0">Duas abas: o resumo acima e a distribuição '+
+    'por faixa, com os números como <b>números</b> — dá para somar e gerar gráfico. '+
+    'As premissas e os avisos vão junto nas duas.</div>'+
     comoHtml;
 
   // O ⓘ sobrevive ao repaint. renderRenda() refaz este HTML a cada ajuste
@@ -5660,6 +5668,8 @@ function renderRenda(){
       if(barra) barra.style.background=inp.value;
     };
   });
+  var xls=box.querySelector('#rdXlsx');
+  if(xls) xls.onclick=function(){ baixarPlanilhaRenda(xls); };
   var ret=box.querySelector('#rdRetentar');
   if(ret) ret.onclick=function(){
     Object.keys(censoUF).forEach(function(k){ if(censoUF[k]!=='ok') delete censoUF[k]; });
@@ -6337,6 +6347,325 @@ document.getElementById('chipLbl').onclick = function(){
   this.classList.toggle('on', on);
 };
 
+// ── Entregar um arquivo ao usuário ─────────────────────────────────
+// O object URL NÃO pode morrer num cronômetro. Com "perguntar onde salvar
+// cada arquivo" ligado, o download só começa quando a pessoa escolhe a
+// pasta; revogar em 60s fazia o arquivo falhar DEPOIS de o aviso já ter
+// dito "exportado" — falha silenciosa no entregável do produto. O dataURL
+// de antes não expirava nunca. Então: solta-se o anterior quando um novo é
+// criado (um blob vivo por vez) e o último no fechamento da aba.
+//
+// Uma função só, porque são dois downloads (a imagem e a planilha) e duas
+// cópias desta lição divergiriam.
+var urlBaixaAtual = null;
+function soltarUrlBaixa(){
+  if(urlBaixaAtual){ try{ URL.revokeObjectURL(urlBaixaAtual); }catch(e){} urlBaixaAtual=null; }
+}
+window.addEventListener('beforeunload', soltarUrlBaixa);
+function baixarBlob(blob, nome){
+  var a=document.createElement('a');
+  a.download = nome;
+  soltarUrlBaixa();
+  urlBaixaAtual = URL.createObjectURL(blob);
+  a.href = urlBaixaAtual;
+  a.click();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PLANILHA DA ANÁLISE DE RENDA (.xlsx)
+//
+//  Um .xlsx é um ZIP de XML, e o JSZip já está na página (é o que lê os
+//  KMZ) — então isto sai sem dependência nova, no mesmo padrão de
+//  zero-build do resto.
+//
+//  DUAS REGRAS QUE VALEM MAIS AQUI DO QUE NA TELA:
+//
+//  1. OS NÚMEROS SAEM COMO NÚMEROS, não como texto formatado. Uma
+//     planilha em que "37.965" é uma string não soma, não ordena e não
+//     vira gráfico — seria uma captura de tela em outro formato. Daí o
+//     styles.xml: formato de milhar, de real e de percentual aplicados
+//     pelo Excel sobre o valor cru.
+//
+//  2. AS PREMISSAS VIAJAM JUNTO, nas DUAS abas. A planilha é o artefato
+//     mais copiável que este produto gera: dela saem células coladas em
+//     outra planilha, em e-mail, em slide. Um valor em reais que chega
+//     ao destino sem o mês da moeda e sem dizer de quem é a renda é uma
+//     afirmação incompleta sobre dinheiro — o mesmo motivo pelo qual a
+//     legenda do PNG carrega as duas linhas.
+//     E o aviso de margem de borda, quando existe, vai NO TOPO: na tela
+//     ele aparece no meio da lista porque você rola por tudo; aqui
+//     alguém pode copiar só um intervalo, então a frase que manda não
+//     usar os números tem de estar onde não se perde.
+// ══════════════════════════════════════════════════════════════════
+function xlsxEsc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function xlsxCol(n){                      // 1 -> A, 27 -> AA
+  var s='';
+  while(n>0){ var r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=(n-1-r)/26; }
+  return s;
+}
+// Atalhos de célula: xT = texto, xN = número, null = célula vazia.
+// Com prefixo, e não "T"/"N" soltos: num arquivo único de 6.500 linhas,
+// uma letra no escopo global é armadilha — paletaOps() já tem um xT()
+// local que por acaso a sombreia, e a próxima podia não ter.
+function xT(v, st){ return v==null ? null : {t:'s', v:v, s:st||0}; }
+function xN(v, st){ return (v==null || !isFinite(v)) ? null : {t:'n', v:+v, s:st||0}; }
+
+var XLSX_EST = {TXT:0, NEG:1, INT:2, RS:3, PCT:4, DEC:5, NOTA:6, TIT:7};
+
+function xlsxFolhaXML(linhas, larguras){
+  var cols='';
+  if(larguras && larguras.length){
+    cols='<cols>'+larguras.map(function(w,i){
+      return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>';
+    }).join('')+'</cols>';
+  }
+  var corpo=linhas.map(function(cells, li){
+    var r=li+1;
+    // A ORDEM IMPORTA: o Excel recusa o arquivo se as células de uma
+    // linha não vierem em ordem de coluna, ou as linhas fora de ordem.
+    var cs=(cells||[]).map(function(c, ci){
+      if(!c) return '';
+      var ref=xlsxCol(ci+1)+r;
+      return c.t==='n'
+        ? '<c r="'+ref+'" s="'+c.s+'"><v>'+c.v+'</v></c>'
+        : '<c r="'+ref+'" s="'+c.s+'" t="inlineStr"><is><t xml:space="preserve">'+xlsxEsc(c.v)+'</t></is></c>';
+    }).join('');
+    return cs ? '<row r="'+r+'">'+cs+'</row>' : '';
+  }).join('');
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    cols+'<sheetData>'+corpo+'</sheetData></worksheet>';
+}
+
+// Strings em linha (inlineStr) em vez de sharedStrings: uma parte a
+// menos no pacote, e a tabela compartilhada não paga a pena num arquivo
+// de ~40 linhas.
+var XLSX_ESTILOS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+  '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+  '<numFmts count="4">'+
+    '<numFmt numFmtId="164" formatCode="#,##0"/>'+
+    '<numFmt numFmtId="165" formatCode="&quot;R$&quot;\\ #,##0"/>'+
+    '<numFmt numFmtId="166" formatCode="0.0%"/>'+
+    '<numFmt numFmtId="167" formatCode="#,##0.00"/>'+
+  '</numFmts>'+
+  '<fonts count="4">'+
+    '<font><sz val="11"/><name val="Calibri"/></font>'+
+    '<font><b/><sz val="11"/><name val="Calibri"/></font>'+
+    '<font><i/><sz val="10"/><color rgb="FF57534E"/><name val="Calibri"/></font>'+
+    '<font><b/><sz val="14"/><name val="Calibri"/></font>'+
+  '</fonts>'+
+  '<fills count="2"><fill><patternFill patternType="none"/></fill>'+
+    '<fill><patternFill patternType="gray125"/></fill></fills>'+
+  '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'+
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+  '<cellXfs count="8">'+
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+    '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'+
+    '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'+
+    '<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'+
+    '<xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'+
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+    '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+  '</cellXfs>'+
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
+  '</styleSheet>';
+
+// folhas: [{nome, linhas, larguras}]
+function xlsxLivro(folhas){
+  if(typeof JSZip==='undefined') throw new Error('JSZip não carregou (rede).');
+  var zip=new JSZip();
+  var REL='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+  // createFolders:false — sem isto o JSZip grava entradas de diretório
+  // ("xl/", "xl/worksheets/") no ZIP. O Excel costuma tolerar, mas um
+  // .xlsx gerado por ele não as tem, e não há motivo para divergir do
+  // formato de referência num arquivo que vai ser aberto por ele.
+  var add=function(nome, txt){ zip.file(nome, txt, {createFolders:false}); };
+
+  add('[Content_Types].xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+    '<Default Extension="xml" ContentType="application/xml"/>'+
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+
+    folhas.map(function(f,i){
+      return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+    }).join('')+
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+    '</Types>');
+
+  add('_rels/.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="'+REL+'officeDocument" Target="xl/workbook.xml"/>'+
+    '</Relationships>');
+
+  add('xl/workbook.xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '+
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+    '<sheets>'+folhas.map(function(f,i){
+      return '<sheet name="'+xlsxEsc(f.nome)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>';
+    }).join('')+'</sheets></workbook>');
+
+  add('xl/_rels/workbook.xml.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    folhas.map(function(f,i){
+      return '<Relationship Id="rId'+(i+1)+'" Type="'+REL+'worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>';
+    }).join('')+
+    '<Relationship Id="rId'+(folhas.length+1)+'" Type="'+REL+'styles" Target="styles.xml"/>'+
+    '</Relationships>');
+
+  add('xl/styles.xml', XLSX_ESTILOS);
+  folhas.forEach(function(f,i){
+    add('xl/worksheets/sheet'+(i+1)+'.xml', xlsxFolhaXML(f.linhas, f.larguras));
+  });
+  return zip.generateAsync({type:'blob', compression:'DEFLATE',
+    mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+// ── As linhas da análise ───────────────────────────────────────────
+// Os RÓTULOS SÃO OS MESMOS DA TELA, palavra por palavra. Renomear aqui
+// faria quem confere os dois lado a lado se perguntar se é o mesmo
+// número.
+function rendaRecorteTxt(){
+  return rendaModo==='iso'
+    ? censoTituloCurto()+' · '+isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()
+    : rendaRaio.km+' km';
+}
+function rendaPlanilhaFolhas(q){
+  var E=XLSX_EST, L=[];
+  var semRenda = q.faixaTot===0;
+  var quem = censoQuemTxt();
+  var prem = censoPremissas();
+  var nomes = q.muns.map(function(c){ return (CENSO && CENSO.mun[c]) || c; }).join(', ');
+
+  L.push([xT('Maker Map — Análise de renda', E.TIT)]);
+  L.push([xT('Gerado em', E.NOTA), xT(new Date().toLocaleString('pt-BR'), E.NOTA)]);
+  L.push([]);
+
+  // O aviso de confiabilidade vem ANTES dos números, não depois: numa
+  // planilha ninguém garante que o leitor rolou até o fim.
+  var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
+  if(nivel==='bad'){
+    L.push([xT('ATENÇÃO — NÃO USE ESTES NÚMEROS COMO FECHADOS', E.NEG)]);
+    L.push([xT('Recorte pequeno demais para a densidade local. '+
+      (q.setores<30 ? 'São apenas '+q.setores+' setores aqui dentro. ' : '')+
+      Math.round(q.margem)+'% dos domicílios estão na faixa de incerteza da borda, onde entrar '+
+      'ou sair do total depende de onde caiu o centroide do setor (setor médio aqui: '+
+      Math.round(q.setorMedioM)+' m). '+
+      (rendaModo==='iso' ? 'Use uma faixa de tempo maior' : 'Aumente o raio')+
+      ' antes de usar estes números.')]);
+    L.push([]);
+  } else if(nivel==='warn'){
+    L.push([xT('ATENÇÃO', E.NEG)]);
+    L.push([xT('Margem de borda de '+Math.round(q.margem)+'% dos domicílios — suficiente para '+
+      'leitura de tendência, apertado para número fechado.')]);
+    L.push([]);
+  }
+
+  L.push([xT('RECORTE', E.NEG)]);
+  L.push([xT(rendaModo==='iso' ? 'Dentro da isócrona' : 'Dentro do raio'), xT(rendaRecorteTxt())]);
+  L.push([xT('Área'), xN(q.area, E.DEC), xT('km²')]);
+  L.push([]);
+
+  L.push([xT('TOTAIS', E.NEG)]);
+  L.push([xT('Domicílios ocupados'), xN(q.dom, E.INT)]);
+  L.push([xT('Pessoas (estimativa)'), xN(q.pes, E.INT)]);
+  L.push([xT('Moradores por domicílio'), xN(q.morDom, E.DEC)]);
+  L.push([xT('Densidade por km²'), xN(q.densDom, E.INT), xT('dom/km²')]);
+  L.push([null, xN(q.densPes, E.INT), xT('pess/km²')]);
+  L.push([xT('Setores censitários'), xN(q.setores, E.INT)]);
+  L.push([xT('Sem renda informada'), xN(q.domSemRenda, E.INT), xT('domicílios')]);
+  L.push([xT('Municípios'), xN(q.muns.length, E.INT), xT(nomes)]);
+  L.push([]);
+
+  L.push([xT('RENDA', E.NEG)]);
+  if(semRenda){
+    L.push([xT('O IBGE não informa a renda de nenhum dos setores deste recorte, '+
+      'então não há renda média, mediana nem classe a apresentar. Os totais de '+
+      'domicílios e de pessoas acima continuam valendo.')]);
+  }else{
+    L.push([xT('Renda média '+quem), xN(q.rendaMedia, E.RS)]);
+    L.push([xT('Renda mediana '+quem), xN(q.rendaMediana, E.RS)]);
+    L.push([xT('Classe socioeconômica'), xT(censoClasse(q.rendaMedia))]);
+  }
+  L.push([]);
+
+  L.push([xT('PREMISSAS', E.NEG)]);
+  prem.forEach(function(p){ L.push([xT(p[0]), xT(p[1])]); });
+  L.push([]);
+
+  L.push([xT('MÉTODO', E.NEG)]);
+  L.push([xT('Fonte: IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
+    'O Censo mede a renda do responsável pelo domicílio.')]);
+  L.push([xT(censoBaseTxt()==='R$ de jul/2022'
+    ? 'Valores em reais de julho de 2022, sem correção monetária.'
+    : 'Valores corrigidos: '+censoBaseTxt()+'.')]);
+  L.push([xT((+rendaRaio.outros||0) > 0
+    ? 'Renda domiciliar estimada: a do responsável mais '+(+rendaRaio.outros)+'% atribuídos '+
+      'aos demais moradores. É uma estimativa sua, não um dado do Censo.'
+    : 'Mostrando apenas a renda do responsável. A renda domiciliar costuma ser 1,5 a 2× maior.')]);
+  if(q.domSemRenda>0){
+    L.push([xT('Os '+q.domSemRenda+' domicílios sem renda informada (setor sem informação de '+
+      'rendimento) contam no total de domicílios e de pessoas; ficam de fora da média, da '+
+      'mediana e da distribuição por faixa.')]);
+  }
+  if(rendaModo==='iso'){
+    L.push([xT('O recorte é um tempo de deslocamento, calculado sobre a malha viária do '+
+      'OpenStreetMap, sem considerar trânsito.')]);
+  }
+  L.push([xT('Média condicional: responsáveis sem rendimento não entram. '+
+    'Corte por centroide do setor.')]);
+
+  var folhas=[{nome:'Resumo', linhas:L, larguras:[34,16,46]}];
+  if(semRenda) return folhas;
+
+  // ── Aba 2: a distribuição, com as premissas repetidas no topo ──
+  // Quem abrir só esta aba, ou copiar só a tabela, tem de levar junto
+  // de que base os percentuais são e em que moeda estão os valores.
+  var F=[];
+  F.push([xT('Domicílios por faixa de renda', E.TIT)]);
+  F.push([xT(rendaModo==='iso' ? 'Dentro da isócrona' : 'Dentro do raio'), xT(rendaRecorteTxt())]);
+  prem.forEach(function(p){ F.push([xT(p[0]), xT(p[1])]); });
+  F.push([xT('Base'), xN(q.faixaTot, E.INT), xT('domicílios com renda informada')]);
+  F.push([]);
+  F.push([xT('Faixa', E.NEG), xT('Domicílios', E.NEG), xT('% da base', E.NEG)]);
+  CENSO_FAIXAS.forEach(function(f, i){
+    F.push([xT(f.rot), xN(q.faixas[i], E.INT),
+            xN(q.faixaTot>0 ? q.faixas[i]/q.faixaTot : 0, E.PCT)]);
+  });
+  // A linha de total existe para a soma ficar à vista: ela fecha com a
+  // Base, não com "Domicílios ocupados", e é essa a confusão que o
+  // número absoluto convida a fazer.
+  F.push([xT('Total', E.NEG), xN(q.faixaTot, E.INT), xN(q.faixaTot>0?1:0, E.PCT)]);
+  folhas.push({nome:'Faixas de renda', linhas:F, larguras:[26,14,12]});
+  return folhas;
+}
+
+async function baixarPlanilhaRenda(btn){
+  var q = censoCache.res;
+  if(!q || q.vazio){ toast('Não há análise para exportar.'); return; }
+  var rot = btn ? btn.textContent : '';
+  if(btn){ btn.disabled=true; btn.textContent='Gerando…'; }
+  try{
+    var blob = await xlsxLivro(rendaPlanilhaFolhas(q));
+    var nome = 'MakerMap_renda_'+new Date().toISOString().slice(0,10)+'_'+
+      rendaRecorteTxt().replace(/[^0-9a-zA-Zá-úÁ-Ú]+/g,'-').replace(/^-|-$/g,'')+'.xlsx';
+    baixarBlob(blob, nome);
+    toast('Planilha baixada · '+expTamanhoTxt(blob.size));
+  }catch(err){
+    console.error('planilha', err);
+    toast(err && err.message ? err.message : 'Falha ao gerar a planilha.');
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent=rot; }
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════
 //  EXPORTAR IMAGEM — gaveta de formato e tamanho
 //
@@ -6586,19 +6915,6 @@ function expParaBlob(canvas, mime, qual){
     catch(e){ rej(e); }
   });
 }
-// O object URL NÃO pode morrer num cronômetro. Com "perguntar onde salvar
-// cada arquivo" ligado, o download só começa quando a pessoa escolhe a
-// pasta; revogar em 60s fazia o arquivo falhar depois de o aviso já ter
-// dito "exportado", que é falha silenciosa no único entregável do produto.
-// O dataURL de antes não expirava nunca. Então: solta-se o anterior quando
-// um novo é criado (um blob vivo por vez, no máximo) e o último no
-// fechamento da aba.
-var expUrlAtual = null;
-function expSoltarUrl(){
-  if(expUrlAtual){ try{ URL.revokeObjectURL(expUrlAtual); }catch(e){} expUrlAtual=null; }
-}
-window.addEventListener('beforeunload', expSoltarUrl);
-
 function expExtDe(mime){
   var k=Object.keys(EXP_FMT);
   for(var i=0;i<k.length;i++) if(EXP_FMT[k[i]].mime===mime) return k[i];
@@ -6646,11 +6962,7 @@ document.getElementById('expGerar').onclick = async function(){
                           ' — não sabe gerar '+F.ext.toUpperCase()+'.');
 
     var dim = base.width+'x'+base.height;
-    var a=document.createElement('a');
-    a.download = 'MakerMap_mapa_'+new Date().toISOString().slice(0,10)+'_'+dim+'.'+saida.ext;
-    expSoltarUrl();
-    expUrlAtual = URL.createObjectURL(blob);
-    a.href = expUrlAtual; a.click();
+    baixarBlob(blob, 'MakerMap_mapa_'+new Date().toISOString().slice(0,10)+'_'+dim+'.'+saida.ext);
     if(saida === F) toast(F.ext.toUpperCase()+' exportado · '+nfInt(base.width)+'×'+nfInt(base.height)+
           ' px · '+expTamanhoTxt(blob.size));
   }catch(err){

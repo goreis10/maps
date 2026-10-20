@@ -5,6 +5,35 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.3 — Baixar a análise de renda em planilha
+
+_Em revisão._
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Novo botão "Baixar planilha (.xlsx)"** no painel do Mapa de renda, logo
+  abaixo do gráfico de faixas. Leva tudo o que está no painel: o recorte, os
+  totais, a renda média e mediana, a classe, a densidade, os setores, os
+  municípios e a distribuição por faixa.
+- **Os números saem como números**, não como texto formatado — dá para somar,
+  ordenar e gerar gráfico direto no Excel. Milhar, real e percentual são
+  formatos aplicados pela planilha sobre o valor cru.
+- **Duas abas:** *Resumo*, com o painel inteiro, e *Faixas de renda*, com a
+  distribuição numa tabela limpa e uma linha de total que fecha com a base.
+- **As premissas vão nas duas abas** — moeda, correção, de quem é a renda e,
+  na isócrona, "sem trânsito". Uma planilha é o arquivo mais copiável que
+  existe: dela saem células coladas noutra planilha, em e-mail, em slide. Um
+  valor em reais que chega ao destino sem o mês da moeda é uma afirmação
+  incompleta sobre dinheiro.
+- **O aviso de recorte pequeno vai no topo da planilha**, acima dos números.
+  Na tela ele aparece no meio da lista porque você rola por tudo; num arquivo,
+  alguém pode copiar só um intervalo, e a frase que manda não usar os números
+  não pode ficar onde se perde.
+- A planilha é gerada **no seu navegador**, sem enviar nada para lugar nenhum,
+  como todo o resto do produto.
+
+---
+
 ## Maker Map 3.2 — Exportar em mais formatos e tamanhos
 
 _No ar em maker-map.netlify.app._
