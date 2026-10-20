@@ -46,6 +46,9 @@
   • Exportar imagem ..... btnExport abre #drawerExport; expGerar()
                           (PNG/JPEG/WebP, múltiplo ou largura exata,
                           expPrever() diz o tamanho antes de gerar)
+  • Zoom pelo scroll .... ZOOM_VEL, aplicarZoomVel() — fator sobre as
+                          duas taxas da MapLibre (roda e trackpad),
+                          escolhido em Configurações
   • Telas / menu ........ irPara('mapa'|'negocios'), #nav, #navBtn
   • Novos Negócios ...... NEGOCIOS (guarda própria em localStorage),
                           negSincronizar(), carregarNegocios(),
@@ -550,6 +553,12 @@
   .cfg-nome{font-weight:700;font-size:var(--fs-4)}
   .cfg-email{color:var(--ink-2);font-size:var(--fs-2);margin-top:2px}
   .cfg-desc{font-size:var(--fs-2);color:var(--ink-2);line-height:1.5;margin-bottom:14px}
+  /* Preferência de ferramenta dentro da janela de Configurações. Reaproveita
+     .seg e .e-hint; a .e-hint traz o recuo lateral do #editor, que aqui
+     brigaria com o recuo da própria janela. */
+  .cfg-pref{margin:var(--sp-2) 0 var(--sp-4)}
+  .cfg-pref .cfg-lbl{margin-bottom:7px}
+  .cfg-modal .e-hint{padding:7px 0 0}
   /* Botão primário de CONFIRMAÇÃO (laranja): "confirmar e fechar" —
      Salvar projeto, Salvar dados. O par dele é .rd-load (tinta), que é
      "executar algo que custa tempo ou quota" e deixa o usuário na mesma
@@ -1218,6 +1227,19 @@
     </div>
     <button id="cfgEditar" class="cfg-btn ghost">Editar meus dados</button>
     <button id="cfgPlanos" class="cfg-btn ghost">Planos</button>
+    <!-- Preferência de ferramenta, não conteúdo de projeto: vive em
+         localStorage, igual a makermap.secoes e makermap.drawerW. -->
+    <div class="cfg-pref">
+      <div class="cfg-lbl">Velocidade do zoom pelo scroll</div>
+      <div class="seg" id="cfgZoomSeg" style="box-shadow:none">
+        <button type="button" data-vel="lento">Lento</button>
+        <button type="button" data-vel="medio">Médio</button>
+        <button type="button" data-vel="rapido">Rápido</button>
+      </div>
+      <p class="e-hint">Vale para a roda do mouse e para o scroll de dois dedos
+      no trackpad, que no mapa zooma 4,5× mais por unidade de rolagem.
+      <b>Rápido</b> é a velocidade original do mapa.</p>
+    </div>
     <p class="cfg-desc">Os <b>KMZ e a edição do mapa</b> ficam em <b>Meus Projetos</b> (botão no topo); use <b>Salvar Projeto</b> para criar um. O quadro de <b>Novos Negócios</b> é guardado automaticamente, à parte dos projetos.</p>
     <button id="cfgSair" class="cfg-link">Sair da conta</button>
   </div>
@@ -1482,6 +1504,52 @@ const matchCor = ['match', ['get','municipio'],
 // implícito faria a previsão depender de um padrão da biblioteca.
 var EXPORT_MAX = 4096;
 
+// ── Velocidade do zoom pelo scroll ───────────────────────────────────────
+// A MapLibre tem DUAS taxas, e a diferença entre elas é por que o scroll
+// parece descontrolado em alguns equipamentos e não em outros: a roda do
+// mouse usa 1/450, o trackpad usa 1/100 — 4,5× mais zoom por unidade de
+// delta, num dispositivo que dispara dezenas de eventos por segundo. Quem
+// reclama de zoom "rápido e longo" quase sempre está no trackpad, e mexer
+// só numa das taxas deixaria metade dos usuários como estava.
+// É PREFERÊNCIA DE FERRAMENTA: vive em localStorage, não no projeto (mesmo
+// precedente de makermap.secoes, makermap.drawerW e makermap.export) — um
+// projeto de 2024 não deve reabrir com a velocidade de scroll de 2024.
+var ZOOM_KEY = 'makermap.zoom';
+// Fator sobre as taxas originais da biblioteca: 'rapido' É a original.
+var ZOOM_VEL = { lento:0.25, medio:0.5, rapido:1 };
+var ZOOM_VEL_PADRAO = 'medio';
+var zoomVel = ZOOM_VEL_PADRAO;
+function zoomVelValida(v){
+  // hasOwnProperty, e não ZOOM_VEL[v]: 'constructor' é herdado e verdadeiro,
+  // e um localStorage adulterado deixaria as duas taxas em NaN — foi
+  // exatamente assim que EXP_FMT travou o botão de exportar.
+  return typeof v === 'string' && Object.prototype.hasOwnProperty.call(ZOOM_VEL, v);
+}
+try{ var zvSalvo = localStorage.getItem(ZOOM_KEY); if(zoomVelValida(zvSalvo)) zoomVel = zvSalvo; }catch(e){}
+// Taxas originais da MapLibre 4.7.1 (ScrollZoomHandler): defaultZoomRate
+// 1/100 (trackpad e um clique isolado de roda) e wheelZoomRate 1/450.
+var ZOOM_TAXA_TRACKPAD = 1/100, ZOOM_TAXA_RODA = 1/450;
+function zoomFator(){ return ZOOM_VEL[zoomVelValida(zoomVel) ? zoomVel : ZOOM_VEL_PADRAO]; }
+function aplicarZoomVel(){
+  if(!map || !map.scrollZoom) return;
+  var f = zoomFator();
+  map.scrollZoom.setZoomRate(ZOOM_TAXA_TRACKPAD * f);
+  map.scrollZoom.setWheelZoomRate(ZOOM_TAXA_RODA * f);
+}
+function syncZoomVel(){
+  var seg = document.getElementById('cfgZoomSeg'); if(!seg) return;
+  seg.querySelectorAll('button').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-vel') === zoomVel);
+  });
+}
+function setZoomVel(v){
+  if(!zoomVelValida(v) || v === zoomVel) return;
+  zoomVel = v;
+  try{ localStorage.setItem(ZOOM_KEY, v); }catch(e){}
+  aplicarZoomVel();
+  syncZoomVel();
+}
+
 let map;
 fetch('https://tiles.openfreemap.org/styles/positron')
   .then(r=>{ if(!r.ok) throw new Error('estilo '+r.status); return r.json(); })
@@ -1499,6 +1567,9 @@ fetch('https://tiles.openfreemap.org/styles/positron')
       maxCanvasSize:[EXPORT_MAX, EXPORT_MAX],
       attributionControl:{compact:true}
     });
+    // Antes de qualquer interação: a preferência já foi lida do localStorage
+    // e as taxas do scroll valem desde o primeiro giro de roda.
+    aplicarZoomVel();
     map.addControl(new maplibregl.NavigationControl({showCompass:true, visualizePitch:false}), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({unit:'metric'}), 'bottom-left');
     let ultimoErroToast = 0;
@@ -7081,6 +7152,10 @@ document.getElementById('expGerar').onclick = async function(){
   cfgOv.onclick = function(e){ if(e.target === cfgOv) fecharCfg(); };
   document.getElementById('cfgSair').onclick = doLogout;
   document.getElementById('cfgPlanos').onclick = function(){ fecharCfg(); abrirPlanos(); };
+  document.querySelectorAll('#cfgZoomSeg button').forEach(function(b){
+    b.onclick = function(){ setZoomVel(b.getAttribute('data-vel')); };
+  });
+  syncZoomVel();
 
   // ── Editar dados do usuário (Netlify Identity) ──
   var IDENTITY = location.origin + '/.netlify/identity';
