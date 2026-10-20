@@ -7,7 +7,7 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ## Maker Map 3.3 — Baixar a análise de renda em planilha
 
-_Em revisão._
+_No ar em maker-map.netlify.app._
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
