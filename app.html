@@ -5594,8 +5594,7 @@ function renderRenda(){
 
   box.innerHTML=
     '<div class="rd-h">Dentro d'+(rendaModo==='iso'?'a isócrona':'o raio')+' <em>'+
-      (rendaModo==='iso' ? esc(censoTituloCurto())+' · '+isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()
-                         : nf(rendaRaio.km)+' km')+' · '+nf(q.area)+' km²</em></div>'+
+      esc(rendaRecorteTxt())+' · '+nf(q.area)+' km²</em></div>'+
     '<div class="rd-stat big"><span>Domicílios ocupados</span><b>'+nf(q.dom)+'</b></div>'+
     '<div class="rd-stat big"><span>Pessoas (estimativa)</span><b>'+nf(q.pes)+'</b></div>'+
     premissasHTML()+
@@ -5640,9 +5639,14 @@ function renderRenda(){
     // Baixar a análise como planilha. Fica AQUI, junto dos números que
     // exporta, e não na gaveta de exportação — aquela é da imagem.
     '<button class="rd-load" id="rdXlsx" style="margin-top:14px">Baixar planilha (.xlsx)</button>'+
-    '<div class="e-hint" style="padding:6px 0 0">Duas abas: o resumo acima e a distribuição '+
-    'por faixa, com os números como <b>números</b> — dá para somar e gerar gráfico. '+
-    'As premissas e os avisos vão junto nas duas.</div>'+
+    // Sem renda informada não há aba de faixas, e a dica não pode prometer
+    // duas: o recorte com a renda retida em todos os setores é real.
+    '<div class="e-hint" style="padding:6px 0 0">'+(semRenda
+      ? 'O resumo acima, com os números como <b>números</b> — dá para somar e gerar '+
+        'gráfico. Sem a distribuição por faixa, que não existe neste recorte.'
+      : 'Duas abas: o resumo acima e a distribuição por faixa, com os números como '+
+        '<b>números</b> — dá para somar e gerar gráfico. As premissas e os avisos '+
+        'vão junto nas duas.')+'</div>'+
     comoHtml;
 
   // O ⓘ sobrevive ao repaint. renderRenda() refaz este HTML a cada ajuste
@@ -6357,17 +6361,28 @@ document.getElementById('chipLbl').onclick = function(){
 //
 // Uma função só, porque são dois downloads (a imagem e a planilha) e duas
 // cópias desta lição divergiriam.
-var urlBaixaAtual = null;
-function soltarUrlBaixa(){
-  if(urlBaixaAtual){ try{ URL.revokeObjectURL(urlBaixaAtual); }catch(e){} urlBaixaAtual=null; }
+//
+// UM SLOT POR TIPO DE ARQUIVO, e não um slot só: com um compartilhado,
+// baixar a planilha (diálogo de pasta aberto, esperando) e exportar o PNG
+// em seguida revogava o blob da planilha e o salvamento dela falhava —
+// depois de o aviso já ter dito "Planilha baixada". A mesma falha que o
+// cronômetro causava, por outra porta, criada ao unificar os dois
+// caminhos. Guardar tudo até o fechamento da aba também não serve:
+// cinquenta exportações de 4.096 px seriam meio giga preso na memória.
+var urlBaixa = {};
+function soltarUrlBaixa(chave){           // sem chave: solta todos
+  (chave ? [chave] : Object.keys(urlBaixa)).forEach(function(k){
+    if(urlBaixa[k]){ try{ URL.revokeObjectURL(urlBaixa[k]); }catch(e){} delete urlBaixa[k]; }
+  });
 }
-window.addEventListener('beforeunload', soltarUrlBaixa);
-function baixarBlob(blob, nome){
+window.addEventListener('beforeunload', function(){ soltarUrlBaixa(); });
+function baixarBlob(blob, nome, chave){
+  var k = chave || 'arquivo';
   var a=document.createElement('a');
   a.download = nome;
-  soltarUrlBaixa();
-  urlBaixaAtual = URL.createObjectURL(blob);
-  a.href = urlBaixaAtual;
+  soltarUrlBaixa(k);
+  urlBaixa[k] = URL.createObjectURL(blob);
+  a.href = urlBaixa[k];
   a.click();
 }
 
@@ -6398,7 +6413,13 @@ function baixarBlob(blob, nome){
 //     usar os números tem de estar onde não se perde.
 // ══════════════════════════════════════════════════════════════════
 function xlsxEsc(s){
-  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  // Os caracteres de controle são ILEGAIS em XML 1.0 e fazem o Excel
+  // recusar o arquivo inteiro, sem dizer por quê. Nenhum nome de
+  // município dos três estados tem um hoje — mas acrescentar um estado é
+  // "acrescentar o arquivo e uma linha no manifesto, nada no código
+  // muda", e essa promessa não pode vir com uma armadilha embutida.
+  return String(s==null?'':s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function xlsxCol(n){                      // 1 -> A, 27 -> AA
@@ -6412,6 +6433,16 @@ function xlsxCol(n){                      // 1 -> A, 27 -> AA
 // local que por acaso a sombreia, e a próxima podia não ter.
 function xT(v, st){ return v==null ? null : {t:'s', v:v, s:st||0}; }
 function xN(v, st){ return (v==null || !isFinite(v)) ? null : {t:'n', v:+v, s:st||0}; }
+// <v> não aceita notação científica em todo leitor de planilha, e o JS
+// passa a expoente abaixo de 1e-6 — alcançável numa faixa com pouquíssimos
+// domicílios sobre uma base de milhões (6 em 6.077.194 dá 9,87e-7).
+function xlsxNum(n){
+  var s=String(n);
+  if(s.indexOf('e')<0 && s.indexOf('E')<0) return s;
+  // toFixed(20) é o máximo que a linguagem aceita, e só falha acima de
+  // 1e21 — nenhum número deste produto chega perto.
+  return Math.abs(n) < 1e21 ? n.toFixed(20).replace(/0+$/,'').replace(/\.$/,'') : s;
+}
 
 var XLSX_EST = {TXT:0, NEG:1, INT:2, RS:3, PCT:4, DEC:5, NOTA:6, TIT:7};
 
@@ -6430,7 +6461,7 @@ function xlsxFolhaXML(linhas, larguras){
       if(!c) return '';
       var ref=xlsxCol(ci+1)+r;
       return c.t==='n'
-        ? '<c r="'+ref+'" s="'+c.s+'"><v>'+c.v+'</v></c>'
+        ? '<c r="'+ref+'" s="'+c.s+'"><v>'+xlsxNum(c.v)+'</v></c>'
         : '<c r="'+ref+'" s="'+c.s+'" t="inlineStr"><is><t xml:space="preserve">'+xlsxEsc(c.v)+'</t></is></c>';
     }).join('');
     return cs ? '<row r="'+r+'">'+cs+'</row>' : '';
@@ -6532,10 +6563,14 @@ function xlsxLivro(folhas){
 // Os RÓTULOS SÃO OS MESMOS DA TELA, palavra por palavra. Renomear aqui
 // faria quem confere os dois lado a lado se perguntar se é o mesmo
 // número.
+// UMA descrição do recorte, usada pelo cabeçalho do painel E pela
+// planilha. Eram duas: o painel formatava o raio com maximumFractionDigits
+// 0, então um raio de 2,5 km aparecia como "3 km" — a tela afirmando um
+// raio que não era o aplicado —, e a planilha escrevia "2.5 km", com ponto.
 function rendaRecorteTxt(){
   return rendaModo==='iso'
     ? censoTituloCurto()+' · '+isoPerfilNome(rendaIso.calcPerfil||rendaIso.perfil).toLowerCase()
-    : rendaRaio.km+' km';
+    : Number(rendaRaio.km).toLocaleString('pt-BR',{maximumFractionDigits:1})+' km';
 }
 function rendaPlanilhaFolhas(q){
   var E=XLSX_EST, L=[];
@@ -6548,8 +6583,22 @@ function rendaPlanilhaFolhas(q){
   L.push([xT('Gerado em', E.NOTA), xT(new Date().toLocaleString('pt-BR'), E.NOTA)]);
   L.push([]);
 
-  // O aviso de confiabilidade vem ANTES dos números, não depois: numa
-  // planilha ninguém garante que o leitor rolou até o fim.
+  // Os avisos vêm ANTES dos números, não depois: numa planilha ninguém
+  // garante que o leitor rolou até o fim — e pode copiar só um intervalo.
+  //
+  // O PRIMEIRO É O DE ESTADO FALTANDO, e ele é o mais grave dos dois: com
+  // falha parcial de rede o painel segue 'ok' e apresenta domicílios,
+  // renda e distribuição de METADE do território. A tarja vermelha diz
+  // isso na tela; sem esta linha, o arquivo — que é o que vai parar em
+  // e-mail e slide, longe do painel — não dizia nada.
+  var faltando = (typeof censoUFsFaltando==='function') ? censoUFsFaltando() : [];
+  if(faltando.length){
+    L.push([xT('ATENÇÃO — ESTES NÚMEROS ESTÃO INCOMPLETOS', E.NEG)]);
+    L.push([xT('Faltou carregar '+faltando.map(function(u){ return u.nome; }).join(', ')+
+      ' — os números abaixo cobrem só o restante d'+(rendaModo==='iso'?'a isócrona':'o raio')+'.')]);
+    L.push([]);
+  }
+
   var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
   if(nivel==='bad'){
     L.push([xT('ATENÇÃO — NÃO USE ESTES NÚMEROS COMO FECHADOS', E.NEG)]);
@@ -6603,7 +6652,15 @@ function rendaPlanilhaFolhas(q){
   L.push([xT('MÉTODO', E.NEG)]);
   L.push([xT('Fonte: IBGE, Censo Demográfico 2022 (referência 31/07/2022). '+
     'O Censo mede a renda do responsável pelo domicílio.')]);
-  L.push([xT(censoBaseTxt()==='R$ de jul/2022'
+  // fonteCorrecao() é a AUTORIDADE ÚNICA sobre qual correção venceu, e esta
+  // linha lê dela como fatorRenda(), censoBaseTxt() e censoPremissas().
+  // Comparar a string de censoBaseTxt() fazia desta linha um quarto leitor
+  // que reescrevia a regra — e com "informado 0%" (valor legítimo) ela
+  // dizia "valores corrigidos" dez linhas abaixo de a faixa de Premissas
+  // dizer, corretamente, R$ jul/2022. O painel se contradizendo sobre
+  // dinheiro dentro do mesmo arquivo é exatamente o defeito que a 2.6
+  // existiu para consertar.
+  L.push([xT(Math.abs(fonteCorrecao().f - 1) < 1e-12
     ? 'Valores em reais de julho de 2022, sem correção monetária.'
     : 'Valores corrigidos: '+censoBaseTxt()+'.')]);
   L.push([xT((+rendaRaio.outros||0) > 0
@@ -6656,7 +6713,7 @@ async function baixarPlanilhaRenda(btn){
     var blob = await xlsxLivro(rendaPlanilhaFolhas(q));
     var nome = 'MakerMap_renda_'+new Date().toISOString().slice(0,10)+'_'+
       rendaRecorteTxt().replace(/[^0-9a-zA-Zá-úÁ-Ú]+/g,'-').replace(/^-|-$/g,'')+'.xlsx';
-    baixarBlob(blob, nome);
+    baixarBlob(blob, nome, 'planilha');
     toast('Planilha baixada · '+expTamanhoTxt(blob.size));
   }catch(err){
     console.error('planilha', err);
@@ -6962,7 +7019,7 @@ document.getElementById('expGerar').onclick = async function(){
                           ' — não sabe gerar '+F.ext.toUpperCase()+'.');
 
     var dim = base.width+'x'+base.height;
-    baixarBlob(blob, 'MakerMap_mapa_'+new Date().toISOString().slice(0,10)+'_'+dim+'.'+saida.ext);
+    baixarBlob(blob, 'MakerMap_mapa_'+new Date().toISOString().slice(0,10)+'_'+dim+'.'+saida.ext, 'imagem');
     if(saida === F) toast(F.ext.toUpperCase()+' exportado · '+nfInt(base.width)+'×'+nfInt(base.height)+
           ' px · '+expTamanhoTxt(blob.size));
   }catch(err){
