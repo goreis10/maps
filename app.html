@@ -897,6 +897,14 @@
         <span class="pal-swatch"><i style="background:#F6F4F1"></i><i style="background:#CFE0F5"></i><i style="background:#F5C9B8"></i><i style="background:#DDE8DA"></i></span>
         <span class="pal-txt">Padrão<small>cores originais do Maker Map</small></span>
       </button>
+      <button class="pal-btn" data-pal="mosaicoLight">
+        <span class="pal-swatch"><i style="background:#FFFFFF"></i><i style="background:#E6E6E6"></i><i style="background:#F87226"></i><i style="background:#3973B9"></i></span>
+        <span class="pal-txt">Mosaico Light<small>a paleta da marca sobre branco</small></span>
+      </button>
+      <button class="pal-btn" data-pal="mosaicoDark">
+        <span class="pal-swatch"><i style="background:#1D1D1B"></i><i style="background:#2D2D2B"></i><i style="background:#F87226"></i><i style="background:#3973B9"></i></span>
+        <span class="pal-txt">Dark Mosaico<small>a paleta da marca sobre chumbo</small></span>
+      </button>
       <button class="pal-btn" data-pal="pb">
         <span class="pal-swatch"><i style="background:#FFFFFF"></i><i style="background:#E9E9E9"></i><i style="background:#111111"></i><i style="background:#F4F4F4"></i></span>
         <span class="pal-txt">Preto e branco<small>alto contraste, sem cor</small></span>
@@ -921,6 +929,11 @@
         <span class="pal-swatch"><i style="background:#1E1E24"></i><i style="background:#44444C"></i><i style="background:#00B4D8"></i><i style="background:#FF007F"></i></span>
         <span class="pal-txt">Dark mode<small>fundo escuro, destaques vibrantes</small></span>
       </button>
+    </div>
+    <div class="sd-sec">
+      <div class="e-hint">As duas paletas <b>Mosaico</b> são a paleta do deck, e o deck não tem
+      verde: parque e vegetação saem em cinza, e as rodovias ficam no laranja da marca.
+      Inventar um verde faria dela outra paleta.</div>
     </div>
   </div>
 
@@ -1368,6 +1381,63 @@ var PALETAS = {
     aeroway:'#EDE8E1', boundary:'#C9C2BA', motorway:'#F5C9B8', motorwayCasing:'#E0A98F',
     major:'#FFFFFF', majorCasing:'#E0DAD3', roadText:'#6B6560',
     placeCity:'#1C1917', placeOther:'#8A8F98', symbol:'#8A8F98', halo:'#FFFFFF' },
+  // ── As duas paletas da marca ────────────────────────────────────────────
+  // Vêm da paleta do deck FIDC · Projetos (MOSAICO 2026_Slide-Base), e o
+  // objetivo é que o PNG exportado entre no deck sem parecer de outro lugar.
+  // Por isso quase todo valor abaixo é um valor REAL do deck, com o papel
+  // dele anotado ao lado; os derivados estão marcados como tais e a conta
+  // está escrita. Duas regras do deck que o mapa herda:
+  //   • laranja é a 1ª série sempre — aqui, as rodovias;
+  //   • azul, magenta e amarelo só em série de gráfico e acento de card, e
+  //     NUNCA em título/rótulo. Água é a única coisa que fica azul, porque
+  //     água azul não é um acento, é o que a coisa é.
+  // E uma consequência que a interface precisa dizer em voz alta: o deck
+  // NÃO TEM VERDE. Parque e vegetação saem em cinza nas duas paletas. A
+  // alternativa seria inventar um verde, e aí não seria mais a paleta do
+  // deck — que é justamente o motivo de ela existir aqui.
+  mosaicoLight: {
+    bg:'#FFFFFF',               // texto de destaque do deck, virado em papel
+    water:'#D7E3F2',            // derivado: azul #3973B9 a 25% sobre branco
+    waterway:'#3973B9',         // azul da marca, em linha
+    waterText:'#3973B9',        // azul da marca
+    park:'#E6E6E6',             // corpo de tabela / legenda
+    parkText:'#706F6F',         // nota de rodapé / fonte
+    grass:'#ECECEC',            // derivado: passo claro na mesma família
+    landcover:'#F4F4F4',        // derivado
+    landuse:'#F8F8F8',          // derivado
+    aeroway:'#EDEDED',          // derivado
+    boundary:'#706F6F',         // borda tracejada (raios 5/10 km do deck)
+    motorway:'#F87226',         // laranja MOSAICO — 1ª série, sempre laranja
+    motorwayCasing:'#FBAE7C',   // laranja secundário
+    major:'#FFFFFF',
+    majorCasing:'#E6E6E6',      // corpo de tabela
+    roadText:'#1D1D1B',         // fundo de slide do deck, virado em tinta
+    placeCity:'#1D1D1B',
+    placeOther:'#8C8C8C',       // rótulo de cidade/raio no mapa
+    symbol:'#8C8C8C',
+    halo:'#FFFFFF' },
+  mosaicoDark: {
+    bg:'#1D1D1B',               // fundo de slide de conteúdo
+    water:'#2A4462',            // derivado: azul #3973B9 a 45% sobre o fundo
+    waterway:'#3973B9',         // azul da marca, em linha
+    waterText:'#B2B2B2',        // valores dos eixos
+    park:'#2D2D2B',             // card / painel
+    parkText:'#929292',         // kicker
+    grass:'#2D2D2B',            // card / painel
+    landcover:'#242422',        // zebra par / espaço reservado
+    landuse:'#1F1F1D',          // zebra ímpar
+    aeroway:'#242422',          // espaço reservado
+    boundary:'#706F6F',         // borda tracejada (raios 5/10 km do deck)
+    motorway:'#F87226',         // laranja MOSAICO — 1ª série, sempre laranja
+    motorwayCasing:'#3A2E22',   // linha de total da tabela: o laranja já
+                                // escurecido pelo deck sobre este fundo
+    major:'#404040',            // linhas de grade e eixos
+    majorCasing:'#2D2D2B',      // borda do marcador = cor do card (§4 do deck)
+    roadText:'#E6E6E6',         // corpo de tabela / legenda
+    placeCity:'#FFFFFF',        // texto de destaque / rótulos no mapa
+    placeOther:'#8C8C8C',       // rótulo de cidade/raio no mapa
+    symbol:'#8C8C8C',
+    halo:'#1D1D1B' },
   // Preto e branco — alto contraste, sem cor.
   pb: { bg:'#FFFFFF', water:'#E9E9E9', waterway:'#CFCFCF', waterText:'#555555',
     park:'#F4F4F4', parkText:'#555555', grass:'#F4F4F4', landcover:'#F7F7F7', landuse:'#F2F2F2',

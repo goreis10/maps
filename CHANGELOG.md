@@ -5,6 +5,30 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.5 — Mosaico Light e Dark Mosaico
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Duas paletas novas na gaveta Cores**, as duas com as cores da marca:
+  *Mosaico Light* sobre branco e *Dark Mosaico* sobre o chumbo `#1D1D1B` do
+  deck. As rodovias saem no laranja MOSAICO nas duas.
+- **São a paleta do deck, não uma aproximação dela.** 19 dos 20 tons do Dark
+  Mosaico são valores literais do material da marca, cada um no papel que já
+  tinha lá: o fundo de slide virou o fundo do mapa, a cor dos cards virou
+  parque e contorno de via, a linha de total da tabela virou o contorno das
+  rodovias, e a borda tracejada dos raios de 5 e 10 km virou a cor das divisas.
+- **O mapa segue as regras do deck.** Laranja é sempre o primeiro destaque, e
+  azul, magenta e amarelo não entram em título nem rótulo — só a água fica
+  azul, porque água azul não é um acento, é o que a coisa é.
+- **Parque e vegetação saem em cinza, e a gaveta avisa.** O deck não tem verde.
+  Inventar um faria dela outra paleta, e aí ela não serviria para o que foi
+  pedida. Se precisar de verde num mapa específico, a seção **Mapa** da Edição
+  continua ajustando cor por cor.
+- As outras sete paletas estão intactas, e as duas novas entram logo depois da
+  **Padrão**, antes das demais.
+
+---
+
 ## Maker Map 3.4 — Velocidade do zoom pelo scroll
 
 _No ar em maker-map.netlify.app._
