@@ -7,6 +7,8 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ## Maker Map 3.4 — Velocidade do zoom pelo scroll
 
+_No ar em maker-map.netlify.app._
+
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 
 - **O zoom pelo scroll ficou mais calmo.** Rolar a roda ou passar dois dedos no
