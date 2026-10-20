@@ -544,8 +544,16 @@
   .cfg-overlay{position:fixed;inset:0;z-index:2000;background:rgba(28,25,23,.38);
     display:none;align-items:center;justify-content:center;padding:20px}
   .cfg-overlay.show{display:flex}
+  /* O max-height/overflow vale para TODAS as janelas, não só para a .tall:
+     o overlay é fixed, centraliza com align-items:center e o body tem
+     overflow:hidden, então sem isto a janela mais alta que a viewport é
+     cortada nas DUAS pontas — sai o × de fechar em cima e o "Sair da conta"
+     embaixo, sem rolagem que os alcance. O gatilho realista não é tela
+     pequena, é zoom de página: a 125% num 1366×768 a viewport fica em
+     ~508px CSS. */
   .cfg-modal{width:100%;max-width:380px;background:var(--paper);border:1px solid var(--line);
-    border-radius:var(--sp-4);box-shadow:0 24px 60px rgba(28,25,23,.28);padding:20px 22px;font-size:var(--fs-3)}
+    border-radius:var(--sp-4);box-shadow:0 24px 60px rgba(28,25,23,.28);padding:20px 22px;font-size:var(--fs-3);
+    max-height:calc(100vh - 40px);overflow-y:auto}
   .cfg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
   .cfg-x{border:0;background:none;font-size:22px;line-height:1;color:var(--ink-2);cursor:pointer;padding:0 var(--sp-1)}
   .cfg-x:hover{color:var(--ink)}
@@ -1233,12 +1241,15 @@
       <div class="cfg-lbl">Velocidade do zoom pelo scroll</div>
       <div class="seg" id="cfgZoomSeg" style="box-shadow:none">
         <button type="button" data-vel="lento">Lento</button>
-        <button type="button" data-vel="medio">Médio</button>
+        <!-- "medio" nasce marcado porque é o padrão: se algo quebrar antes de
+             syncZoomVel(), o segmentado mostra o estado mais provável em vez de
+             nenhum. Os outros seis .seg do arquivo também trazem o padrão. -->
+        <button type="button" data-vel="medio" class="on">Médio</button>
         <button type="button" data-vel="rapido">Rápido</button>
       </div>
       <p class="e-hint">Vale para a roda do mouse e para o scroll de dois dedos
-      no trackpad, que no mapa zooma 4,5× mais por unidade de rolagem.
-      <b>Rápido</b> é a velocidade original do mapa.</p>
+      ou a pinça no trackpad — que usa uma taxa 4,5× maior por unidade de
+      rolagem. <b>Rápido</b> é a velocidade original do mapa.</p>
     </div>
     <p class="cfg-desc">Os <b>KMZ e a edição do mapa</b> ficam em <b>Meus Projetos</b> (botão no topo); use <b>Salvar Projeto</b> para criar um. O quadro de <b>Novos Negócios</b> é guardado automaticamente, à parte dos projetos.</p>
     <button id="cfgSair" class="cfg-link">Sair da conta</button>

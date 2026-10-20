@@ -19,7 +19,11 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 - **Vale para os dois equipamentos.** O mapa usava duas velocidades diferentes
   por baixo, e a do trackpad era 4,5 vezes maior por unidade de rolagem — por
   isso o zoom parecia descontrolado em notebook e aceitável no mouse. O controle
-  mexe nas duas juntas.
+  mexe nas duas juntas, e também na pinça de dois dedos do trackpad.
+- **Correção: a janela de Configurações não corta mais o conteúdo.** Com zoom de
+  página alto (125% ou mais) ou janela baixa, ela podia ficar mais alta que a
+  tela e esconder o × de fechar em cima e o "Sair da conta" embaixo, sem rolagem
+  que os alcançasse. Agora rola, como a janela de Planos já fazia.
 - A escolha fica **guardada no seu navegador**, como a largura do painel de
   edição e as opções de exportação. Não entra no projeto salvo: é preferência da
   ferramenta, e um projeto antigo não deve reabrir com a velocidade de scroll da
