@@ -5,6 +5,28 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.4 — Velocidade do zoom pelo scroll
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **O zoom pelo scroll ficou mais calmo.** Rolar a roda ou passar dois dedos no
+  trackpad saltava rápido demais e ia longe demais; agora o passo é metade do
+  que era.
+- **Novo controle em Configurações** (clique no seu nome, no topo): *Lento ·
+  Médio · Rápido*. **Rápido** é exatamente a velocidade de antes, a um clique de
+  distância para quem gostava dela; **Lento** é um quarto, para ajuste fino de
+  enquadramento. O padrão passa a ser **Médio**.
+- **Vale para os dois equipamentos.** O mapa usava duas velocidades diferentes
+  por baixo, e a do trackpad era 4,5 vezes maior por unidade de rolagem — por
+  isso o zoom parecia descontrolado em notebook e aceitável no mouse. O controle
+  mexe nas duas juntas.
+- A escolha fica **guardada no seu navegador**, como a largura do painel de
+  edição e as opções de exportação. Não entra no projeto salvo: é preferência da
+  ferramenta, e um projeto antigo não deve reabrir com a velocidade de scroll da
+  época.
+
+---
+
 ## Maker Map 3.3 — Baixar a análise de renda em planilha
 
 _No ar em maker-map.netlify.app._
