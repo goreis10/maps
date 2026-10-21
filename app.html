@@ -4403,16 +4403,35 @@ var FEATURE_ELEMENTS = {
 //      admin), usa o MAIOR deles. É a forma mais segura e a que funciona no
 //      painel novo do Netlify (onde só dá para editar "Roles").
 // Basta configurar UMA das duas — por exemplo, definir o Role "admin".
+// O MAIOR entre os dois caminhos, não o primeiro que existir.
+//
+// Antes isto devolvia `user_metadata.plano` assim que ele fosse um plano
+// válido, e só caía nos Roles quando ele não existia. Como o cadastro do
+// index.html gravava `plano:'free'` em todo mundo, 'free' ganhava sempre: o
+// Role concedido no painel do Netlify — que é o único campo que o painel
+// novo oferece, e que este arquivo e o CLAUDE.md afirmavam que bastava
+// configurar — não destravava nada para ninguém criado pelo site. A venda
+// era configurada e o recurso continuava com cadeado.
+//
+// O máximo só CONCEDE, nunca retira: ninguém perde acesso no dia do deploy,
+// e as contas que já existem com `plano:'free'` passam a obedecer ao Role
+// sem ninguém editar metadados uma por uma. O dono confirmou que não usa o
+// campo `plano` para rebaixar quem tem Role — se algum dia usar, esta é a
+// linha a reverter, e aí a precedência volta a importar.
+//
+// Nada disso é segurança: os dois campos são do cliente e o `user_metadata`
+// é editável pelo próprio usuário. É a regra de qual recurso aparece
+// destravado, e ela precisa ser a mesma que o painel do Netlify promete.
 function getUserPlano(){
   try{
     var s = JSON.parse(localStorage.getItem('makermap.user') || 'null');
     var u = (s && s.user) || {};
+    var nivel = -1;
     // 1) user_metadata.plano
     var p = u.user_metadata && u.user_metadata.plano;
-    if(PLANOS.indexOf(p) >= 0) return p;
-    // 2) app_metadata.roles (pega o maior plano entre os roles)
+    if(PLANOS.indexOf(p) > nivel) nivel = PLANOS.indexOf(p);
+    // 2) app_metadata.roles (o maior plano entre os roles)
     var roles = (u.app_metadata && u.app_metadata.roles) || [];
-    var nivel = -1;
     for(var i=0;i<roles.length;i++){
       var r = String(roles[i]||'').toLowerCase();
       if(PLANOS.indexOf(r) > nivel) nivel = PLANOS.indexOf(r);

@@ -173,6 +173,35 @@
   }
   function getSession(){ try{ return JSON.parse(localStorage.getItem('makermap.user') || 'null'); }catch(e){ return null; } }
 
+  // A SESSÃO NUNCA É GRAVADA SEM O USUÁRIO.
+  //
+  // Sem ele, o app.html calcula `plano = 'free'` e a chave dos projetos vira
+  // `makermap.projetos.anon`: quem paga Pro voltava do link do e-mail com
+  // cadeado em Mapa de renda, Isócrona e Novos Negócios, com os projetos
+  // salvos invisíveis na lista, e o que salvasse daí em diante ia para um
+  // balde `anon` compartilhado com qualquer outra conta no mesmo navegador.
+  // O dado não era destruído — ficava inalcançável, que para quem usa é a
+  // mesma coisa.
+  //
+  // O gotrue às vezes já devolve o usuário dentro do próprio token; quando
+  // não devolve, buscamos /user com o bearer. `fallback` é usado só onde o
+  // e-mail já é conhecido (o login, em que a pessoa o acabou de digitar):
+  // aí uma falha de rede em /user degrada o plano, mas não perde os
+  // projetos, porque a chave de armazenamento é o e-mail. Nos dois fluxos
+  // que vêm do link do e-mail não há e-mail conhecido, então não há
+  // fallback seguro — devolvem false e quem chamou manda entrar pelo login.
+  function sessaoComUsuario(tok, fallback){
+    if(tok && tok.user && tok.user.email){ saveSession(tok, tok.user); return Promise.resolve(true); }
+    return fetch(IDENTITY + '/user', { headers: { Authorization: 'Bearer ' + tok.access_token } })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; })
+      .then(function(user){
+        if(user && user.email){ saveSession(tok, user); return true; }
+        if(fallback && fallback.email){ saveSession(tok, fallback); return true; }
+        return false;
+      });
+  }
+
   // ── Chamada à API do Netlify Identity ──
   function api(path, opts){
     return fetch(IDENTITY + path, opts).then(function(res){
@@ -217,15 +246,38 @@
         });
       })
       .then(function(tok){
-        return fetch(IDENTITY + '/user', { headers: { Authorization: 'Bearer ' + tok.access_token } })
-          .then(function(r){ return r.ok ? r.json() : { email: email }; })
-          .catch(function(){ return { email: email }; })
-          .then(function(user){ saveSession(tok, user); });
+        // o e-mail é conhecido aqui (a pessoa acabou de digitá-lo), então
+        // vale como reserva: pior caso, entra com o plano degradado mas com
+        // a chave de projetos certa. Ver sessaoComUsuario().
+        return sessaoComUsuario(tok, { email: email });
       });
   }
 
   // ── Se já estiver logado, vai direto para o app ──
-  (function(){ var s = getSession(); if(s && s.access_token){ location.replace(APP); } })();
+  //
+  // Exige o USUÁRIO, não só o token. Antes bastava existir um access_token:
+  // uma sessão sem usuário mandava para o app, o app.html só volta para cá
+  // quando `makermap.user` está AUSENTE, e a pessoa ficava presa numa sessão
+  // degradada — sem conseguir chegar na tela de login para se reautenticar,
+  // a não ser pelo "Sair da conta" dentro de Configurações.
+  //
+  // Deliberadamente NÃO olho `expires_at`. O access_token vale uma hora e o
+  // refresh_token vive muito mais; o app.html já renova com
+  // grant_type=refresh_token. Barrar aqui pelo vencimento do access_token
+  // deslogaria todo mundo de hora em hora — regressão pior que o defeito.
+  (function(){
+    // Link do e-mail primeiro, sessão depois. Com uma sessão qualquer no
+    // navegador, abrir index.html#recovery_token=… era redirecionado para o
+    // app antes de tratarHash() rodar, e o link do e-mail não fazia nada:
+    // quem já estava logado não conseguia redefinir a senha pelo link.
+    if(/(?:confirmation|recovery)_token=/.test(location.hash || '')) return;
+    var s = getSession();
+    if(!s || !s.access_token) return;
+    if(s.user && s.user.email){ location.replace(APP); return; }
+    // sessão sem usuário: joga fora e mostra o formulário
+    try{ localStorage.removeItem('makermap.user'); }catch(e){}
+    show('Não conseguimos recuperar seus dados de conta. Entre novamente.', 'err');
+  })();
 
   // ── Login ──
   el('formLogin').addEventListener('submit', function(e){
@@ -250,7 +302,12 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email, password: senha,
-          data: { first_name: nome, last_name: sobrenome, full_name: (nome + ' ' + sobrenome).trim(), phone: tel, plano: 'free' }
+          // Sem `plano` aqui de propósito. Gravar `plano:'free'` em
+          // user_metadata fazia todo usuário criado pelo site ficar imune ao
+          // Role concedido no painel do Netlify. Ausente, getUserPlano()
+          // resolve pelos Roles, e 'free' continua sendo o padrão de quem
+          // não tem nenhum.
+          data: { first_name: nome, last_name: sobrenome, full_name: (nome + ' ' + sobrenome).trim(), phone: tel }
         })
       })
       .then(function(user){
@@ -289,7 +346,18 @@
     api('/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'recovery', token: recoveryToken }) })
       .then(function(tok){
         return api('/user', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok.access_token }, body: JSON.stringify({ password: novaSenha }) })
-          .then(function(){ saveSession(tok, null); location.href = APP; });
+          .then(function(){ return sessaoComUsuario(tok); })
+          .then(function(temUsuario){
+            // A senha JÁ foi trocada — esta é a notícia que importa. Se não
+            // conseguimos identificar a conta, entrar agora significaria
+            // entrar como 'anon', com cadeado em tudo e os projetos
+            // invisíveis; é melhor mandar entrar pelo login, que resolve a
+            // identidade pelo caminho normal.
+            if(temUsuario){ location.href = APP; return; }
+            mostrarForm('login');
+            show('Senha alterada. Entre com a nova senha.', 'ok');
+            b.disabled = false; b.textContent = 'Salvar nova senha';
+          });
       })
       .catch(function(err){ show(humano(err), 'err'); b.disabled = false; b.textContent = 'Salvar nova senha'; });
   });
@@ -305,7 +373,14 @@
 
     if(conf){
       api('/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'signup', token: conf }) })
-        .then(function(tok){ saveSession(tok, null); location.href = APP; })
+        .then(function(tok){ return sessaoComUsuario(tok); })
+        .then(function(temUsuario){
+          // O e-mail JÁ está confirmado. Sem identificar a conta, entrar
+          // agora seria entrar como 'anon' — ver sessaoComUsuario().
+          if(temUsuario){ location.href = APP; return; }
+          mostrarForm('login');
+          show('E-mail confirmado. Entre com sua senha.', 'ok');
+        })
         .catch(function(err){ show('Não foi possível confirmar o e-mail: ' + humano(err), 'err'); });
     } else if(rec){
       recoveryToken = rec;
