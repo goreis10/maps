@@ -127,6 +127,14 @@
     --del:#D92D20;  --del-bg:#FEF3F2;  --del-ln:#FECDCA;
     /* cor de cada análise, a mesma no mapa e na interface */
     --c-renda:#0E9F8A; --c-iso:#6B21A8;
+
+    /* Recuo das legendas em canvas, por canto — A TABELA ÚNICA. A CSS
+       posiciona a caixa na tela com estes valores e legendaIsoPos() lê os
+       mesmos para o PNG (ver .leg-* e legRecuo()). Os 104px do inferior
+       direito são a altura do grupo de zoom/bússola da MapLibre, que mora
+       nesse canto; os 44px do inferior esquerdo, o controle de escala. */
+    --leg-rec-sup:14px; --leg-rec-lado:14px;
+    --leg-rec-inf-esq:44px; --leg-rec-inf-dir:104px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%}
@@ -336,11 +344,21 @@
      porque painel e chips são HTML e não entram na imagem. */
   #isoLegenda,#rendaLegenda{position:absolute;z-index:1001;pointer-events:none;display:none;
     filter:drop-shadow(0 3px 10px rgba(28,25,23,.18))}
-  .leg-sup-esq{top:14px;left:14px}
-  .leg-sup-dir{top:14px;right:14px}
-  .leg-inf-esq{bottom:44px;left:14px}
-  /* 104px: altura do grupo de zoom/bússola da MapLibre, que mora aqui */
-  .leg-inf-dir{bottom:104px;right:14px}
+  /* RECUO DAS LEGENDAS EM CANVAS — uma tabela só, para os dois destinos.
+     A CSS posiciona a caixa na tela com estas variáveis e legendaIsoPos()
+     lê as MESMAS, multiplicadas pela escala, para posicionar no PNG.
+     Eram dois números diferentes: a CSS punha a caixa do canto inferior
+     direito 104px acima da borda (altura do grupo de zoom/bússola da
+     MapLibre, que mora nesse canto) e o PNG punha 44px × escala — 60px de
+     deslocamento no canto que a pessoa escolheu olhando a tela, enquanto o
+     produto promete que a caixa da tela e a do PNG são o mesmo desenho em
+     escalas diferentes. Os controles da MapLibre são DOM e não entram no
+     canvas, mas o recuo tem de ser o mesmo nos dois: o enquadramento é o
+     que a pessoa compôs. */
+  .leg-sup-esq{top:var(--leg-rec-sup);left:var(--leg-rec-lado)}
+  .leg-sup-dir{top:var(--leg-rec-sup);right:var(--leg-rec-lado)}
+  .leg-inf-esq{bottom:var(--leg-rec-inf-esq);left:var(--leg-rec-lado)}
+  .leg-inf-dir{bottom:var(--leg-rec-inf-dir);right:var(--leg-rec-lado)}
   #wrap.side-open #map{right:var(--drawer-w)}
   #wrap.side-open #ctrl{right:calc(var(--drawer-w) + 14px)}
   #wrap.side-open #edResize{display:block;right:calc(var(--drawer-w) - 5px)}
@@ -1541,6 +1559,28 @@ function aplicarPaleta(style, palName){
 }
 
 // Troca a paleta com o mapa já carregado, camada por camada.
+//
+// A PALETA É A BASE, NÃO A PALAVRA FINAL. paletaOps escreve line-color nas
+// mesmas camadas que as seções Vias, Rótulos e Mapa editam, então trocar de
+// paleta jogava no lixo, em silêncio, tudo que o usuário havia escolhido:
+// os input[type=color] continuavam mostrando as cores antigas, o mapa saía
+// com as novas, e nada era reaplicado. Pior: viasOrigCor/viasOrigCas
+// guardam a cor "original" só na PRIMEIRA vez, então trocar a paleta e
+// desligar o satélite restaurava a cor da paleta ANTERIOR — meio mapa numa
+// paleta, meio na outra, sem erro na tela.
+//
+// A ordem abaixo é a correção, e ela importa:
+//   1. esquecer os "originais", que agora são os da paleta nova;
+//   2. reafirmar as cores explícitas das vias (viaCfg[sub].cor) e
+//      recapturar os originais certos — pelo setSat quando o satélite está
+//      ligado, porque ele é quem manda nas vias nesse modo;
+//   3. reafirmar as cores explícitas dos rótulos (lblCfg[t].cor);
+//   4. reler para mapaCfg a cor que cada grupo da seção Mapa acabou de
+//      receber, para os input[type=color] da gaveta dizerem a verdade.
+//
+// O passo 4 só LÊ. Chamar __aplicarMapa() aqui repintaria fundo, água e
+// verde com os valores guardados — os da paleta anterior — sob vias já
+// escuras, e destruiria as paletas Mosaico.
 function recolorLive(palName){
   if(!map) return;
   var PAL = PALETAS[palName] || PALETAS.padrao;
@@ -1553,6 +1593,22 @@ function recolorLive(palName){
     });
   });
   paletaAtual = palName;
+
+  // 1. os "originais" das vias passam a ser os da paleta nova
+  Object.keys(viasOrigCor).forEach(function(k){ delete viasOrigCor[k]; });
+  Object.keys(viasOrigCas).forEach(function(k){ delete viasOrigCas[k]; });
+  // 2. reafirma as vias (e, no satélite, o look híbrido inteiro)
+  try{
+    var noSat = map.getLayer('satelite') &&
+                map.getLayoutProperty('satelite','visibility')==='visible';
+    if(noSat) setSat(true); else reaplicarVias();
+  }catch(e){ console.error('paleta/vias', e); }
+  // 3. rótulos: as cores escolhidas pelo usuário voltam a valer
+  try{ if(window.__lblRepintar) window.__lblRepintar(); }
+  catch(e){ console.error('paleta/rótulos', e); }
+  // 4. seção Mapa: lê do mapa, não escreve nele
+  try{ if(window.__mapaLerDoMapa) window.__mapaLerDoMapa(); }
+  catch(e){ console.error('paleta/mapa', e); }
 }
 
 // ── Dados: grupos e rótulos ──
@@ -2898,16 +2954,41 @@ function legendaRendaCaixa(ctx, esc, x, y, pintar){
 
 // Canto -> posição dentro de um canvas de larg×alt (já em px do device).
 // `desl` empilha a segunda caixa quando as duas escolhem o mesmo canto.
+// Recuo de um canto, lido da TABELA ÚNICA que vive no :root da CSS
+// (--leg-rec-*). A tela é posicionada pelas classes .leg-* com essas mesmas
+// variáveis, então as duas pontas não podem mais discordar: o PNG é o recuo
+// da tela multiplicado pela escala. Antes eram dois números — 104px na CSS
+// contra 44px×escala aqui — e a caixa do canto inferior direito saía 60px
+// mais baixa no arquivo do que na tela em que a pessoa compôs.
+//
+// Reserva: num navegador onde a propriedade personalizada não pudesse ser
+// lida, a caixa cai no recuo simples do canto (LEG_ISO.margem), que é a
+// margem horizontal que ela já usa. Não é uma segunda tabela — é o canto
+// cru, e aí o desenho fica sobre os controles da MapLibre em vez de errado
+// por 60px. Todo o resto do produto já depende de propriedades
+// personalizadas (a escala de tipos e de espaço inteira mora no :root).
+function legRecuo(nome){
+  try{
+    var v=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--leg-rec-'+nome));
+    if(isFinite(v)) return v;
+  }catch(e){}
+  return LEG_ISO.margem;
+}
+// Canto -> chave de recuo vertical. Um canto desconhecido cai em 'inf-esq',
+// exatamente como o `default:` abaixo e como pintarLegendaEl() faz com a
+// classe CSS — senão o PNG usaria o recuo de cima com a posição de baixo.
+function legRecuoChave(canto){
+  return (canto==='sup-esq'||canto==='sup-dir') ? 'sup'
+       : (canto==='inf-dir' ? 'inf-dir' : 'inf-esq');
+}
 function legendaIsoPos(canto, cx, larg, alt, esc, desl){
-  var m=LEG_ISO.margem*esc, d=desl||0;
-  // o controle de escala da MapLibre mora no canto inferior esquerdo e
-  // a bússola no inferior direito: sobe a caixa para não cobri-los
-  var mb=m+30*esc;
+  var mx=legRecuo('lado')*esc, d=desl||0;
+  var my=legRecuo(legRecuoChave(canto))*esc;
   switch(canto){
-    case 'sup-dir': return {x:larg-cx.w-m,  y:m+d};
-    case 'inf-dir': return {x:larg-cx.w-m,  y:alt-cx.h-mb-d};
-    case 'sup-esq': return {x:m,            y:m+d};
-    default:        return {x:m,            y:alt-cx.h-mb-d};   // inf-esq
+    case 'sup-dir': return {x:larg-cx.w-mx, y:my+d};
+    case 'inf-dir': return {x:larg-cx.w-mx, y:alt-cx.h-my-d};
+    case 'sup-esq': return {x:mx,           y:my+d};
+    default:        return {x:mx,           y:alt-cx.h-my-d};   // inf-esq
   }
 }
 
@@ -3459,6 +3540,14 @@ function montarEditor(){
       map.setPaintProperty(id,'text-halo-width', c.halo ? c.haloW : 0);
     });
   }
+  // Repinta os rótulos depois de uma troca de paleta. Apaga origTC porque a
+  // cor "original" do texto passou a ser a da paleta nova; NÃO apaga origTS,
+  // que guarda TAMANHOS — a paleta não mexe em tamanho de texto, e esquecer
+  // os originais faria o fator de escala se acumular a cada troca.
+  window.__lblRepintar = function(){
+    Object.keys(origTC).forEach(function(k){ delete origTC[k]; });
+    Object.keys(lblCfg).forEach(function(t){ aplicarLbl(t); });
+  };
   const lblUi = [
     {k:'cidade',  nome:'Cidades'},
     {k:'estrada', nome:'Estradas'},
@@ -3719,6 +3808,13 @@ function montarEditor(){
       ref.cor.value = '#1C1917'; ref.tam.value = 100;
       ref.chk.checked = d.halo; ref.hcor.value = d.haloCor; ref.hw.value = Math.round(d.haloW*10);
     });
+    // A PALETA TAMBÉM VOLTA AO PADRÃO. O botão diz "Padrão Maker Map
+    // restaurado" e não restaurava a paleta — e logo abaixo ele força
+    // mapaCfg = MAPA_PADRAO e APLICA, então com Dark Mosaico ativo fundo,
+    // água e verde voltavam ao claro sob vias escuras, com a gaveta de
+    // Cores ainda marcando Dark Mosaico. Vem DEPOIS do setSat(false) acima,
+    // para o satélite restaurar as cores antes de a base nova ser definida.
+    recolorLive('padrao'); marcarPaleta();
     // seção Mapa: volta às cores/visibilidade padrão
     Object.keys(mapaCfg).forEach(function(k){ Object.assign(mapaCfg[k], MAPA_PADRAO[k]); });
     mapaUi.forEach(function(t){ aplicarMapaCor(t.k); aplicarMapaVis(t.k); });
@@ -3880,6 +3976,29 @@ function montarEditor(){
       const c = mapaCfg[mapaUi[i].k], ins = r.querySelectorAll('input');
       ins[0].checked = c.on; ins[1].value = c.cor;
     });
+  };
+  // Depois de uma troca de paleta, a seção Mapa tem de dizer a cor que
+  // está no mapa. SÓ LÊ: aplicar aqui repintaria fundo, água e verde com
+  // os valores guardados — os da paleta anterior — sob vias já recoloridas,
+  // e era isso que apagava as paletas Mosaico.
+  //
+  // Guarda só se vier string '#…' ou 'rgb(': a camada pode carregar uma
+  // EXPRESSÃO (interpolate por zoom) ou undefined, e escrever isso em
+  // mapaCfg[k].cor acabaria num input[type=color] com valor inválido — que
+  // o navegador reseta para #000000 em silêncio, e o primeiro toque no
+  // controle pintaria o grupo de preto.
+  window.__mapaLerDoMapa = function(){
+    if(!map) return;
+    mapaUi.forEach(t=>{
+      const l = camadasMapa(t.k)[0];
+      if(!l || !map.getLayer(l.id)) return;
+      const prop = l.type==='background' ? 'background-color'
+                 : l.type==='fill' ? 'fill-color' : 'line-color';
+      let v;
+      try{ v = map.getPaintProperty(l.id, prop); }catch(e){ return; }
+      if(typeof v==='string' && (v.charAt(0)==='#' || v.indexOf('rgb(')===0)) mapaCfg[t.k].cor = v;
+    });
+    window.__syncMapaInputs();
   };
 
   // ── Salvar / restaurar as edições do usuário (localStorage por conta) ──
