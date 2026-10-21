@@ -1921,6 +1921,11 @@ function anelOrientado(pts, horario){
 }
 function construirMascara(){
   const mundo = anelOrientado([[-179.9,-85],[179.9,-85],[179.9,85],[-179.9,85]], false); // anti-horário
+  // coordinates[0] de propósito: o clarão da máscara segue o CONTORNO
+  // EXTERNO da gleba. Desde que o KMZ passou a trazer os furos
+  // (innerBoundaryIs), este anel não é mais o único da geometria — e
+  // repassar os furos para cá veilaria a reserva dentro da área, o que não
+  // é o que a máscara faz: ela ilumina a gleba inteira.
   const furos = maskCobreGlebas ? [] : DATA.features
     .filter(f=> f.geometry.type==='Polygon' && grupos[f.properties.municipio].on)
     .map(f=> anelLimpo(f.geometry.coordinates[0]))
@@ -6421,8 +6426,26 @@ function kmlParaFeats(txt, grupo){
       let pts = parseCoords(cEl && cEl.textContent);
       if(pts.length && pts[0][0]===pts[pts.length-1][0] && pts[0][1]===pts[pts.length-1][1]) pts=pts.slice(0,-1);
       if(pts.length<3) continue;
-      feats.push({nome, tipo:'poligono', gtype:'Polygon', coords:[[...pts, pts[0]]],
-        ha:areaHa(pts), lon:pts.reduce((s,p)=>s+p[0],0)/pts.length, lat:pts.reduce((s,p)=>s+p[1],0)/pts.length});
+      // Os FUROS (innerBoundaryIs) eram ignorados, e os hectares saíam só
+      // do contorno externo. Uma gleba com reserva, enclave ou faixa de
+      // domínio recortada vinha com área superestimada — e esse número vai
+      // para o cabeçalho, o rótulo no mapa, o popup e o cartão do kanban.
+      // Um quadrado de 1 km² com um furo de 0,25 km² dava 100 ha; agora dá 75.
+      const furos = [];
+      for(const inner of poly.getElementsByTagName('innerBoundaryIs')){
+        const iEl = inner.getElementsByTagName('coordinates')[0];
+        let ip = parseCoords(iEl && iEl.textContent);
+        if(ip.length && ip[0][0]===ip[ip.length-1][0] && ip[0][1]===ip[ip.length-1][1]) ip=ip.slice(0,-1);
+        if(ip.length>=3) furos.push(ip);
+      }
+      // Math.max(0, …): um furo mal desenhado (maior que o externo, ou
+      // dois furos sobrepostos) daria hectare negativo no cabeçalho —
+      // número obviamente errado é melhor que número negativo com cara
+      // de certo, e a área superestimada já era o defeito.
+      const ha = Math.max(0, furos.reduce((a,f)=> a-areaHa(f), areaHa(pts)));
+      feats.push({nome, tipo:'poligono', gtype:'Polygon',
+        coords:[[...pts, pts[0]], ...furos.map(f=>[...f, f[0]])],
+        ha, lon:pts.reduce((s,p)=>s+p[0],0)/pts.length, lat:pts.reduce((s,p)=>s+p[1],0)/pts.length});
     }
     for(const ls of pm.getElementsByTagName('LineString')){
       const pts = parseCoords(ls.getElementsByTagName('coordinates')[0]?.textContent);
