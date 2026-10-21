@@ -3997,6 +3997,16 @@ function montarEditor(){
         var _p=parseFloat(s.renda.ipcaPct);
         rendaRaio.ipcaPct=(isFinite(_p) && _p>=-50 && _p<=1000) ? _p : null;
         if(!isFinite(+s.renda.outros))      rendaRaio.outros=RENDA_PADRAO.outros;
+        // km fora da faixa que o campo #rdRaioKm aceita (1..2000) viria do
+        // Object.assign cru e iria direto para gerarCirculo e para a
+        // consulta do Censo: um raio 0 ou negativo desenha nada e um raio
+        // absurdo varre o país inteiro. Mesmos limites do campo.
+        var _km=parseFloat(s.renda.km);
+        rendaRaio.km=isFinite(_km) ? Math.max(1, Math.min(2000, _km)) : RENDA_PADRAO.km;
+        // heatModo decide QUAL camada acende; um valor desconhecido apagava
+        // as duas e deixava o chip de Calor ligado sobre um mapa sem calor.
+        if(s.renda.heatModo!=='renda' && s.renda.heatModo!=='dens')
+          rendaRaio.heatModo=RENDA_PADRAO.heatModo;
       }
       syncRaioRendaInputs();
       atualizarRaioRenda();
@@ -4765,7 +4775,13 @@ document.getElementById('riLblOn').onchange = function(e){ rendaIso.lbl.on=e.tar
 document.getElementById('riCtAplicar').onclick = function(){
   var la=parseFloat(document.getElementById('riCtLat').value);
   var lo=parseFloat(document.getElementById('riCtLon').value);
-  if(!isFinite(la) || !isFinite(lo)){ toast('Coordenadas inválidas.'); return; }
+  // Mesma faixa que edCtAplicar e rdCtAplicar já exigiam: só isFinite
+  // deixava passar lat 500, e aí o centro já tinha sido gravado e a fonte
+  // atualizada quando o construtor de LngLat lançava dentro do flyTo —
+  // o handler abortava no meio, com o estado meio aplicado.
+  if(!isFinite(la) || !isFinite(lo) || la<-90 || la>90 || lo<-180 || lo>180){
+    toast('Coordenadas inválidas (lat -90..90, lon -180..180).'); return;
+  }
   rendaIso.centro=[+lo.toFixed(5), +la.toFixed(5)];
   atualizarRendaIso(); renderRenda();
   if(map) map.flyTo({center:rendaIso.centro, zoom:Math.max(map.getZoom(), 9)});
@@ -4848,7 +4864,10 @@ document.getElementById('isoLegTit').oninput = function(e){ iso.legenda.titulo=e
 document.getElementById('isoCtAplicar').onclick = function(){
   var la=parseFloat(document.getElementById('isoCtLat').value);
   var lo=parseFloat(document.getElementById('isoCtLon').value);
-  if(!isFinite(la) || !isFinite(lo)){ toast('Coordenadas inválidas.'); return; }
+  // mesma faixa dos outros três centros — ver riCtAplicar
+  if(!isFinite(la) || !isFinite(lo) || la<-90 || la>90 || lo<-180 || lo>180){
+    toast('Coordenadas inválidas (lat -90..90, lon -180..180).'); return;
+  }
   iso.centro=[+lo.toFixed(5), +la.toFixed(5)];
   isoMudouParametro();
   if(map) map.flyTo({center:iso.centro, zoom:Math.max(map.getZoom(), 9)});
