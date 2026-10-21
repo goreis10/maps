@@ -1841,9 +1841,13 @@ function montarCamadas(){
       const p = e.features[0].properties;
       new maplibregl.Popup({closeButton:true, maxWidth:'280px'})
         .setLngLat(e.lngLat)
+        // esc(): município e nome vêm do <name> do KML e do nome do arquivo
+        // KMZ, e Popup.setHTML faz innerHTML sem sanitizar nada. Como
+        // localStorage['makermap.user'] guarda os tokens do Identity na
+        // mesma origem, um KMZ recebido de terceiro roubaria a sessão.
         .setHTML(`
-          <div class="pp-eyebrow" style="color:${p.cor_final}">${p.municipio}</div>
-          <div class="pp-name">${p.nome}</div>
+          <div class="pp-eyebrow" style="color:${p.cor_final}">${esc(p.municipio)}</div>
+          <div class="pp-name">${esc(p.nome)}</div>
           <div class="pp-row"><span>Área</span><b>${p.ha_txt}</b></div>
           <div class="pp-row"><span>Centroide</span><b>${p.lat}, ${p.lon}</b></div>
           <div class="pp-row"><span>${centroEhSe()?'Distância da Sé':'Dist. do centro'}</span><b>${Number(p.dist_sp).toLocaleString('pt-BR',{maximumFractionDigits:1})} km ${Number(p.dist_sp)<=raioKm?'· dentro do raio':'· fora do raio'}</b></div>
@@ -1980,10 +1984,16 @@ function ligarLinhaGrupo(el, m, g){
   const del = el.querySelector('.g-del');
   if(del) del.onclick = ev=>{ ev.stopPropagation(); excluirGrupo(m); };
 }
+// esc() no nome do grupo (= nome do arquivo KMZ, escolhido por quem
+// mandou o arquivo). Além do XSS, isto conserta o casamento por
+// textContent: excluirGrupo/updatePanelRow/aplicarEstado acham a linha
+// comparando .g-name.textContent com o nome do grupo, e com markup cru no
+// nome o textContent passava a ser o texto renderizado — a lixeira não
+// apagava nada.
 function htmlLinhaGrupo(m, g, cor){
   return `<span class="sw" style="background:${cor}"></span>
     <span class="g-body">
-      <span class="g-name">${m}</span>
+      <span class="g-name">${esc(m)}</span>
       <span class="g-meta">${metaGrupo(g)}</span>
       <span class="g-barwrap"><span class="g-bar"><i style="width:${Math.min(100,Math.max(3,100*g.ha/maxHa))}%;background:${cor}"></i></span><span class="g-pct">${pctGrupo(g)}%</span></span>
     </span>
@@ -3107,7 +3117,14 @@ function setCidade(m, prop, val){
         el.querySelector('.g-bar i').style.background = val;
       }
     });
-    document.querySelectorAll(`#edAreas input[data-mun="${m}"][type=color]`).forEach(i=> i.value=val);
+    // Compara em JavaScript em vez de interpolar o nome dentro do seletor:
+    // um nome de grupo com " montava um seletor inválido, o
+    // querySelectorAll lançava SyntaxError e a troca de cor por cidade
+    // parava de funcionar. Escapar não resolveria — o atributo volta com o
+    // caractere cru na leitura, que é justamente o que dataset.mun dá.
+    document.querySelectorAll('#edAreas input[type=color][data-mun]').forEach(i=>{
+      if(i.dataset.mun===m) i.value=val;
+    });
   }
 }
 function setArea(idx, prop, val){
@@ -3266,7 +3283,7 @@ function montarEditor(){
     const cor = CORES[m] || '#8A8F98';
     const row = document.createElement('div');
     row.className='e-row';
-    row.innerHTML = `<input type="color" value="${cor}"><span class="e-nome">${m}</span>
+    row.innerHTML = `<input type="color" value="${cor}"><span class="e-nome">${esc(m)}</span>
       <label title="preenchimento"><input type="checkbox" checked>fill</label>`;
     row.querySelector('input[type=color]').oninput = e=> setCidade(m,'cor_final',e.target.value);
     row.querySelector('input[type=checkbox]').onchange = e=> setCidade(m,'fill_on', e.target.checked?1:0);
@@ -3277,8 +3294,10 @@ function montarEditor(){
     const p = f.properties;
     const row = document.createElement('div');
     row.className='e-row';
-    row.innerHTML = `<input type="color" value="${p.cor_final}" data-mun="${p.municipio}">
-      <span class="e-nome" title="${p.nome}">${p.nome}</span>
+    // esc() também no atributo: um nome com " fugia do title e virava
+    // atributo de evento (" onmouseover="…).
+    row.innerHTML = `<input type="color" value="${p.cor_final}" data-mun="${esc(p.municipio)}">
+      <span class="e-nome" title="${esc(p.nome)}">${esc(p.nome)}</span>
       <label title="preenchimento"><input type="checkbox" ${p.tipo==='linha'?'disabled':'checked'}>fill</label>`;
     row.querySelector('input[type=color]').oninput = e=> setArea(p.idx,'cor_final',e.target.value);
     row.querySelector('input[type=checkbox]').onchange = e=> setArea(p.idx,'fill_on', e.target.checked?1:0);
@@ -6450,7 +6469,7 @@ function excluirGrupo(m){
 function appendEditorCidade(m){
   const row = document.createElement('div');
   row.className='e-row';
-  row.innerHTML = `<input type="color" value="${CORES[m]}"><span class="e-nome">${m}</span>
+  row.innerHTML = `<input type="color" value="${CORES[m]}"><span class="e-nome">${esc(m)}</span>
     <label title="preenchimento"><input type="checkbox" checked>fill</label>`;
   row.querySelector('input[type=color]').oninput = e=> setCidade(m,'cor_final',e.target.value);
   row.querySelector('input[type=checkbox]').onchange = e=> setCidade(m,'fill_on', e.target.checked?1:0);
@@ -6460,8 +6479,8 @@ function appendEditorArea(f){
   const p = f.properties;
   const row = document.createElement('div');
   row.className='e-row';
-  row.innerHTML = `<input type="color" value="${p.cor_final}" data-mun="${p.municipio}">
-    <span class="e-nome" title="${p.nome}">${p.nome}</span>
+  row.innerHTML = `<input type="color" value="${p.cor_final}" data-mun="${esc(p.municipio)}">
+    <span class="e-nome" title="${esc(p.nome)}">${esc(p.nome)}</span>
     <label title="preenchimento"><input type="checkbox" ${p.tipo!=='poligono'?'disabled':'checked'}>fill</label>`;
   row.querySelector('input[type=color]').oninput = e=> setArea(p.idx,'cor_final',e.target.value);
   row.querySelector('input[type=checkbox]').onchange = e=> setArea(p.idx,'fill_on', e.target.checked?1:0);
