@@ -5044,6 +5044,11 @@ var censoUF = {};             // cod -> 'ok' | 'carregando' | 'erro'
 var censoStatus = 'vazio';    // vazio | carregando | ok | erro | fora
 var censoDist = null;         // Float32Array de distâncias (reaproveitado)
 var censoCache = {chave:null, res:null};
+// Grade de ocupação (Set de células de 0,05°, ~5,5 km) usada para medir que
+// fração do recorte tem setor censitário na base. Montada por demanda e
+// invalidada junto com o cache quando uma UF entra — ver censoGradeMontar().
+var CENSO_CEL = 0.05;
+var censoGrade = null;
 
 // Faixas de renda. As MESMAS cores pintam os pontos e o calor de renda no
 // mapa e as barras da distribuição na gaveta — assim o gráfico serve de
@@ -5164,7 +5169,7 @@ function censoAnexar(cod, js){
   for(var i=0;i<js.s.length;i++) CENSO.s.push(js.s[i]);
   censoUF[cod]='ok';
   censoDist=new Float32Array(CENSO.s.length);   // o vetor de distâncias cresceu
-  censoCache.chave=null;
+  censoCache.chave=null; censoGrade=null;       // a grade de ocupação cresceu junto
 }
 
 function carregarCenso(){
@@ -5320,7 +5325,7 @@ function censoSelecionarPoly(geom){
 function censoAgregar(idx, area){
   if(!idx.length) return {vazio:true, idx:[]};
   var S=CENSO.s, fat=fatorRenda();      // correção IPCA × demais moradores
-  var dom=0, pes=0, wMed=0, wMdn=0, domRenda=0;
+  var dom=0, pes=0, wMed=0, domRenda=0, mdnPares=[];
   var muns={}, faixas=[0,0,0,0,0,0,0], faixaTot=0;
   for(var k=0;k<idx.length;k++){
     var r=S[idx[k]];
@@ -5328,7 +5333,11 @@ function censoAgregar(idx, area){
     muns[r[2]]=(muns[r[2]]||0)+r[3];
     if(r[5]>0){
       var rm=r[5]*fat, rd=r[6]*fat;
-      wMed+=rm*r[3]; wMdn+=rd*r[3]; domRenda+=r[3];
+      wMed+=rm*r[3]; domRenda+=r[3];
+      // A mediana setorial entra como PAR (valor, domicílios) para
+      // censoMedianaPond ordenar depois: somar rd*r[3] aqui dava a média
+      // ponderada das medianas, que não é mediana nenhuma.
+      mdnPares.push([rd, r[3]]);
       // A FAIXA É DECIDIDA SOBRE O VALOR ARREDONDADO, que é exatamente o
       // que censoCamadas() grava em 'renda' e o que censoStepCor() usa para
       // escolher a cor do ponto no mapa. Decidir aqui sobre o valor cheio
@@ -5348,13 +5357,131 @@ function censoAgregar(idx, area){
     pes:Math.round(pes),
     morDom: dom>0 ? pes/dom : 0,
     rendaMedia:   domRenda>0 ? wMed/domRenda : 0,
-    rendaMediana: domRenda>0 ? wMdn/domRenda : 0,
+    rendaMediana: censoMedianaPond(mdnPares, domRenda),
     domSemRenda: dom-domRenda,
     densDom: area>0 ? dom/area : 0, densPes: area>0 ? pes/area : 0, area:area,
     margem: 0, setorMedioM: 0,          // preenchidos por quem chamou
     muns:lista, munNomes:lista.slice(0,3).map(function(c){ return CENSO.mun[c]||c; }),
     faixas:faixas, faixaTot:faixaTot, idx:idx
   };
+}
+
+// A MEDIANA TEM DE SER UMA MEDIANA.
+//
+// Até aqui o painel somava rd*dom e dividia pelo total: isso é a MÉDIA
+// PONDERADA DAS MEDIANAS SETORIAIS, impressa com o rótulo "Renda mediana".
+// Erra sempre para cima, porque a cauda rica dos setores puxa a soma e a
+// mediana de verdade não se deixa puxar: em Campinas 10 km dava 6.329
+// contra 4.500 reais (+40,6%); num raio de 100 km da Sé, +57,8%. O rótulo
+// é contrato com a planilha, palavra por palavra, então quem tinha de
+// mudar era a conta.
+//
+// Mediana ponderada por domicílios: ordena os setores por valor e devolve
+// aquele em que o acumulado de domicílios cruza a metade. Custo medido:
+// 20 ms para 76.738 setores — e o resultado é cacheado em censoCache.
+//
+// A MÉDIA continua sobre o valor cheio e as FAIXAS continuam decididas
+// sobre Math.round(rm): nenhuma das duas regras muda aqui.
+function censoMedianaPond(pares, domTot){
+  if(!pares.length || !(domTot>0)) return 0;
+  pares.sort(function(a,b){ return a[0]-b[0]; });
+  var meta=domTot/2, acc=0;
+  for(var i=0;i<pares.length;i++){
+    acc+=pares[i][1];
+    if(acc>=meta) return pares[i][0];
+  }
+  return pares[pares.length-1][0];   // arredondamento: o último par fecha a soma
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  COBERTURA DO RECORTE — que fração dele a base realmente cobre
+//
+//  A base tem SP, MG e BA. Com o centro num deles e a área entrando em
+//  PR/MS/GO/RJ, o painel contava os domicílios da parte coberta e dividia
+//  pela área INTEIRA do recorte: "Domicílios ocupados", "Pessoas",
+//  "Densidade por km²" e "Municípios" saíam sem uma palavra de aviso.
+//  Havia tarja para UF do manifesto que falhou na rede (censoUFsFaltando)
+//  e para centro fora de tudo ('fora'); não havia nada para este caso,
+//  que é o comum. Num raio de 30 km em Presidente Epitácio só 57% da área
+//  tem dado; num raio de 500 km da Sé o painel imprimia 20.058.352
+//  domicílios e "25,54 dom/km²".
+//
+//  A medida NÃO pode ser a união das bboxes do manifesto: a bbox de SP
+//  engole pedaços de MS, PR e MG, e dava 100% justamente em Epitácio,
+//  Ourinhos, Ilha Solteira e Juiz de Fora. Quem responde é a presença de
+//  setor de verdade, por uma grade de ocupação.
+// ══════════════════════════════════════════════════════════════════
+// Células de 0,05° (~5,5 km) com pelo menos um setor. Montada por demanda
+// e guardada: 35 ms para os 179.224 setores de SP+MG+BA, 23.205 células.
+function censoGradeMontar(){
+  if(censoGrade) return censoGrade;
+  var g=new Set();
+  if(CENSO && CENSO.s) for(var i=0;i<CENSO.s.length;i++)
+    g.add(Math.round(CENSO.s[i][0]/CENSO_CEL)+'|'+Math.round(CENSO.s[i][1]/CENSO_CEL));
+  censoGrade=g;
+  return g;
+}
+// Percentual da área do recorte com setor censitário por perto. Amostra o
+// recorte numa grade de 40 passos por eixo e pergunta à grade de ocupação.
+//
+// A VIZINHANÇA DE ±2 CÉLULAS (~11 km) é o único parâmetro que separa os
+// dois conjuntos de aceitação, e foi medida caso a caso: com ±1 o sertão da
+// BA e Barreiras — plenamente cobertos, só com setores enormes — passariam
+// a avisar; com ±3 Ourinhos, que de fato tem 11% da área no Paraná, cala.
+// Não mexer aqui sem refazer a tabela inteira.
+function censoCoberturaPct(rec){
+  if(!CENSO || !CENSO.s || !CENSO.s.length) return 100;
+  var G=censoGradeMontar(), K=2;
+  var temPerto=function(la, lo){
+    var i=Math.round(la/CENSO_CEL), j=Math.round(lo/CENSO_CEL);
+    for(var a=-K;a<=K;a++) for(var b=-K;b<=K;b++) if(G.has((i+a)+'|'+(j+b))) return true;
+    return false;
+  };
+  var n=0, com=0;
+  if(rec && rec.geom){
+    // Isócrona: grade da caixa do polígono, filtrada pelo polígono — a
+    // mesma pergunta "quem está dentro?" que censoSelecionarPoly faz.
+    var bb=geomCaixa(rec.geom);
+    if(!bb) return 100;
+    var dLon=(bb[2]-bb[0])/40, dLat=(bb[3]-bb[1])/40;
+    if(!(dLon>0) || !(dLat>0)) return 100;
+    for(var gx=0;gx<=40;gx++) for(var gy=0;gy<=40;gy++){
+      var plo=bb[0]+gx*dLon, pla=bb[1]+gy*dLat;
+      if(!pontoEmPoligono(plo, pla, rec.geom)) continue;
+      n++; if(temPerto(pla, plo)) com++;
+    }
+  } else if(rec && rec.km>0){
+    var km=rec.km, kx=111.320*Math.cos(rec.lat*Math.PI/180) || 1, ky=110.574;
+    // Piso de 250 m no passo: num raio de 1 km a grade de km/40 seria de
+    // 25 m, mil vezes mais fina que a célula de 5,5 km que ela consulta.
+    var passo=Math.max(0.25, km/40);
+    for(var dy=-km;dy<=km;dy+=passo) for(var dx=-km;dx<=km;dx+=passo){
+      if(dx*dx+dy*dy>km*km) continue;
+      n++; if(temPerto(rec.lat+dy/ky, rec.lon+dx/kx)) com++;
+    }
+  }
+  return n>0 ? 100*com/n : 100;
+}
+
+// A frase do aviso de cobertura vive em UM lugar: o painel imprime a
+// primeira oração em negrito, e as duas abas da planilha levam a frase
+// inteira no topo. Três cópias de uma afirmação sobre a qualidade do
+// número é exatamente como elas passam a divergir.
+//
+// "Ao menos" não é modéstia: a grade de 5,5 km com vizinhança de ±2
+// SUBESTIMA o buraco (em Epitácio ela mede 83% da área com dado, onde a
+// medida fina por setor dá 57%), então o percentual impresso é piso.
+// Por isso também o Math.floor: arredondar para cima tornaria o "ao
+// menos" falso por fração de ponto.
+function censoCoberturaFrase(q){
+  var car=censoNomesCarregadas();
+  return [
+    'Ao menos '+Math.floor(100-q.cobertura)+'% da área deste recorte não tem setor censitário na base',
+    '— estado vizinho que a base ainda não cobre'+
+      (car.length ? ' (carregados hoje: '+car.join(', ')+')' : '')+
+      ', água ou área sem domicílios. Os totais abaixo contam só a parte com dado, '+
+      'e a densidade por km² divide pelo recorte inteiro — está subestimada nessa proporção.'
+  ];
 }
 
 function censoConsulta(lat, lon, raioKm){
@@ -5367,7 +5494,15 @@ function censoConsulta(lat, lon, raioKm){
   var S=CENSO.s, D=censoDist, rs=raioKm/Math.sqrt(idx.length), domBorda=0;
   for(var j=0;j<S.length;j++){ var dd=D[j]; if(dd>=raioKm-rs && dd<=raioKm+rs) domBorda+=S[j][3]; }
   q.setorMedioM=rs*1000;
-  q.margem = q.dom>0 ? domBorda/q.dom*100 : 100;
+  // Mesmo teto de 100% do ramo do polígono, e pelo mesmo motivo: a banda
+  // conta domicílios de fora do recorte e divide pelos de dentro, então em
+  // recorte minúsculo passa de 100%. A regra estava escrita nos dois
+  // lugares e só o polígono a tinha — num raio de 1 km em SP, 157 de 1.021
+  // centros reais passavam de 100% e o painel chegava a imprimir
+  // "19.800,0% dos domicílios estão na faixa de incerteza da borda".
+  // Acima de 100 a mensagem já é a mesma: não use estes números.
+  q.margem = q.dom>0 ? Math.min(100, domBorda/q.dom*100) : 100;
+  q.cobertura = censoCoberturaPct({lat:lat, lon:lon, km:raioKm});
   return q;
 }
 
@@ -5390,6 +5525,7 @@ function censoConsultaPoly(geom){
   // margem 0% SEM aviso, enquanto o painel imprime domicílios e pessoas —
   // exatamente o número confiante e errado que a margem existe para impedir
   q.margem = (q.dom>0 && q.area>0) ? Math.min(100, censoBordaPoly(geom, rs)/q.dom*100) : 100;
+  q.cobertura = censoCoberturaPct({geom:geom});
   return q;
 }
 
@@ -5642,6 +5778,18 @@ function renderRenda(){
       '<a id="rdRetentar" style="color:inherit;text-decoration:underline;cursor:pointer">tentar de novo</a></div>'
     : '';
 
+  // Cobertura parcial: parte do recorte está fora da base (estado vizinho
+  // ainda não publicado, mar, área sem domicílios). Diferente do aviso
+  // acima, que é falha de rede sobre um estado que a base TEM, e diferente
+  // de 'fora', que é o centro fora de tudo. Este é o caso comum, e era o
+  // único sem palavra nenhuma na tela.
+  var avisoCob = '';
+  if(q.cobertura < 95){
+    var fr = censoCoberturaFrase(q);
+    avisoCob = '<div class="rd-msg '+(q.cobertura<80 ? 'bad' : 'warn')+'"><b>'+
+      esc(fr[0])+'</b> '+esc(fr[1])+'</div>';
+  }
+
   // Confiabilidade: em raio pequeno a margem de borda domina o resultado.
   var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
   var aviso='';
@@ -5741,7 +5889,8 @@ function renderRenda(){
     (rendaModo==='iso' ? '<p>O recorte é um tempo de deslocamento, '+
       'calculado sobre a malha viária do OpenStreetMap <b>sem considerar trânsito</b>.</p>' : '')+
     '<p>Média condicional: responsáveis sem rendimento não entram. '+
-    'Corte por centroide do setor.</p>'+
+    'Corte por centroide do setor. A <b>mediana</b> é a mediana entre os '+
+    'setores do recorte, ponderada por domicílios.</p>'+
     '</div></details>';
 
   box.innerHTML=
@@ -5777,7 +5926,9 @@ function renderRenda(){
       ? '<div class="rd-stat"><span>Sem renda informada</span><b>'+nf(q.domSemRenda)+' dom.</b></div>'
       : '')+
     '<div class="rd-stat"><span>Municípios ('+q.muns.length+')</span><b style="font-weight:600;font-size:var(--fs-1)">'+esc(munTxt)+'</b></div>'+
-    avisoUF+aviso+
+    // Território errado antes de borda incerta: contar outro estado é mais
+    // grave que contar mal a franja do recorte.
+    avisoUF+avisoCob+aviso+
     // Sem nenhum setor com renda, o gráfico seria sete linhas "0,0% (0)" e
     // um "Base: 0" — ruído sobre uma informação que o aviso acima já deu.
     (semRenda ? '' :
@@ -6751,6 +6902,15 @@ function rendaPlanilhaFolhas(q){
     L.push([]);
   }
 
+  // Cobertura parcial vem ANTES da margem de borda: contar outro estado é
+  // mais grave que contar mal a franja. Mesma ordem do painel.
+  var cob = q.cobertura < 95 ? censoCoberturaFrase(q) : null;
+  if(cob){
+    L.push([xT('ATENÇÃO — O RECORTE NÃO ESTÁ TODO COBERTO PELA BASE', E.NEG)]);
+    L.push([xT(cob[0]+' '+cob[1])]);
+    L.push([]);
+  }
+
   var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
   if(nivel==='bad'){
     L.push([xT('ATENÇÃO — NÃO USE ESTES NÚMEROS COMO FECHADOS', E.NEG)]);
@@ -6772,6 +6932,10 @@ function rendaPlanilhaFolhas(q){
   L.push([xT('RECORTE', E.NEG)]);
   L.push([xT(rendaModo==='iso' ? 'Dentro da isócrona' : 'Dentro do raio'), xT(rendaRecorteTxt())]);
   L.push([xT('Área'), xN(q.area, E.DEC), xT('km²')]);
+  // A cobertura fica ao lado da área porque é um atributo dela: é a fração
+  // da área que tem setor censitário na base. Fração, não 41,9 — célula de
+  // percentual, como manda o resto da planilha.
+  L.push([xT('Área com setor censitário'), xN(q.cobertura/100, E.PCT)]);
   L.push([]);
 
   L.push([xT('TOTAIS', E.NEG)]);
@@ -6819,8 +6983,10 @@ function rendaPlanilhaFolhas(q){
     ? 'Renda domiciliar estimada: a do responsável mais '+(+rendaRaio.outros)+'% atribuídos '+
       'aos demais moradores. É uma estimativa sua, não um dado do Censo.'
     : 'Mostrando apenas a renda do responsável. A renda domiciliar costuma ser 1,5 a 2× maior.')]);
+  // Pelo MESMO formatador do painel: cru, saía "20172" onde a tela escreve
+  // "20.172" — o mesmo número parecendo outro no arquivo que viaja.
   if(q.domSemRenda>0){
-    L.push([xT('Os '+q.domSemRenda+' domicílios sem renda informada (setor sem informação de '+
+    L.push([xT('Os '+nfInt(q.domSemRenda)+' domicílios sem renda informada (setor sem informação de '+
       'rendimento) contam no total de domicílios e de pessoas; ficam de fora da média, da '+
       'mediana e da distribuição por faixa.')]);
   }
@@ -6829,7 +6995,8 @@ function rendaPlanilhaFolhas(q){
       'OpenStreetMap, sem considerar trânsito.')]);
   }
   L.push([xT('Média condicional: responsáveis sem rendimento não entram. '+
-    'Corte por centroide do setor.')]);
+    'Corte por centroide do setor. A mediana é a mediana entre os setores do '+
+    'recorte, ponderada por domicílios.')]);
 
   var folhas=[{nome:'Resumo', linhas:L, larguras:[34,16,46]}];
   if(semRenda) return folhas;
@@ -6839,6 +7006,14 @@ function rendaPlanilhaFolhas(q){
   // de que base os percentuais são e em que moeda estão os valores.
   var F=[];
   F.push([xT('Domicílios por faixa de renda', E.TIT)]);
+  // O aviso de cobertura se repete aqui, no TOPO, pelo mesmo motivo que as
+  // premissas se repetem: quem copia só esta tabela tem de levar junto que
+  // parte do recorte não tem dado.
+  if(cob){
+    F.push([xT('ATENÇÃO — O RECORTE NÃO ESTÁ TODO COBERTO PELA BASE', E.NEG)]);
+    F.push([xT(cob[0]+' '+cob[1])]);
+    F.push([]);
+  }
   F.push([xT(rendaModo==='iso' ? 'Dentro da isócrona' : 'Dentro do raio'), xT(rendaRecorteTxt())]);
   prem.forEach(function(p){ F.push([xT(p[0]), xT(p[1])]); });
   F.push([xT('Base'), xN(q.faixaTot, E.INT), xT('domicílios com renda informada')]);
