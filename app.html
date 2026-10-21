@@ -861,7 +861,13 @@
   </div>
 
   <!-- Gaveta: Salvar Projeto -->
-  <div id="drawerSave" class="side-drawer" role="dialog" aria-modal="true">
+  <!-- role="dialog" SEM aria-modal: não há armadilha de foco e o mapa
+       continua operável com a gaveta aberta, então aria-modal="true" era
+       afirmação falsa para leitor de tela. O que as gavetas fechadas
+       ganharam é `inert` (ver gavetaInerte): sem ele, o Tab a partir do
+       cabeçalho entrava em dezenas de controles invisíveis, com o anel de
+       foco fora da tela, e dava para acioná-los às cegas. -->
+  <div id="drawerSave" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Salvar Projeto</div>
       <button id="saveClose" class="e-x" title="fechar">×</button>
@@ -875,7 +881,7 @@
   </div>
 
   <!-- Gaveta: Meus Projetos -->
-  <div id="drawerProj" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerProj" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Meus Projetos</div>
       <button id="projClose" class="e-x" title="fechar">×</button>
@@ -886,7 +892,7 @@
   </div>
 
   <!-- Gaveta: Cores do mapa (paletas pré-definidas) -->
-  <div id="drawerCores" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerCores" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Cores do mapa</div>
       <button id="coresClose" class="e-x" title="fechar">×</button>
@@ -938,7 +944,7 @@
   </div>
 
   <!-- Gaveta: Mapa de renda (Pro) — raio próprio; a camada de renda entra depois -->
-  <div id="drawerRenda" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerRenda" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Mapa de renda</div>
       <button id="rendaClose" class="e-x" title="fechar">×</button>
@@ -1099,7 +1105,7 @@
     </details>
   </div>
 
-  <div id="drawerIso" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerIso" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Isócrona</div>
       <button id="isoClose" class="e-x" title="fechar">×</button>
@@ -1157,7 +1163,7 @@
        arquivo: empurrar o mapa para a esquerda faria a imagem sair mais
        estreita só porque a gaveta está aberta, e o enquadramento que o
        usuário escolheu antes de clicar seria outro no arquivo. Ela sobrepõe. -->
-  <div id="drawerExport" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerExport" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Exportar imagem</div>
       <button id="expClose" class="e-x" title="fechar">×</button>
@@ -4369,17 +4375,39 @@ aplicarPlano();
 
 const __wrap = document.getElementById('wrap');
 var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda','drawerIso','drawerExport'];
+
+// Gaveta fechada sai do alcance do teclado.
+//
+// As seis gavetas e o #editor são escondidos só por
+// transform:translateX(101%) — continuam no fluxo, visíveis para o
+// navegador e para o leitor de tela. Sem `inert`, o Tab a partir do
+// cabeçalho entrava em dezenas de controles fora da tela (o #editor é a
+// maior coleção de controles do produto), com o anel de foco invisível, e
+// dava para acioná-los às cegas: trocar cor de via, ligar camada, apagar
+// projeto. aria-hidden acompanha porque `inert` é recente e um leitor de
+// tela antigo ainda narraria o conteúdo.
+function gavetaInerte(el, v){
+  if(el){ el.inert = v; el.setAttribute('aria-hidden', v?'true':'false'); }
+}
+// Todas nascem fechadas — o estado inicial tem de dizer isso ao teclado
+// também, senão a primeira volta do Tab já entra nelas.
+GAVETAS_IDS.forEach(function(id){ gavetaInerte(document.getElementById(id), true); });
+gavetaInerte(document.getElementById('editor'), true);
 function abrirEdicao(on){
   if(on && typeof expExportando!=='undefined' && expExportando){
     toast('Aguarde a exportação terminar.'); return;
   }
   const ed = document.getElementById('editor');
   if(on){ // abrir a Edição fecha as gavetas laterais
-    GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
+    GAVETAS_IDS.forEach(function(id){
+      var d=document.getElementById(id);
+      if(d){ d.classList.remove('show'); gavetaInerte(d, true); }
+    });
     __wrap.classList.remove('side-open');
     __wrap.classList.remove('exp-open');
     marcarChipGaveta(null);   // senão o chip continuaria marcado como aberto
   }
+  gavetaInerte(ed, !on);
   ed.classList.toggle('show', on);
   __wrap.classList.toggle('editing', on);
   document.getElementById('chipEdit').classList.toggle('on', on);
@@ -4417,14 +4445,26 @@ function abrirGaveta(id){
     toast('Aguarde a exportação terminar.'); return;
   }
   abrirEdicao(false);
-  GAVETAS_IDS.forEach(function(g){ var d=document.getElementById(g); if(d) d.classList.toggle('show', g===id); });
+  GAVETAS_IDS.forEach(function(g){
+    var d=document.getElementById(g);
+    if(d){ d.classList.toggle('show', g===id); gavetaInerte(d, g!==id); }
+  });
   __wrap.classList.add('side-open');
   __wrap.classList.toggle('exp-open', !!GAVETAS_SOBREPOEM[id]);
   marcarChipGaveta(id);
   setTimeout(function(){ if(map) map.resize(); }, 360);
 }
 function fecharGaveta(){
-  GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
+  GAVETAS_IDS.forEach(function(id){
+    var d=document.getElementById(id);
+    if(d){ d.classList.remove('show'); gavetaInerte(d, true); }
+  });
+  // o #editor entra aqui também: fechar tudo é fechar tudo. O teste de
+  // .show não é redundância sobre a regra "uma por vez" — é a garantia de
+  // que, se ela um dia furar, o editor fique inútil só até alguém notar e
+  // não silenciosamente intocável com a gaveta na tela.
+  var _ed=document.getElementById('editor');
+  if(_ed && !_ed.classList.contains('show')) gavetaInerte(_ed, true);
   __wrap.classList.remove('side-open');
   __wrap.classList.remove('exp-open');
   marcarChipGaveta(null);
