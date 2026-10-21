@@ -3299,6 +3299,17 @@ function ctSync(pfx){
 }
 // "lat, lon" colado em vez de endereço. Devolve [lon,lat] ou null.
 // Qualquer letra no campo significa endereço, e aí nem tentamos.
+// Um centro de projeto salvo é válido? [lon, lat], finitos e na faixa.
+// `length===2` sozinho não basta: uma lat 500 (localStorage adulterado, ou
+// um projeto gravado por uma versão com outro bug) chega em gerarCirculo e
+// produz um anel de NaN — o círculo desaparece do mapa sem nenhuma
+// mensagem. Os campos de centro da interface já validam a faixa
+// (edCtAplicar e os três irmãos); o caminho de restauração não validava.
+function centroValido(c){
+  return Array.isArray(c) && c.length === 2 &&
+         isFinite(c[0]) && isFinite(c[1]) &&
+         Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90;
+}
 function coordsDoTexto(q){
   var t = String(q==null?'':q).trim();
   if(!t || !/^[-+0-9.,;\s]+$/.test(t)) return null;
@@ -3544,9 +3555,28 @@ function montarEditor(){
   // cor "original" do texto passou a ser a da paleta nova; NÃO apaga origTS,
   // que guarda TAMANHOS — a paleta não mexe em tamanho de texto, e esquecer
   // os originais faria o fator de escala se acumular a cada troca.
+  //
+  // Reafirma SÓ A COR, e só onde o usuário escolheu uma. Chamar aplicarLbl()
+  // aqui parecia natural e apagava o halo da paleta: aplicarLbl escreve
+  // text-halo-color SEMPRE, e o padrão de lblCfg[*].haloCor é #FFFFFF — a
+  // paleta acabava de pôr halo #1D1D1B no Dark Mosaico e isto trocava por
+  // branco, sobre texto #E6E6E6 num fundo #1D1D1B: nome de via, de água e
+  // de parque viravam borrão. Nas claras o estrago era menor, mas em TODAS
+  // as camadas `place` ganhavam halo 1,2 onde paletaOps havia posto 0.
+  // Mesmo defeito que o resto desta correção existe para consertar — meio
+  // mapa numa paleta, meio na outra — só que no halo.
   window.__lblRepintar = function(){
+    if(!map) return;
     Object.keys(origTC).forEach(function(k){ delete origTC[k]; });
-    Object.keys(lblCfg).forEach(function(t){ aplicarLbl(t); });
+    classificarRotulos();
+    Object.keys(lblCfg).forEach(function(t){
+      if(!lblCfg[t].cor) return;
+      lblTiers[t].forEach(function(id){
+        if(!map.getLayer(id)) return;
+        origTC[id] = map.getPaintProperty(id,'text-color');
+        map.setPaintProperty(id,'text-color', lblCfg[t].cor);
+      });
+    });
   };
   const lblUi = [
     {k:'cidade',  nome:'Cidades'},
@@ -3996,7 +4026,12 @@ function montarEditor(){
                  : l.type==='fill' ? 'fill-color' : 'line-color';
       let v;
       try{ v = map.getPaintProperty(l.id, prop); }catch(e){ return; }
-      if(typeof v==='string' && (v.charAt(0)==='#' || v.indexOf('rgb(')===0)) mapaCfg[t.k].cor = v;
+      // #rrggbb e nada mais. Um input[type=color] só aceita essa forma:
+      // 'rgb(…)', '#rgb' e '#rrggbbaa' são sanitizados para #000000 em
+      // silêncio, e o primeiro toque no controle pintaria o grupo de preto
+      // — que é justamente o que este guarda existe para evitar. Aceitar
+      // 'rgb(' deixava a porta aberta para o mesmo defeito.
+      if(/^#[0-9a-fA-F]{6}$/.test(v)) mapaCfg[t.k].cor = v;
     });
     window.__syncMapaInputs();
   };
@@ -4090,7 +4125,7 @@ function montarEditor(){
       // raio
       if(s.raio){
         raioKm=s.raio.km||100;
-        centroRaio=(s.raio.centro&&s.raio.centro.length===2)?s.raio.centro.slice():CENTRO_SE.slice();
+        centroRaio=centroValido(s.raio.centro)?s.raio.centro.slice():CENTRO_SE.slice();
         document.getElementById('edRaioKm').value=raioKm;
         document.getElementById('edRaioCor').value=s.raio.cor||'#337FFF';
         document.getElementById('edRaioFill').checked=s.raio.fill!==false;
@@ -4118,7 +4153,7 @@ function montarEditor(){
         rendaRaio.lbl=Object.assign(JSON.parse(JSON.stringify(RENDA_PADRAO.lbl)), s.renda.lbl||{});
         // legenda no mapa (projetos anteriores à 3.0 não têm: cai no padrão)
         rendaRaio.legenda=Object.assign(JSON.parse(JSON.stringify(RENDA_PADRAO.legenda)), s.renda.legenda||{});
-        rendaRaio.centro=(s.renda.centro&&s.renda.centro.length===2)?s.renda.centro.slice():CENTRO_SE.slice();
+        rendaRaio.centro=centroValido(s.renda.centro)?s.renda.centro.slice():CENTRO_SE.slice();
         // cores das faixas: projeto antigo (sem o campo) cai no padrão
         rendaRaio.cores=(s.renda.cores&&s.renda.cores.length===CENSO_FAIXAS.length)?s.renda.cores.slice():null;
         // projeto antigo não tem os ajustes: cai no padrão (IPCA ligado, 50%)
@@ -4151,7 +4186,7 @@ function montarEditor(){
         Object.assign(iso, s.iso);
         iso.lbl=Object.assign(JSON.parse(JSON.stringify(ISO_PADRAO.lbl)), s.iso.lbl||{});
         iso.legenda=Object.assign(JSON.parse(JSON.stringify(ISO_PADRAO.legenda)), s.iso.legenda||{});
-        iso.centro=(s.iso.centro&&s.iso.centro.length===2)?s.iso.centro.slice():CENTRO_SE.slice();
+        iso.centro=centroValido(s.iso.centro)?s.iso.centro.slice():CENTRO_SE.slice();
         iso.minutos=(Array.isArray(s.iso.minutos)&&s.iso.minutos.length)?s.iso.minutos.slice():ISO_PADRAO.minutos.slice();
         iso.cores=(Array.isArray(s.iso.cores)&&s.iso.cores.length)?s.iso.cores.slice():null;
         if(ISO_PERFIS.every(function(p){ return p.k!==iso.perfil; })) iso.perfil=ISO_PADRAO.perfil;
@@ -4175,7 +4210,7 @@ function montarEditor(){
       if(s.rendaIso){
         Object.assign(rendaIso, s.rendaIso);
         rendaIso.lbl=Object.assign(JSON.parse(JSON.stringify(RENDA_ISO_PADRAO.lbl)), s.rendaIso.lbl||{});
-        rendaIso.centro=(s.rendaIso.centro&&s.rendaIso.centro.length===2)?s.rendaIso.centro.slice():CENTRO_SE.slice();
+        rendaIso.centro=centroValido(s.rendaIso.centro)?s.rendaIso.centro.slice():CENTRO_SE.slice();
         rendaIso.minutos=(Array.isArray(s.rendaIso.minutos)&&s.rendaIso.minutos.length)?s.rendaIso.minutos.slice():RENDA_ISO_PADRAO.minutos.slice();
         rendaIso.cores=(Array.isArray(s.rendaIso.cores)&&s.rendaIso.cores.length)?s.rendaIso.cores.slice():null;
         rendaIso.calcMin=Array.isArray(s.rendaIso.calcMin)?s.rendaIso.calcMin.slice():null;
@@ -5697,7 +5732,12 @@ function censoCoberturaPct(rec){
 function censoCoberturaFrase(q){
   var car=censoNomesCarregadas();
   return [
-    'Ao menos '+Math.floor(100-q.cobertura)+'% da área deste recorte não tem setor censitário na base',
+    // "está sem setor censitário", não "a base não cobre": a primeira
+    // oração é a que se lê de relance, e num recorte litorâneo a causa é o
+    // mar, não uma falha da base. Os dois casos diluem a densidade do mesmo
+    // jeito, mas só um deles é culpa nossa — a oração seguinte lista as
+    // três causas e não insinua nenhuma.
+    'Ao menos '+Math.floor(100-q.cobertura)+'% da área deste recorte está sem setor censitário',
     '— estado vizinho que a base ainda não cobre'+
       (car.length ? ' (carregados hoje: '+car.join(', ')+')' : '')+
       ', água ou área sem domicílios. Os totais abaixo contam só a parte com dado, '+
@@ -6460,8 +6500,17 @@ document.querySelectorAll('.nv-item').forEach(function(b){
   b.onclick=function(){ irPara(b.getAttribute('data-view')); };
 });
 carregarNegocios();   // o quadro é próprio: volta sozinho, sem abrir projeto
+// A gaveta da esquerda também é escondida só por transform, então fechada
+// continuava no caminho do Tab — mesmo defeito que as seis da direita e o
+// #editor. Ela é pequena (dois itens), mas o foco ia para fora da tela do
+// mesmo jeito.
+function navInerte(){
+  gavetaInerte(document.getElementById('nav'), !document.body.classList.contains('nav-open'));
+}
+navInerte();   // nasce fechada
 document.getElementById('navBtn').onclick=function(){
   document.body.classList.toggle('nav-open');
+  navInerte();
   if(viewAtual==='mapa' && map) setTimeout(function(){ map.resize(); }, 300);
 };
 
@@ -6621,8 +6670,18 @@ function kmlParaFeats(txt, grupo){
       // número obviamente errado é melhor que número negativo com cara
       // de certo, e a área superestimada já era o defeito.
       const ha = Math.max(0, furos.reduce((a,f)=> a-areaHa(f), areaHa(pts)));
+      // O FURO PRECISA DA ORIENTAÇÃO CONTRÁRIA à do contorno. A MapLibre
+      // decide furo × polígono separado pelo SINAL da área do anel
+      // (classifyRings), não pela posição na lista: um furo no mesmo sentido
+      // do externo vira um segundo polígono PREENCHIDO sobre a gleba e, com
+      // fill-opacity 0,32, blenda duas vezes — o furo aparece como mancha
+      // mais ESCURA, na tela e no PNG, enquanto o hectare (que usa
+      // Math.abs) sai certo: o desenho contradizendo o número.
+      // O Google Earth não normaliza o sentido; conversões de shapefile
+      // normalmente já saem opostas, e é por isso que essas funcionavam.
+      // anelOrientado recebe anel aberto e devolve fechado.
       feats.push({nome, tipo:'poligono', gtype:'Polygon',
-        coords:[[...pts, pts[0]], ...furos.map(f=>[...f, f[0]])],
+        coords:[anelOrientado(pts, false), ...furos.map(f=> anelOrientado(f, true))],
         ha, lon:pts.reduce((s,p)=>s+p[0],0)/pts.length, lat:pts.reduce((s,p)=>s+p[1],0)/pts.length});
     }
     for(const ls of pm.getElementsByTagName('LineString')){
@@ -7174,7 +7233,15 @@ function rendaPlanilhaFolhas(q){
   // A cobertura fica ao lado da área porque é um atributo dela: é a fração
   // da área que tem setor censitário na base. Fração, não 41,9 — célula de
   // percentual, como manda o resto da planilha.
-  L.push([xT('Área com setor censitário'), xN(q.cobertura/100, E.PCT)]);
+  //
+  // "no máximo" no rótulo, e a célula só aparece quando há o que avisar.
+  // A medida vem de uma grade de ~5,5 km, então ela SUPERESTIMA a cobertura
+  // (num raio de 30 km em Presidente Epitácio dá 83% onde a medida fina dá
+  // 57%) — é por isso que a frase do painel diz "ao menos N% não tem". Pôr
+  // o limite superior aqui sem dizer que é limite apresentaria como fato o
+  // melhor caso; e imprimir "100,0%" num recorte inteiramente coberto
+  // afirmaria uma precisão que a grade não tem.
+  if(cob) L.push([xT('Área com setor censitário (no máximo)'), xN(q.cobertura/100, E.PCT)]);
   L.push([]);
 
   L.push([xT('TOTAIS', E.NEG)]);
