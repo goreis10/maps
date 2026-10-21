@@ -127,6 +127,14 @@
     --del:#D92D20;  --del-bg:#FEF3F2;  --del-ln:#FECDCA;
     /* cor de cada análise, a mesma no mapa e na interface */
     --c-renda:#0E9F8A; --c-iso:#6B21A8;
+
+    /* Recuo das legendas em canvas, por canto — A TABELA ÚNICA. A CSS
+       posiciona a caixa na tela com estes valores e legendaIsoPos() lê os
+       mesmos para o PNG (ver .leg-* e legRecuo()). Os 104px do inferior
+       direito são a altura do grupo de zoom/bússola da MapLibre, que mora
+       nesse canto; os 44px do inferior esquerdo, o controle de escala. */
+    --leg-rec-sup:14px; --leg-rec-lado:14px;
+    --leg-rec-inf-esq:44px; --leg-rec-inf-dir:104px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%}
@@ -336,11 +344,21 @@
      porque painel e chips são HTML e não entram na imagem. */
   #isoLegenda,#rendaLegenda{position:absolute;z-index:1001;pointer-events:none;display:none;
     filter:drop-shadow(0 3px 10px rgba(28,25,23,.18))}
-  .leg-sup-esq{top:14px;left:14px}
-  .leg-sup-dir{top:14px;right:14px}
-  .leg-inf-esq{bottom:44px;left:14px}
-  /* 104px: altura do grupo de zoom/bússola da MapLibre, que mora aqui */
-  .leg-inf-dir{bottom:104px;right:14px}
+  /* RECUO DAS LEGENDAS EM CANVAS — uma tabela só, para os dois destinos.
+     A CSS posiciona a caixa na tela com estas variáveis e legendaIsoPos()
+     lê as MESMAS, multiplicadas pela escala, para posicionar no PNG.
+     Eram dois números diferentes: a CSS punha a caixa do canto inferior
+     direito 104px acima da borda (altura do grupo de zoom/bússola da
+     MapLibre, que mora nesse canto) e o PNG punha 44px × escala — 60px de
+     deslocamento no canto que a pessoa escolheu olhando a tela, enquanto o
+     produto promete que a caixa da tela e a do PNG são o mesmo desenho em
+     escalas diferentes. Os controles da MapLibre são DOM e não entram no
+     canvas, mas o recuo tem de ser o mesmo nos dois: o enquadramento é o
+     que a pessoa compôs. */
+  .leg-sup-esq{top:var(--leg-rec-sup);left:var(--leg-rec-lado)}
+  .leg-sup-dir{top:var(--leg-rec-sup);right:var(--leg-rec-lado)}
+  .leg-inf-esq{bottom:var(--leg-rec-inf-esq);left:var(--leg-rec-lado)}
+  .leg-inf-dir{bottom:var(--leg-rec-inf-dir);right:var(--leg-rec-lado)}
   #wrap.side-open #map{right:var(--drawer-w)}
   #wrap.side-open #ctrl{right:calc(var(--drawer-w) + 14px)}
   #wrap.side-open #edResize{display:block;right:calc(var(--drawer-w) - 5px)}
@@ -861,7 +879,13 @@
   </div>
 
   <!-- Gaveta: Salvar Projeto -->
-  <div id="drawerSave" class="side-drawer" role="dialog" aria-modal="true">
+  <!-- role="dialog" SEM aria-modal: não há armadilha de foco e o mapa
+       continua operável com a gaveta aberta, então aria-modal="true" era
+       afirmação falsa para leitor de tela. O que as gavetas fechadas
+       ganharam é `inert` (ver gavetaInerte): sem ele, o Tab a partir do
+       cabeçalho entrava em dezenas de controles invisíveis, com o anel de
+       foco fora da tela, e dava para acioná-los às cegas. -->
+  <div id="drawerSave" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Salvar Projeto</div>
       <button id="saveClose" class="e-x" title="fechar">×</button>
@@ -875,7 +899,7 @@
   </div>
 
   <!-- Gaveta: Meus Projetos -->
-  <div id="drawerProj" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerProj" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Meus Projetos</div>
       <button id="projClose" class="e-x" title="fechar">×</button>
@@ -886,7 +910,7 @@
   </div>
 
   <!-- Gaveta: Cores do mapa (paletas pré-definidas) -->
-  <div id="drawerCores" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerCores" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Cores do mapa</div>
       <button id="coresClose" class="e-x" title="fechar">×</button>
@@ -938,7 +962,7 @@
   </div>
 
   <!-- Gaveta: Mapa de renda (Pro) — raio próprio; a camada de renda entra depois -->
-  <div id="drawerRenda" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerRenda" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Mapa de renda</div>
       <button id="rendaClose" class="e-x" title="fechar">×</button>
@@ -1099,7 +1123,7 @@
     </details>
   </div>
 
-  <div id="drawerIso" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerIso" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Isócrona</div>
       <button id="isoClose" class="e-x" title="fechar">×</button>
@@ -1157,7 +1181,7 @@
        arquivo: empurrar o mapa para a esquerda faria a imagem sair mais
        estreita só porque a gaveta está aberta, e o enquadramento que o
        usuário escolheu antes de clicar seria outro no arquivo. Ela sobrepõe. -->
-  <div id="drawerExport" class="side-drawer" role="dialog" aria-modal="true">
+  <div id="drawerExport" class="side-drawer" role="dialog">
     <div class="sd-head">
       <div class="sd-title">Exportar imagem</div>
       <button id="expClose" class="e-x" title="fechar">×</button>
@@ -1535,6 +1559,28 @@ function aplicarPaleta(style, palName){
 }
 
 // Troca a paleta com o mapa já carregado, camada por camada.
+//
+// A PALETA É A BASE, NÃO A PALAVRA FINAL. paletaOps escreve line-color nas
+// mesmas camadas que as seções Vias, Rótulos e Mapa editam, então trocar de
+// paleta jogava no lixo, em silêncio, tudo que o usuário havia escolhido:
+// os input[type=color] continuavam mostrando as cores antigas, o mapa saía
+// com as novas, e nada era reaplicado. Pior: viasOrigCor/viasOrigCas
+// guardam a cor "original" só na PRIMEIRA vez, então trocar a paleta e
+// desligar o satélite restaurava a cor da paleta ANTERIOR — meio mapa numa
+// paleta, meio na outra, sem erro na tela.
+//
+// A ordem abaixo é a correção, e ela importa:
+//   1. esquecer os "originais", que agora são os da paleta nova;
+//   2. reafirmar as cores explícitas das vias (viaCfg[sub].cor) e
+//      recapturar os originais certos — pelo setSat quando o satélite está
+//      ligado, porque ele é quem manda nas vias nesse modo;
+//   3. reafirmar as cores explícitas dos rótulos (lblCfg[t].cor);
+//   4. reler para mapaCfg a cor que cada grupo da seção Mapa acabou de
+//      receber, para os input[type=color] da gaveta dizerem a verdade.
+//
+// O passo 4 só LÊ. Chamar __aplicarMapa() aqui repintaria fundo, água e
+// verde com os valores guardados — os da paleta anterior — sob vias já
+// escuras, e destruiria as paletas Mosaico.
 function recolorLive(palName){
   if(!map) return;
   var PAL = PALETAS[palName] || PALETAS.padrao;
@@ -1547,6 +1593,22 @@ function recolorLive(palName){
     });
   });
   paletaAtual = palName;
+
+  // 1. os "originais" das vias passam a ser os da paleta nova
+  Object.keys(viasOrigCor).forEach(function(k){ delete viasOrigCor[k]; });
+  Object.keys(viasOrigCas).forEach(function(k){ delete viasOrigCas[k]; });
+  // 2. reafirma as vias (e, no satélite, o look híbrido inteiro)
+  try{
+    var noSat = map.getLayer('satelite') &&
+                map.getLayoutProperty('satelite','visibility')==='visible';
+    if(noSat) setSat(true); else reaplicarVias();
+  }catch(e){ console.error('paleta/vias', e); }
+  // 3. rótulos: as cores escolhidas pelo usuário voltam a valer
+  try{ if(window.__lblRepintar) window.__lblRepintar(); }
+  catch(e){ console.error('paleta/rótulos', e); }
+  // 4. seção Mapa: lê do mapa, não escreve nele
+  try{ if(window.__mapaLerDoMapa) window.__mapaLerDoMapa(); }
+  catch(e){ console.error('paleta/mapa', e); }
 }
 
 // ── Dados: grupos e rótulos ──
@@ -1841,9 +1903,13 @@ function montarCamadas(){
       const p = e.features[0].properties;
       new maplibregl.Popup({closeButton:true, maxWidth:'280px'})
         .setLngLat(e.lngLat)
+        // esc(): município e nome vêm do <name> do KML e do nome do arquivo
+        // KMZ, e Popup.setHTML faz innerHTML sem sanitizar nada. Como
+        // localStorage['makermap.user'] guarda os tokens do Identity na
+        // mesma origem, um KMZ recebido de terceiro roubaria a sessão.
         .setHTML(`
-          <div class="pp-eyebrow" style="color:${p.cor_final}">${p.municipio}</div>
-          <div class="pp-name">${p.nome}</div>
+          <div class="pp-eyebrow" style="color:${p.cor_final}">${esc(p.municipio)}</div>
+          <div class="pp-name">${esc(p.nome)}</div>
           <div class="pp-row"><span>Área</span><b>${p.ha_txt}</b></div>
           <div class="pp-row"><span>Centroide</span><b>${p.lat}, ${p.lon}</b></div>
           <div class="pp-row"><span>${centroEhSe()?'Distância da Sé':'Dist. do centro'}</span><b>${Number(p.dist_sp).toLocaleString('pt-BR',{maximumFractionDigits:1})} km ${Number(p.dist_sp)<=raioKm?'· dentro do raio':'· fora do raio'}</b></div>
@@ -1917,6 +1983,11 @@ function anelOrientado(pts, horario){
 }
 function construirMascara(){
   const mundo = anelOrientado([[-179.9,-85],[179.9,-85],[179.9,85],[-179.9,85]], false); // anti-horário
+  // coordinates[0] de propósito: o clarão da máscara segue o CONTORNO
+  // EXTERNO da gleba. Desde que o KMZ passou a trazer os furos
+  // (innerBoundaryIs), este anel não é mais o único da geometria — e
+  // repassar os furos para cá veilaria a reserva dentro da área, o que não
+  // é o que a máscara faz: ela ilumina a gleba inteira.
   const furos = maskCobreGlebas ? [] : DATA.features
     .filter(f=> f.geometry.type==='Polygon' && grupos[f.properties.municipio].on)
     .map(f=> anelLimpo(f.geometry.coordinates[0]))
@@ -1980,10 +2051,16 @@ function ligarLinhaGrupo(el, m, g){
   const del = el.querySelector('.g-del');
   if(del) del.onclick = ev=>{ ev.stopPropagation(); excluirGrupo(m); };
 }
+// esc() no nome do grupo (= nome do arquivo KMZ, escolhido por quem
+// mandou o arquivo). Além do XSS, isto conserta o casamento por
+// textContent: excluirGrupo/updatePanelRow/aplicarEstado acham a linha
+// comparando .g-name.textContent com o nome do grupo, e com markup cru no
+// nome o textContent passava a ser o texto renderizado — a lixeira não
+// apagava nada.
 function htmlLinhaGrupo(m, g, cor){
   return `<span class="sw" style="background:${cor}"></span>
     <span class="g-body">
-      <span class="g-name">${m}</span>
+      <span class="g-name">${esc(m)}</span>
       <span class="g-meta">${metaGrupo(g)}</span>
       <span class="g-barwrap"><span class="g-bar"><i style="width:${Math.min(100,Math.max(3,100*g.ha/maxHa))}%;background:${cor}"></i></span><span class="g-pct">${pctGrupo(g)}%</span></span>
     </span>
@@ -2877,16 +2954,41 @@ function legendaRendaCaixa(ctx, esc, x, y, pintar){
 
 // Canto -> posição dentro de um canvas de larg×alt (já em px do device).
 // `desl` empilha a segunda caixa quando as duas escolhem o mesmo canto.
+// Recuo de um canto, lido da TABELA ÚNICA que vive no :root da CSS
+// (--leg-rec-*). A tela é posicionada pelas classes .leg-* com essas mesmas
+// variáveis, então as duas pontas não podem mais discordar: o PNG é o recuo
+// da tela multiplicado pela escala. Antes eram dois números — 104px na CSS
+// contra 44px×escala aqui — e a caixa do canto inferior direito saía 60px
+// mais baixa no arquivo do que na tela em que a pessoa compôs.
+//
+// Reserva: num navegador onde a propriedade personalizada não pudesse ser
+// lida, a caixa cai no recuo simples do canto (LEG_ISO.margem), que é a
+// margem horizontal que ela já usa. Não é uma segunda tabela — é o canto
+// cru, e aí o desenho fica sobre os controles da MapLibre em vez de errado
+// por 60px. Todo o resto do produto já depende de propriedades
+// personalizadas (a escala de tipos e de espaço inteira mora no :root).
+function legRecuo(nome){
+  try{
+    var v=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--leg-rec-'+nome));
+    if(isFinite(v)) return v;
+  }catch(e){}
+  return LEG_ISO.margem;
+}
+// Canto -> chave de recuo vertical. Um canto desconhecido cai em 'inf-esq',
+// exatamente como o `default:` abaixo e como pintarLegendaEl() faz com a
+// classe CSS — senão o PNG usaria o recuo de cima com a posição de baixo.
+function legRecuoChave(canto){
+  return (canto==='sup-esq'||canto==='sup-dir') ? 'sup'
+       : (canto==='inf-dir' ? 'inf-dir' : 'inf-esq');
+}
 function legendaIsoPos(canto, cx, larg, alt, esc, desl){
-  var m=LEG_ISO.margem*esc, d=desl||0;
-  // o controle de escala da MapLibre mora no canto inferior esquerdo e
-  // a bússola no inferior direito: sobe a caixa para não cobri-los
-  var mb=m+30*esc;
+  var mx=legRecuo('lado')*esc, d=desl||0;
+  var my=legRecuo(legRecuoChave(canto))*esc;
   switch(canto){
-    case 'sup-dir': return {x:larg-cx.w-m,  y:m+d};
-    case 'inf-dir': return {x:larg-cx.w-m,  y:alt-cx.h-mb-d};
-    case 'sup-esq': return {x:m,            y:m+d};
-    default:        return {x:m,            y:alt-cx.h-mb-d};   // inf-esq
+    case 'sup-dir': return {x:larg-cx.w-mx, y:my+d};
+    case 'inf-dir': return {x:larg-cx.w-mx, y:alt-cx.h-my-d};
+    case 'sup-esq': return {x:mx,           y:my+d};
+    default:        return {x:mx,           y:alt-cx.h-my-d};   // inf-esq
   }
 }
 
@@ -3107,7 +3209,14 @@ function setCidade(m, prop, val){
         el.querySelector('.g-bar i').style.background = val;
       }
     });
-    document.querySelectorAll(`#edAreas input[data-mun="${m}"][type=color]`).forEach(i=> i.value=val);
+    // Compara em JavaScript em vez de interpolar o nome dentro do seletor:
+    // um nome de grupo com " montava um seletor inválido, o
+    // querySelectorAll lançava SyntaxError e a troca de cor por cidade
+    // parava de funcionar. Escapar não resolveria — o atributo volta com o
+    // caractere cru na leitura, que é justamente o que dataset.mun dá.
+    document.querySelectorAll('#edAreas input[type=color][data-mun]').forEach(i=>{
+      if(i.dataset.mun===m) i.value=val;
+    });
   }
 }
 function setArea(idx, prop, val){
@@ -3190,6 +3299,17 @@ function ctSync(pfx){
 }
 // "lat, lon" colado em vez de endereço. Devolve [lon,lat] ou null.
 // Qualquer letra no campo significa endereço, e aí nem tentamos.
+// Um centro de projeto salvo é válido? [lon, lat], finitos e na faixa.
+// `length===2` sozinho não basta: uma lat 500 (localStorage adulterado, ou
+// um projeto gravado por uma versão com outro bug) chega em gerarCirculo e
+// produz um anel de NaN — o círculo desaparece do mapa sem nenhuma
+// mensagem. Os campos de centro da interface já validam a faixa
+// (edCtAplicar e os três irmãos); o caminho de restauração não validava.
+function centroValido(c){
+  return Array.isArray(c) && c.length === 2 &&
+         isFinite(c[0]) && isFinite(c[1]) &&
+         Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90;
+}
 function coordsDoTexto(q){
   var t = String(q==null?'':q).trim();
   if(!t || !/^[-+0-9.,;\s]+$/.test(t)) return null;
@@ -3266,7 +3386,7 @@ function montarEditor(){
     const cor = CORES[m] || '#8A8F98';
     const row = document.createElement('div');
     row.className='e-row';
-    row.innerHTML = `<input type="color" value="${cor}"><span class="e-nome">${m}</span>
+    row.innerHTML = `<input type="color" value="${cor}"><span class="e-nome">${esc(m)}</span>
       <label title="preenchimento"><input type="checkbox" checked>fill</label>`;
     row.querySelector('input[type=color]').oninput = e=> setCidade(m,'cor_final',e.target.value);
     row.querySelector('input[type=checkbox]').onchange = e=> setCidade(m,'fill_on', e.target.checked?1:0);
@@ -3277,8 +3397,10 @@ function montarEditor(){
     const p = f.properties;
     const row = document.createElement('div');
     row.className='e-row';
-    row.innerHTML = `<input type="color" value="${p.cor_final}" data-mun="${p.municipio}">
-      <span class="e-nome" title="${p.nome}">${p.nome}</span>
+    // esc() também no atributo: um nome com " fugia do title e virava
+    // atributo de evento (" onmouseover="…).
+    row.innerHTML = `<input type="color" value="${p.cor_final}" data-mun="${esc(p.municipio)}">
+      <span class="e-nome" title="${esc(p.nome)}">${esc(p.nome)}</span>
       <label title="preenchimento"><input type="checkbox" ${p.tipo==='linha'?'disabled':'checked'}>fill</label>`;
     row.querySelector('input[type=color]').oninput = e=> setArea(p.idx,'cor_final',e.target.value);
     row.querySelector('input[type=checkbox]').onchange = e=> setArea(p.idx,'fill_on', e.target.checked?1:0);
@@ -3429,6 +3551,33 @@ function montarEditor(){
       map.setPaintProperty(id,'text-halo-width', c.halo ? c.haloW : 0);
     });
   }
+  // Repinta os rótulos depois de uma troca de paleta. Apaga origTC porque a
+  // cor "original" do texto passou a ser a da paleta nova; NÃO apaga origTS,
+  // que guarda TAMANHOS — a paleta não mexe em tamanho de texto, e esquecer
+  // os originais faria o fator de escala se acumular a cada troca.
+  //
+  // Reafirma SÓ A COR, e só onde o usuário escolheu uma. Chamar aplicarLbl()
+  // aqui parecia natural e apagava o halo da paleta: aplicarLbl escreve
+  // text-halo-color SEMPRE, e o padrão de lblCfg[*].haloCor é #FFFFFF — a
+  // paleta acabava de pôr halo #1D1D1B no Dark Mosaico e isto trocava por
+  // branco, sobre texto #E6E6E6 num fundo #1D1D1B: nome de via, de água e
+  // de parque viravam borrão. Nas claras o estrago era menor, mas em TODAS
+  // as camadas `place` ganhavam halo 1,2 onde paletaOps havia posto 0.
+  // Mesmo defeito que o resto desta correção existe para consertar — meio
+  // mapa numa paleta, meio na outra — só que no halo.
+  window.__lblRepintar = function(){
+    if(!map) return;
+    Object.keys(origTC).forEach(function(k){ delete origTC[k]; });
+    classificarRotulos();
+    Object.keys(lblCfg).forEach(function(t){
+      if(!lblCfg[t].cor) return;
+      lblTiers[t].forEach(function(id){
+        if(!map.getLayer(id)) return;
+        origTC[id] = map.getPaintProperty(id,'text-color');
+        map.setPaintProperty(id,'text-color', lblCfg[t].cor);
+      });
+    });
+  };
   const lblUi = [
     {k:'cidade',  nome:'Cidades'},
     {k:'estrada', nome:'Estradas'},
@@ -3689,6 +3838,13 @@ function montarEditor(){
       ref.cor.value = '#1C1917'; ref.tam.value = 100;
       ref.chk.checked = d.halo; ref.hcor.value = d.haloCor; ref.hw.value = Math.round(d.haloW*10);
     });
+    // A PALETA TAMBÉM VOLTA AO PADRÃO. O botão diz "Padrão Maker Map
+    // restaurado" e não restaurava a paleta — e logo abaixo ele força
+    // mapaCfg = MAPA_PADRAO e APLICA, então com Dark Mosaico ativo fundo,
+    // água e verde voltavam ao claro sob vias escuras, com a gaveta de
+    // Cores ainda marcando Dark Mosaico. Vem DEPOIS do setSat(false) acima,
+    // para o satélite restaurar as cores antes de a base nova ser definida.
+    recolorLive('padrao'); marcarPaleta();
     // seção Mapa: volta às cores/visibilidade padrão
     Object.keys(mapaCfg).forEach(function(k){ Object.assign(mapaCfg[k], MAPA_PADRAO[k]); });
     mapaUi.forEach(function(t){ aplicarMapaCor(t.k); aplicarMapaVis(t.k); });
@@ -3851,6 +4007,34 @@ function montarEditor(){
       ins[0].checked = c.on; ins[1].value = c.cor;
     });
   };
+  // Depois de uma troca de paleta, a seção Mapa tem de dizer a cor que
+  // está no mapa. SÓ LÊ: aplicar aqui repintaria fundo, água e verde com
+  // os valores guardados — os da paleta anterior — sob vias já recoloridas,
+  // e era isso que apagava as paletas Mosaico.
+  //
+  // Guarda só se vier string '#…' ou 'rgb(': a camada pode carregar uma
+  // EXPRESSÃO (interpolate por zoom) ou undefined, e escrever isso em
+  // mapaCfg[k].cor acabaria num input[type=color] com valor inválido — que
+  // o navegador reseta para #000000 em silêncio, e o primeiro toque no
+  // controle pintaria o grupo de preto.
+  window.__mapaLerDoMapa = function(){
+    if(!map) return;
+    mapaUi.forEach(t=>{
+      const l = camadasMapa(t.k)[0];
+      if(!l || !map.getLayer(l.id)) return;
+      const prop = l.type==='background' ? 'background-color'
+                 : l.type==='fill' ? 'fill-color' : 'line-color';
+      let v;
+      try{ v = map.getPaintProperty(l.id, prop); }catch(e){ return; }
+      // #rrggbb e nada mais. Um input[type=color] só aceita essa forma:
+      // 'rgb(…)', '#rgb' e '#rrggbbaa' são sanitizados para #000000 em
+      // silêncio, e o primeiro toque no controle pintaria o grupo de preto
+      // — que é justamente o que este guarda existe para evitar. Aceitar
+      // 'rgb(' deixava a porta aberta para o mesmo defeito.
+      if(/^#[0-9a-fA-F]{6}$/.test(v)) mapaCfg[t.k].cor = v;
+    });
+    window.__syncMapaInputs();
+  };
 
   // ── Salvar / restaurar as edições do usuário (localStorage por conta) ──
   function usuarioEmail(){
@@ -3941,7 +4125,7 @@ function montarEditor(){
       // raio
       if(s.raio){
         raioKm=s.raio.km||100;
-        centroRaio=(s.raio.centro&&s.raio.centro.length===2)?s.raio.centro.slice():CENTRO_SE.slice();
+        centroRaio=centroValido(s.raio.centro)?s.raio.centro.slice():CENTRO_SE.slice();
         document.getElementById('edRaioKm').value=raioKm;
         document.getElementById('edRaioCor').value=s.raio.cor||'#337FFF';
         document.getElementById('edRaioFill').checked=s.raio.fill!==false;
@@ -3969,7 +4153,7 @@ function montarEditor(){
         rendaRaio.lbl=Object.assign(JSON.parse(JSON.stringify(RENDA_PADRAO.lbl)), s.renda.lbl||{});
         // legenda no mapa (projetos anteriores à 3.0 não têm: cai no padrão)
         rendaRaio.legenda=Object.assign(JSON.parse(JSON.stringify(RENDA_PADRAO.legenda)), s.renda.legenda||{});
-        rendaRaio.centro=(s.renda.centro&&s.renda.centro.length===2)?s.renda.centro.slice():CENTRO_SE.slice();
+        rendaRaio.centro=centroValido(s.renda.centro)?s.renda.centro.slice():CENTRO_SE.slice();
         // cores das faixas: projeto antigo (sem o campo) cai no padrão
         rendaRaio.cores=(s.renda.cores&&s.renda.cores.length===CENSO_FAIXAS.length)?s.renda.cores.slice():null;
         // projeto antigo não tem os ajustes: cai no padrão (IPCA ligado, 50%)
@@ -3978,6 +4162,16 @@ function montarEditor(){
         var _p=parseFloat(s.renda.ipcaPct);
         rendaRaio.ipcaPct=(isFinite(_p) && _p>=-50 && _p<=1000) ? _p : null;
         if(!isFinite(+s.renda.outros))      rendaRaio.outros=RENDA_PADRAO.outros;
+        // km fora da faixa que o campo #rdRaioKm aceita (1..2000) viria do
+        // Object.assign cru e iria direto para gerarCirculo e para a
+        // consulta do Censo: um raio 0 ou negativo desenha nada e um raio
+        // absurdo varre o país inteiro. Mesmos limites do campo.
+        var _km=parseFloat(s.renda.km);
+        rendaRaio.km=isFinite(_km) ? Math.max(1, Math.min(2000, _km)) : RENDA_PADRAO.km;
+        // heatModo decide QUAL camada acende; um valor desconhecido apagava
+        // as duas e deixava o chip de Calor ligado sobre um mapa sem calor.
+        if(s.renda.heatModo!=='renda' && s.renda.heatModo!=='dens')
+          rendaRaio.heatModo=RENDA_PADRAO.heatModo;
       }
       syncRaioRendaInputs();
       atualizarRaioRenda();
@@ -3992,7 +4186,7 @@ function montarEditor(){
         Object.assign(iso, s.iso);
         iso.lbl=Object.assign(JSON.parse(JSON.stringify(ISO_PADRAO.lbl)), s.iso.lbl||{});
         iso.legenda=Object.assign(JSON.parse(JSON.stringify(ISO_PADRAO.legenda)), s.iso.legenda||{});
-        iso.centro=(s.iso.centro&&s.iso.centro.length===2)?s.iso.centro.slice():CENTRO_SE.slice();
+        iso.centro=centroValido(s.iso.centro)?s.iso.centro.slice():CENTRO_SE.slice();
         iso.minutos=(Array.isArray(s.iso.minutos)&&s.iso.minutos.length)?s.iso.minutos.slice():ISO_PADRAO.minutos.slice();
         iso.cores=(Array.isArray(s.iso.cores)&&s.iso.cores.length)?s.iso.cores.slice():null;
         if(ISO_PERFIS.every(function(p){ return p.k!==iso.perfil; })) iso.perfil=ISO_PADRAO.perfil;
@@ -4016,7 +4210,7 @@ function montarEditor(){
       if(s.rendaIso){
         Object.assign(rendaIso, s.rendaIso);
         rendaIso.lbl=Object.assign(JSON.parse(JSON.stringify(RENDA_ISO_PADRAO.lbl)), s.rendaIso.lbl||{});
-        rendaIso.centro=(s.rendaIso.centro&&s.rendaIso.centro.length===2)?s.rendaIso.centro.slice():CENTRO_SE.slice();
+        rendaIso.centro=centroValido(s.rendaIso.centro)?s.rendaIso.centro.slice():CENTRO_SE.slice();
         rendaIso.minutos=(Array.isArray(s.rendaIso.minutos)&&s.rendaIso.minutos.length)?s.rendaIso.minutos.slice():RENDA_ISO_PADRAO.minutos.slice();
         rendaIso.cores=(Array.isArray(s.rendaIso.cores)&&s.rendaIso.cores.length)?s.rendaIso.cores.slice():null;
         rendaIso.calcMin=Array.isArray(s.rendaIso.calcMin)?s.rendaIso.calcMin.slice():null;
@@ -4244,16 +4438,35 @@ var FEATURE_ELEMENTS = {
 //      admin), usa o MAIOR deles. É a forma mais segura e a que funciona no
 //      painel novo do Netlify (onde só dá para editar "Roles").
 // Basta configurar UMA das duas — por exemplo, definir o Role "admin".
+// O MAIOR entre os dois caminhos, não o primeiro que existir.
+//
+// Antes isto devolvia `user_metadata.plano` assim que ele fosse um plano
+// válido, e só caía nos Roles quando ele não existia. Como o cadastro do
+// index.html gravava `plano:'free'` em todo mundo, 'free' ganhava sempre: o
+// Role concedido no painel do Netlify — que é o único campo que o painel
+// novo oferece, e que este arquivo e o CLAUDE.md afirmavam que bastava
+// configurar — não destravava nada para ninguém criado pelo site. A venda
+// era configurada e o recurso continuava com cadeado.
+//
+// O máximo só CONCEDE, nunca retira: ninguém perde acesso no dia do deploy,
+// e as contas que já existem com `plano:'free'` passam a obedecer ao Role
+// sem ninguém editar metadados uma por uma. O dono confirmou que não usa o
+// campo `plano` para rebaixar quem tem Role — se algum dia usar, esta é a
+// linha a reverter, e aí a precedência volta a importar.
+//
+// Nada disso é segurança: os dois campos são do cliente e o `user_metadata`
+// é editável pelo próprio usuário. É a regra de qual recurso aparece
+// destravado, e ela precisa ser a mesma que o painel do Netlify promete.
 function getUserPlano(){
   try{
     var s = JSON.parse(localStorage.getItem('makermap.user') || 'null');
     var u = (s && s.user) || {};
+    var nivel = -1;
     // 1) user_metadata.plano
     var p = u.user_metadata && u.user_metadata.plano;
-    if(PLANOS.indexOf(p) >= 0) return p;
-    // 2) app_metadata.roles (pega o maior plano entre os roles)
+    if(PLANOS.indexOf(p) > nivel) nivel = PLANOS.indexOf(p);
+    // 2) app_metadata.roles (o maior plano entre os roles)
     var roles = (u.app_metadata && u.app_metadata.roles) || [];
-    var nivel = -1;
     for(var i=0;i<roles.length;i++){
       var r = String(roles[i]||'').toLowerCase();
       if(PLANOS.indexOf(r) > nivel) nivel = PLANOS.indexOf(r);
@@ -4335,17 +4548,39 @@ aplicarPlano();
 
 const __wrap = document.getElementById('wrap');
 var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda','drawerIso','drawerExport'];
+
+// Gaveta fechada sai do alcance do teclado.
+//
+// As seis gavetas e o #editor são escondidos só por
+// transform:translateX(101%) — continuam no fluxo, visíveis para o
+// navegador e para o leitor de tela. Sem `inert`, o Tab a partir do
+// cabeçalho entrava em dezenas de controles fora da tela (o #editor é a
+// maior coleção de controles do produto), com o anel de foco invisível, e
+// dava para acioná-los às cegas: trocar cor de via, ligar camada, apagar
+// projeto. aria-hidden acompanha porque `inert` é recente e um leitor de
+// tela antigo ainda narraria o conteúdo.
+function gavetaInerte(el, v){
+  if(el){ el.inert = v; el.setAttribute('aria-hidden', v?'true':'false'); }
+}
+// Todas nascem fechadas — o estado inicial tem de dizer isso ao teclado
+// também, senão a primeira volta do Tab já entra nelas.
+GAVETAS_IDS.forEach(function(id){ gavetaInerte(document.getElementById(id), true); });
+gavetaInerte(document.getElementById('editor'), true);
 function abrirEdicao(on){
   if(on && typeof expExportando!=='undefined' && expExportando){
     toast('Aguarde a exportação terminar.'); return;
   }
   const ed = document.getElementById('editor');
   if(on){ // abrir a Edição fecha as gavetas laterais
-    GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
+    GAVETAS_IDS.forEach(function(id){
+      var d=document.getElementById(id);
+      if(d){ d.classList.remove('show'); gavetaInerte(d, true); }
+    });
     __wrap.classList.remove('side-open');
     __wrap.classList.remove('exp-open');
     marcarChipGaveta(null);   // senão o chip continuaria marcado como aberto
   }
+  gavetaInerte(ed, !on);
   ed.classList.toggle('show', on);
   __wrap.classList.toggle('editing', on);
   document.getElementById('chipEdit').classList.toggle('on', on);
@@ -4383,14 +4618,26 @@ function abrirGaveta(id){
     toast('Aguarde a exportação terminar.'); return;
   }
   abrirEdicao(false);
-  GAVETAS_IDS.forEach(function(g){ var d=document.getElementById(g); if(d) d.classList.toggle('show', g===id); });
+  GAVETAS_IDS.forEach(function(g){
+    var d=document.getElementById(g);
+    if(d){ d.classList.toggle('show', g===id); gavetaInerte(d, g!==id); }
+  });
   __wrap.classList.add('side-open');
   __wrap.classList.toggle('exp-open', !!GAVETAS_SOBREPOEM[id]);
   marcarChipGaveta(id);
   setTimeout(function(){ if(map) map.resize(); }, 360);
 }
 function fecharGaveta(){
-  GAVETAS_IDS.forEach(function(id){ var d=document.getElementById(id); if(d) d.classList.remove('show'); });
+  GAVETAS_IDS.forEach(function(id){
+    var d=document.getElementById(id);
+    if(d){ d.classList.remove('show'); gavetaInerte(d, true); }
+  });
+  // o #editor entra aqui também: fechar tudo é fechar tudo. O teste de
+  // .show não é redundância sobre a regra "uma por vez" — é a garantia de
+  // que, se ela um dia furar, o editor fique inútil só até alguém notar e
+  // não silenciosamente intocável com a gaveta na tela.
+  var _ed=document.getElementById('editor');
+  if(_ed && !_ed.classList.contains('show')) gavetaInerte(_ed, true);
   __wrap.classList.remove('side-open');
   __wrap.classList.remove('exp-open');
   marcarChipGaveta(null);
@@ -4746,7 +4993,13 @@ document.getElementById('riLblOn').onchange = function(e){ rendaIso.lbl.on=e.tar
 document.getElementById('riCtAplicar').onclick = function(){
   var la=parseFloat(document.getElementById('riCtLat').value);
   var lo=parseFloat(document.getElementById('riCtLon').value);
-  if(!isFinite(la) || !isFinite(lo)){ toast('Coordenadas inválidas.'); return; }
+  // Mesma faixa que edCtAplicar e rdCtAplicar já exigiam: só isFinite
+  // deixava passar lat 500, e aí o centro já tinha sido gravado e a fonte
+  // atualizada quando o construtor de LngLat lançava dentro do flyTo —
+  // o handler abortava no meio, com o estado meio aplicado.
+  if(!isFinite(la) || !isFinite(lo) || la<-90 || la>90 || lo<-180 || lo>180){
+    toast('Coordenadas inválidas (lat -90..90, lon -180..180).'); return;
+  }
   rendaIso.centro=[+lo.toFixed(5), +la.toFixed(5)];
   atualizarRendaIso(); renderRenda();
   if(map) map.flyTo({center:rendaIso.centro, zoom:Math.max(map.getZoom(), 9)});
@@ -4829,7 +5082,10 @@ document.getElementById('isoLegTit').oninput = function(e){ iso.legenda.titulo=e
 document.getElementById('isoCtAplicar').onclick = function(){
   var la=parseFloat(document.getElementById('isoCtLat').value);
   var lo=parseFloat(document.getElementById('isoCtLon').value);
-  if(!isFinite(la) || !isFinite(lo)){ toast('Coordenadas inválidas.'); return; }
+  // mesma faixa dos outros três centros — ver riCtAplicar
+  if(!isFinite(la) || !isFinite(lo) || la<-90 || la>90 || lo<-180 || lo>180){
+    toast('Coordenadas inválidas (lat -90..90, lon -180..180).'); return;
+  }
   iso.centro=[+lo.toFixed(5), +la.toFixed(5)];
   isoMudouParametro();
   if(map) map.flyTo({center:iso.centro, zoom:Math.max(map.getZoom(), 9)});
@@ -5044,6 +5300,11 @@ var censoUF = {};             // cod -> 'ok' | 'carregando' | 'erro'
 var censoStatus = 'vazio';    // vazio | carregando | ok | erro | fora
 var censoDist = null;         // Float32Array de distâncias (reaproveitado)
 var censoCache = {chave:null, res:null};
+// Grade de ocupação (Set de células de 0,05°, ~5,5 km) usada para medir que
+// fração do recorte tem setor censitário na base. Montada por demanda e
+// invalidada junto com o cache quando uma UF entra — ver censoGradeMontar().
+var CENSO_CEL = 0.05;
+var censoGrade = null;
 
 // Faixas de renda. As MESMAS cores pintam os pontos e o calor de renda no
 // mapa e as barras da distribuição na gaveta — assim o gráfico serve de
@@ -5164,7 +5425,7 @@ function censoAnexar(cod, js){
   for(var i=0;i<js.s.length;i++) CENSO.s.push(js.s[i]);
   censoUF[cod]='ok';
   censoDist=new Float32Array(CENSO.s.length);   // o vetor de distâncias cresceu
-  censoCache.chave=null;
+  censoCache.chave=null; censoGrade=null;       // a grade de ocupação cresceu junto
 }
 
 function carregarCenso(){
@@ -5320,7 +5581,7 @@ function censoSelecionarPoly(geom){
 function censoAgregar(idx, area){
   if(!idx.length) return {vazio:true, idx:[]};
   var S=CENSO.s, fat=fatorRenda();      // correção IPCA × demais moradores
-  var dom=0, pes=0, wMed=0, wMdn=0, domRenda=0;
+  var dom=0, pes=0, wMed=0, domRenda=0, mdnPares=[];
   var muns={}, faixas=[0,0,0,0,0,0,0], faixaTot=0;
   for(var k=0;k<idx.length;k++){
     var r=S[idx[k]];
@@ -5328,7 +5589,11 @@ function censoAgregar(idx, area){
     muns[r[2]]=(muns[r[2]]||0)+r[3];
     if(r[5]>0){
       var rm=r[5]*fat, rd=r[6]*fat;
-      wMed+=rm*r[3]; wMdn+=rd*r[3]; domRenda+=r[3];
+      wMed+=rm*r[3]; domRenda+=r[3];
+      // A mediana setorial entra como PAR (valor, domicílios) para
+      // censoMedianaPond ordenar depois: somar rd*r[3] aqui dava a média
+      // ponderada das medianas, que não é mediana nenhuma.
+      mdnPares.push([rd, r[3]]);
       // A FAIXA É DECIDIDA SOBRE O VALOR ARREDONDADO, que é exatamente o
       // que censoCamadas() grava em 'renda' e o que censoStepCor() usa para
       // escolher a cor do ponto no mapa. Decidir aqui sobre o valor cheio
@@ -5348,13 +5613,136 @@ function censoAgregar(idx, area){
     pes:Math.round(pes),
     morDom: dom>0 ? pes/dom : 0,
     rendaMedia:   domRenda>0 ? wMed/domRenda : 0,
-    rendaMediana: domRenda>0 ? wMdn/domRenda : 0,
+    rendaMediana: censoMedianaPond(mdnPares, domRenda),
     domSemRenda: dom-domRenda,
     densDom: area>0 ? dom/area : 0, densPes: area>0 ? pes/area : 0, area:area,
     margem: 0, setorMedioM: 0,          // preenchidos por quem chamou
     muns:lista, munNomes:lista.slice(0,3).map(function(c){ return CENSO.mun[c]||c; }),
     faixas:faixas, faixaTot:faixaTot, idx:idx
   };
+}
+
+// A MEDIANA TEM DE SER UMA MEDIANA.
+//
+// Até aqui o painel somava rd*dom e dividia pelo total: isso é a MÉDIA
+// PONDERADA DAS MEDIANAS SETORIAIS, impressa com o rótulo "Renda mediana".
+// Erra sempre para cima, porque a cauda rica dos setores puxa a soma e a
+// mediana de verdade não se deixa puxar: em Campinas 10 km dava 6.329
+// contra 4.500 reais (+40,6%); num raio de 100 km da Sé, +57,8%. O rótulo
+// é contrato com a planilha, palavra por palavra, então quem tinha de
+// mudar era a conta.
+//
+// Mediana ponderada por domicílios: ordena os setores por valor e devolve
+// aquele em que o acumulado de domicílios cruza a metade. Custo medido:
+// 20 ms para 76.738 setores — e o resultado é cacheado em censoCache.
+//
+// A MÉDIA continua sobre o valor cheio e as FAIXAS continuam decididas
+// sobre Math.round(rm): nenhuma das duas regras muda aqui.
+function censoMedianaPond(pares, domTot){
+  if(!pares.length || !(domTot>0)) return 0;
+  pares.sort(function(a,b){ return a[0]-b[0]; });
+  var meta=domTot/2, acc=0;
+  for(var i=0;i<pares.length;i++){
+    acc+=pares[i][1];
+    if(acc>=meta) return pares[i][0];
+  }
+  return pares[pares.length-1][0];   // arredondamento: o último par fecha a soma
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  COBERTURA DO RECORTE — que fração dele a base realmente cobre
+//
+//  A base tem SP, MG e BA. Com o centro num deles e a área entrando em
+//  PR/MS/GO/RJ, o painel contava os domicílios da parte coberta e dividia
+//  pela área INTEIRA do recorte: "Domicílios ocupados", "Pessoas",
+//  "Densidade por km²" e "Municípios" saíam sem uma palavra de aviso.
+//  Havia tarja para UF do manifesto que falhou na rede (censoUFsFaltando)
+//  e para centro fora de tudo ('fora'); não havia nada para este caso,
+//  que é o comum. Num raio de 30 km em Presidente Epitácio só 57% da área
+//  tem dado; num raio de 500 km da Sé o painel imprimia 20.058.352
+//  domicílios e "25,54 dom/km²".
+//
+//  A medida NÃO pode ser a união das bboxes do manifesto: a bbox de SP
+//  engole pedaços de MS, PR e MG, e dava 100% justamente em Epitácio,
+//  Ourinhos, Ilha Solteira e Juiz de Fora. Quem responde é a presença de
+//  setor de verdade, por uma grade de ocupação.
+// ══════════════════════════════════════════════════════════════════
+// Células de 0,05° (~5,5 km) com pelo menos um setor. Montada por demanda
+// e guardada: 35 ms para os 179.224 setores de SP+MG+BA, 23.205 células.
+function censoGradeMontar(){
+  if(censoGrade) return censoGrade;
+  var g=new Set();
+  if(CENSO && CENSO.s) for(var i=0;i<CENSO.s.length;i++)
+    g.add(Math.round(CENSO.s[i][0]/CENSO_CEL)+'|'+Math.round(CENSO.s[i][1]/CENSO_CEL));
+  censoGrade=g;
+  return g;
+}
+// Percentual da área do recorte com setor censitário por perto. Amostra o
+// recorte numa grade de 40 passos por eixo e pergunta à grade de ocupação.
+//
+// A VIZINHANÇA DE ±2 CÉLULAS (~11 km) é o único parâmetro que separa os
+// dois conjuntos de aceitação, e foi medida caso a caso: com ±1 o sertão da
+// BA e Barreiras — plenamente cobertos, só com setores enormes — passariam
+// a avisar; com ±3 Ourinhos, que de fato tem 11% da área no Paraná, cala.
+// Não mexer aqui sem refazer a tabela inteira.
+function censoCoberturaPct(rec){
+  if(!CENSO || !CENSO.s || !CENSO.s.length) return 100;
+  var G=censoGradeMontar(), K=2;
+  var temPerto=function(la, lo){
+    var i=Math.round(la/CENSO_CEL), j=Math.round(lo/CENSO_CEL);
+    for(var a=-K;a<=K;a++) for(var b=-K;b<=K;b++) if(G.has((i+a)+'|'+(j+b))) return true;
+    return false;
+  };
+  var n=0, com=0;
+  if(rec && rec.geom){
+    // Isócrona: grade da caixa do polígono, filtrada pelo polígono — a
+    // mesma pergunta "quem está dentro?" que censoSelecionarPoly faz.
+    var bb=geomCaixa(rec.geom);
+    if(!bb) return 100;
+    var dLon=(bb[2]-bb[0])/40, dLat=(bb[3]-bb[1])/40;
+    if(!(dLon>0) || !(dLat>0)) return 100;
+    for(var gx=0;gx<=40;gx++) for(var gy=0;gy<=40;gy++){
+      var plo=bb[0]+gx*dLon, pla=bb[1]+gy*dLat;
+      if(!pontoEmPoligono(plo, pla, rec.geom)) continue;
+      n++; if(temPerto(pla, plo)) com++;
+    }
+  } else if(rec && rec.km>0){
+    var km=rec.km, kx=111.320*Math.cos(rec.lat*Math.PI/180) || 1, ky=110.574;
+    // Piso de 250 m no passo: num raio de 1 km a grade de km/40 seria de
+    // 25 m, mil vezes mais fina que a célula de 5,5 km que ela consulta.
+    var passo=Math.max(0.25, km/40);
+    for(var dy=-km;dy<=km;dy+=passo) for(var dx=-km;dx<=km;dx+=passo){
+      if(dx*dx+dy*dy>km*km) continue;
+      n++; if(temPerto(rec.lat+dy/ky, rec.lon+dx/kx)) com++;
+    }
+  }
+  return n>0 ? 100*com/n : 100;
+}
+
+// A frase do aviso de cobertura vive em UM lugar: o painel imprime a
+// primeira oração em negrito, e as duas abas da planilha levam a frase
+// inteira no topo. Três cópias de uma afirmação sobre a qualidade do
+// número é exatamente como elas passam a divergir.
+//
+// "Ao menos" não é modéstia: a grade de 5,5 km com vizinhança de ±2
+// SUBESTIMA o buraco (em Epitácio ela mede 83% da área com dado, onde a
+// medida fina por setor dá 57%), então o percentual impresso é piso.
+// Por isso também o Math.floor: arredondar para cima tornaria o "ao
+// menos" falso por fração de ponto.
+function censoCoberturaFrase(q){
+  var car=censoNomesCarregadas();
+  return [
+    // "está sem setor censitário", não "a base não cobre": a primeira
+    // oração é a que se lê de relance, e num recorte litorâneo a causa é o
+    // mar, não uma falha da base. Os dois casos diluem a densidade do mesmo
+    // jeito, mas só um deles é culpa nossa — a oração seguinte lista as
+    // três causas e não insinua nenhuma.
+    'Ao menos '+Math.floor(100-q.cobertura)+'% da área deste recorte está sem setor censitário',
+    '— estado vizinho que a base ainda não cobre'+
+      (car.length ? ' (carregados hoje: '+car.join(', ')+')' : '')+
+      ', água ou área sem domicílios. Os totais abaixo contam só a parte com dado, '+
+      'e a densidade por km² divide pelo recorte inteiro — está subestimada nessa proporção.'
+  ];
 }
 
 function censoConsulta(lat, lon, raioKm){
@@ -5367,7 +5755,15 @@ function censoConsulta(lat, lon, raioKm){
   var S=CENSO.s, D=censoDist, rs=raioKm/Math.sqrt(idx.length), domBorda=0;
   for(var j=0;j<S.length;j++){ var dd=D[j]; if(dd>=raioKm-rs && dd<=raioKm+rs) domBorda+=S[j][3]; }
   q.setorMedioM=rs*1000;
-  q.margem = q.dom>0 ? domBorda/q.dom*100 : 100;
+  // Mesmo teto de 100% do ramo do polígono, e pelo mesmo motivo: a banda
+  // conta domicílios de fora do recorte e divide pelos de dentro, então em
+  // recorte minúsculo passa de 100%. A regra estava escrita nos dois
+  // lugares e só o polígono a tinha — num raio de 1 km em SP, 157 de 1.021
+  // centros reais passavam de 100% e o painel chegava a imprimir
+  // "19.800,0% dos domicílios estão na faixa de incerteza da borda".
+  // Acima de 100 a mensagem já é a mesma: não use estes números.
+  q.margem = q.dom>0 ? Math.min(100, domBorda/q.dom*100) : 100;
+  q.cobertura = censoCoberturaPct({lat:lat, lon:lon, km:raioKm});
   return q;
 }
 
@@ -5390,6 +5786,7 @@ function censoConsultaPoly(geom){
   // margem 0% SEM aviso, enquanto o painel imprime domicílios e pessoas —
   // exatamente o número confiante e errado que a margem existe para impedir
   q.margem = (q.dom>0 && q.area>0) ? Math.min(100, censoBordaPoly(geom, rs)/q.dom*100) : 100;
+  q.cobertura = censoCoberturaPct({geom:geom});
   return q;
 }
 
@@ -5642,6 +6039,18 @@ function renderRenda(){
       '<a id="rdRetentar" style="color:inherit;text-decoration:underline;cursor:pointer">tentar de novo</a></div>'
     : '';
 
+  // Cobertura parcial: parte do recorte está fora da base (estado vizinho
+  // ainda não publicado, mar, área sem domicílios). Diferente do aviso
+  // acima, que é falha de rede sobre um estado que a base TEM, e diferente
+  // de 'fora', que é o centro fora de tudo. Este é o caso comum, e era o
+  // único sem palavra nenhuma na tela.
+  var avisoCob = '';
+  if(q.cobertura < 95){
+    var fr = censoCoberturaFrase(q);
+    avisoCob = '<div class="rd-msg '+(q.cobertura<80 ? 'bad' : 'warn')+'"><b>'+
+      esc(fr[0])+'</b> '+esc(fr[1])+'</div>';
+  }
+
   // Confiabilidade: em raio pequeno a margem de borda domina o resultado.
   var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
   var aviso='';
@@ -5741,7 +6150,8 @@ function renderRenda(){
     (rendaModo==='iso' ? '<p>O recorte é um tempo de deslocamento, '+
       'calculado sobre a malha viária do OpenStreetMap <b>sem considerar trânsito</b>.</p>' : '')+
     '<p>Média condicional: responsáveis sem rendimento não entram. '+
-    'Corte por centroide do setor.</p>'+
+    'Corte por centroide do setor. A <b>mediana</b> é a mediana entre os '+
+    'setores do recorte, ponderada por domicílios.</p>'+
     '</div></details>';
 
   box.innerHTML=
@@ -5777,7 +6187,9 @@ function renderRenda(){
       ? '<div class="rd-stat"><span>Sem renda informada</span><b>'+nf(q.domSemRenda)+' dom.</b></div>'
       : '')+
     '<div class="rd-stat"><span>Municípios ('+q.muns.length+')</span><b style="font-weight:600;font-size:var(--fs-1)">'+esc(munTxt)+'</b></div>'+
-    avisoUF+aviso+
+    // Território errado antes de borda incerta: contar outro estado é mais
+    // grave que contar mal a franja do recorte.
+    avisoUF+avisoCob+aviso+
     // Sem nenhum setor com renda, o gráfico seria sete linhas "0,0% (0)" e
     // um "Base: 0" — ruído sobre uma informação que o aviso acima já deu.
     (semRenda ? '' :
@@ -6088,8 +6500,17 @@ document.querySelectorAll('.nv-item').forEach(function(b){
   b.onclick=function(){ irPara(b.getAttribute('data-view')); };
 });
 carregarNegocios();   // o quadro é próprio: volta sozinho, sem abrir projeto
+// A gaveta da esquerda também é escondida só por transform, então fechada
+// continuava no caminho do Tab — mesmo defeito que as seis da direita e o
+// #editor. Ela é pequena (dois itens), mas o foco ia para fora da tela do
+// mesmo jeito.
+function navInerte(){
+  gavetaInerte(document.getElementById('nav'), !document.body.classList.contains('nav-open'));
+}
+navInerte();   // nasce fechada
 document.getElementById('navBtn').onclick=function(){
   document.body.classList.toggle('nav-open');
+  navInerte();
   if(viewAtual==='mapa' && map) setTimeout(function(){ map.resize(); }, 300);
 };
 
@@ -6232,8 +6653,36 @@ function kmlParaFeats(txt, grupo){
       let pts = parseCoords(cEl && cEl.textContent);
       if(pts.length && pts[0][0]===pts[pts.length-1][0] && pts[0][1]===pts[pts.length-1][1]) pts=pts.slice(0,-1);
       if(pts.length<3) continue;
-      feats.push({nome, tipo:'poligono', gtype:'Polygon', coords:[[...pts, pts[0]]],
-        ha:areaHa(pts), lon:pts.reduce((s,p)=>s+p[0],0)/pts.length, lat:pts.reduce((s,p)=>s+p[1],0)/pts.length});
+      // Os FUROS (innerBoundaryIs) eram ignorados, e os hectares saíam só
+      // do contorno externo. Uma gleba com reserva, enclave ou faixa de
+      // domínio recortada vinha com área superestimada — e esse número vai
+      // para o cabeçalho, o rótulo no mapa, o popup e o cartão do kanban.
+      // Um quadrado de 1 km² com um furo de 0,25 km² dava 100 ha; agora dá 75.
+      const furos = [];
+      for(const inner of poly.getElementsByTagName('innerBoundaryIs')){
+        const iEl = inner.getElementsByTagName('coordinates')[0];
+        let ip = parseCoords(iEl && iEl.textContent);
+        if(ip.length && ip[0][0]===ip[ip.length-1][0] && ip[0][1]===ip[ip.length-1][1]) ip=ip.slice(0,-1);
+        if(ip.length>=3) furos.push(ip);
+      }
+      // Math.max(0, …): um furo mal desenhado (maior que o externo, ou
+      // dois furos sobrepostos) daria hectare negativo no cabeçalho —
+      // número obviamente errado é melhor que número negativo com cara
+      // de certo, e a área superestimada já era o defeito.
+      const ha = Math.max(0, furos.reduce((a,f)=> a-areaHa(f), areaHa(pts)));
+      // O FURO PRECISA DA ORIENTAÇÃO CONTRÁRIA à do contorno. A MapLibre
+      // decide furo × polígono separado pelo SINAL da área do anel
+      // (classifyRings), não pela posição na lista: um furo no mesmo sentido
+      // do externo vira um segundo polígono PREENCHIDO sobre a gleba e, com
+      // fill-opacity 0,32, blenda duas vezes — o furo aparece como mancha
+      // mais ESCURA, na tela e no PNG, enquanto o hectare (que usa
+      // Math.abs) sai certo: o desenho contradizendo o número.
+      // O Google Earth não normaliza o sentido; conversões de shapefile
+      // normalmente já saem opostas, e é por isso que essas funcionavam.
+      // anelOrientado recebe anel aberto e devolve fechado.
+      feats.push({nome, tipo:'poligono', gtype:'Polygon',
+        coords:[anelOrientado(pts, false), ...furos.map(f=> anelOrientado(f, true))],
+        ha, lon:pts.reduce((s,p)=>s+p[0],0)/pts.length, lat:pts.reduce((s,p)=>s+p[1],0)/pts.length});
     }
     for(const ls of pm.getElementsByTagName('LineString')){
       const pts = parseCoords(ls.getElementsByTagName('coordinates')[0]?.textContent);
@@ -6299,7 +6748,7 @@ function excluirGrupo(m){
 function appendEditorCidade(m){
   const row = document.createElement('div');
   row.className='e-row';
-  row.innerHTML = `<input type="color" value="${CORES[m]}"><span class="e-nome">${m}</span>
+  row.innerHTML = `<input type="color" value="${CORES[m]}"><span class="e-nome">${esc(m)}</span>
     <label title="preenchimento"><input type="checkbox" checked>fill</label>`;
   row.querySelector('input[type=color]').oninput = e=> setCidade(m,'cor_final',e.target.value);
   row.querySelector('input[type=checkbox]').onchange = e=> setCidade(m,'fill_on', e.target.checked?1:0);
@@ -6309,8 +6758,8 @@ function appendEditorArea(f){
   const p = f.properties;
   const row = document.createElement('div');
   row.className='e-row';
-  row.innerHTML = `<input type="color" value="${p.cor_final}" data-mun="${p.municipio}">
-    <span class="e-nome" title="${p.nome}">${p.nome}</span>
+  row.innerHTML = `<input type="color" value="${p.cor_final}" data-mun="${esc(p.municipio)}">
+    <span class="e-nome" title="${esc(p.nome)}">${esc(p.nome)}</span>
     <label title="preenchimento"><input type="checkbox" ${p.tipo!=='poligono'?'disabled':'checked'}>fill</label>`;
   row.querySelector('input[type=color]').oninput = e=> setArea(p.idx,'cor_final',e.target.value);
   row.querySelector('input[type=checkbox]').onchange = e=> setArea(p.idx,'fill_on', e.target.checked?1:0);
@@ -6751,6 +7200,15 @@ function rendaPlanilhaFolhas(q){
     L.push([]);
   }
 
+  // Cobertura parcial vem ANTES da margem de borda: contar outro estado é
+  // mais grave que contar mal a franja. Mesma ordem do painel.
+  var cob = q.cobertura < 95 ? censoCoberturaFrase(q) : null;
+  if(cob){
+    L.push([xT('ATENÇÃO — O RECORTE NÃO ESTÁ TODO COBERTO PELA BASE', E.NEG)]);
+    L.push([xT(cob[0]+' '+cob[1])]);
+    L.push([]);
+  }
+
   var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
   if(nivel==='bad'){
     L.push([xT('ATENÇÃO — NÃO USE ESTES NÚMEROS COMO FECHADOS', E.NEG)]);
@@ -6772,6 +7230,18 @@ function rendaPlanilhaFolhas(q){
   L.push([xT('RECORTE', E.NEG)]);
   L.push([xT(rendaModo==='iso' ? 'Dentro da isócrona' : 'Dentro do raio'), xT(rendaRecorteTxt())]);
   L.push([xT('Área'), xN(q.area, E.DEC), xT('km²')]);
+  // A cobertura fica ao lado da área porque é um atributo dela: é a fração
+  // da área que tem setor censitário na base. Fração, não 41,9 — célula de
+  // percentual, como manda o resto da planilha.
+  //
+  // "no máximo" no rótulo, e a célula só aparece quando há o que avisar.
+  // A medida vem de uma grade de ~5,5 km, então ela SUPERESTIMA a cobertura
+  // (num raio de 30 km em Presidente Epitácio dá 83% onde a medida fina dá
+  // 57%) — é por isso que a frase do painel diz "ao menos N% não tem". Pôr
+  // o limite superior aqui sem dizer que é limite apresentaria como fato o
+  // melhor caso; e imprimir "100,0%" num recorte inteiramente coberto
+  // afirmaria uma precisão que a grade não tem.
+  if(cob) L.push([xT('Área com setor censitário (no máximo)'), xN(q.cobertura/100, E.PCT)]);
   L.push([]);
 
   L.push([xT('TOTAIS', E.NEG)]);
@@ -6819,8 +7289,10 @@ function rendaPlanilhaFolhas(q){
     ? 'Renda domiciliar estimada: a do responsável mais '+(+rendaRaio.outros)+'% atribuídos '+
       'aos demais moradores. É uma estimativa sua, não um dado do Censo.'
     : 'Mostrando apenas a renda do responsável. A renda domiciliar costuma ser 1,5 a 2× maior.')]);
+  // Pelo MESMO formatador do painel: cru, saía "20172" onde a tela escreve
+  // "20.172" — o mesmo número parecendo outro no arquivo que viaja.
   if(q.domSemRenda>0){
-    L.push([xT('Os '+q.domSemRenda+' domicílios sem renda informada (setor sem informação de '+
+    L.push([xT('Os '+nfInt(q.domSemRenda)+' domicílios sem renda informada (setor sem informação de '+
       'rendimento) contam no total de domicílios e de pessoas; ficam de fora da média, da '+
       'mediana e da distribuição por faixa.')]);
   }
@@ -6829,7 +7301,8 @@ function rendaPlanilhaFolhas(q){
       'OpenStreetMap, sem considerar trânsito.')]);
   }
   L.push([xT('Média condicional: responsáveis sem rendimento não entram. '+
-    'Corte por centroide do setor.')]);
+    'Corte por centroide do setor. A mediana é a mediana entre os setores do '+
+    'recorte, ponderada por domicílios.')]);
 
   var folhas=[{nome:'Resumo', linhas:L, larguras:[34,16,46]}];
   if(semRenda) return folhas;
@@ -6839,6 +7312,14 @@ function rendaPlanilhaFolhas(q){
   // de que base os percentuais são e em que moeda estão os valores.
   var F=[];
   F.push([xT('Domicílios por faixa de renda', E.TIT)]);
+  // O aviso de cobertura se repete aqui, no TOPO, pelo mesmo motivo que as
+  // premissas se repetem: quem copia só esta tabela tem de levar junto que
+  // parte do recorte não tem dado.
+  if(cob){
+    F.push([xT('ATENÇÃO — O RECORTE NÃO ESTÁ TODO COBERTO PELA BASE', E.NEG)]);
+    F.push([xT(cob[0]+' '+cob[1])]);
+    F.push([]);
+  }
   F.push([xT(rendaModo==='iso' ? 'Dentro da isócrona' : 'Dentro do raio'), xT(rendaRecorteTxt())]);
   prem.forEach(function(p){ F.push([xT(p[0]), xT(p[1])]); });
   F.push([xT('Base'), xN(q.faixaTot, E.INT), xT('domicílios com renda informada')]);

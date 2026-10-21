@@ -5,6 +5,55 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.6 — Mediana de verdade e aviso de cobertura
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **A "Renda mediana" agora é uma mediana.** Ela vinha sendo calculada como uma
+  média, e média de renda puxa para cima: num raio de 10 km em Campinas o painel
+  mostrava R$ 6.329 onde a mediana é R$ 4.500 — 41% a mais. Em Ribeirão Preto
+  eram 38%, num raio de 100 km em São Paulo, 58%. O erro era **sempre para
+  cima**, que é o lado perigoso num argumento sobre poder de compra. A média
+  continua sendo a média, no mesmo lugar.
+- **Novo aviso quando o recorte sai do território coberto.** A base cobre São
+  Paulo, Minas e Bahia. Um raio centrado num deles mas que entra no Paraná, em
+  Mato Grosso do Sul ou em Goiás contava só os domicílios da parte coberta e
+  dividia pela área inteira — em Presidente Epitácio, com 30 km, 57% do círculo
+  não tinha dado, e o painel não dizia nada. Agora uma tarja informa a proporção
+  e explica que a densidade por km² está subestimada. O aviso vai também para o
+  topo da planilha.
+- **A faixa de incerteza da borda não imprime mais percentuais absurdos.** Em
+  raios muito pequenos o painel chegava a dizer "19.800,0%", o que desacreditava
+  justamente o aviso que manda não usar aqueles números.
+- **Gleba com furo agora tem o hectare certo.** Um KMZ com área de preservação,
+  enclave ou faixa recortada por dentro tinha o tamanho somado como se o furo
+  fosse terreno — e o número ia para o cabeçalho, para o rótulo do mapa e para o
+  cartão de Novos Negócios. O furo também passou a ser desenhado como furo: em
+  alguns arquivos ele aparecia como mancha mais escura.
+- **Trocar a paleta não apaga mais as suas cores.** Escolher um conjunto de
+  cores em Cores descartava, em silêncio, o que você tinha ajustado em Vias,
+  Rótulos e Mapa, e os seletores continuavam mostrando as cores antigas. Com o
+  satélite ligado era pior: desligá-lo depois trazia de volta as cores da paleta
+  anterior, deixando metade do mapa numa e metade na outra. O botão "restaurar o
+  padrão" também passou a devolver a paleta.
+- **A legenda sai na imagem no mesmo lugar em que está na tela.** No canto
+  inferior direito ela saía 60 px mais baixa no arquivo do que no enquadramento
+  que você compôs.
+- **Nomes de arquivo e de área com caracteres especiais** deixaram de quebrar a
+  página, a lixeira da lista e a troca de cor por cidade.
+- **Teclado:** as gavetas fechadas saíram do caminho do Tab. Antes era possível
+  tabular para dentro de painéis invisíveis e acionar botões sem ver.
+- **Entrar pelo link do e-mail voltou a preservar sua conta.** Quem redefinia a
+  senha ou confirmava o cadastro pelo link entrava como se fosse outra pessoa:
+  plano gratuito, projetos salvos fora da lista, quadro de Novos Negócios vazio.
+  Também era impossível voltar à tela de login para entrar de novo, e quem já
+  estava logado clicava no link de redefinir senha e nada acontecia.
+- **O plano concedido pelo painel passa a valer.** Conceder o acesso pelo campo
+  de função ("Role") não destravava nada para quem tinha se cadastrado pelo
+  site. Ninguém perde acesso com esta mudança — ela só concede.
+
+---
+
 ## Maker Map 3.5 — Mosaico Light e Dark Mosaico
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
