@@ -5,6 +5,29 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.7 — Mosaico Moderno
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Nova paleta "Mosaico Moderno"** na gaveta Cores, com as cores do *Modelo
+  Moderno* — o grafite `#17191E` do relatório, os três tons de base e o laranja
+  da marca nas rodovias.
+- **É a paleta do modelo, não uma aproximação dela.** 19 dos 20 tons são valores
+  literais do material, cada um no papel que já tinha lá: o fundo de slide virou
+  o fundo do mapa, a cor de cartão virou parque e contorno de via, e o tom das
+  "divisórias e separadores" virou a cor das divisas. O único derivado é a água,
+  que é o azul da marca escurecido sobre o fundo.
+- **O laranja é o único acento, como o modelo manda.** Ele vai nas rodovias e em
+  nada mais. O amarelo fica de fora: o modelo o restringe a formas de gráfico, e
+  num mapa não há série de gráfico. Magenta, proibido.
+- **Parque e vegetação saem em cinza**, como nas outras duas paletas da marca —
+  nenhum dos modelos tem verde. A gaveta avisa. Se precisar de verde num mapa
+  específico, a seção **Mapa** da Edição continua ajustando cor por cor.
+- As nove paletas anteriores estão intactas; a nova entra logo depois de **Dark
+  Mosaico**.
+
+---
+
 ## Maker Map 3.6 — Mediana de verdade e aviso de cobertura
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
