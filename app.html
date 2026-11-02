@@ -929,6 +929,10 @@
         <span class="pal-swatch"><i style="background:#1D1D1B"></i><i style="background:#2D2D2B"></i><i style="background:#F87226"></i><i style="background:#3973B9"></i></span>
         <span class="pal-txt">Dark Mosaico<small>a paleta da marca sobre chumbo</small></span>
       </button>
+      <button class="pal-btn" data-pal="mosaicoModerno">
+        <span class="pal-swatch"><i style="background:#17191E"></i><i style="background:#22252C"></i><i style="background:#F87226"></i><i style="background:#3973B9"></i></span>
+        <span class="pal-txt">Mosaico Moderno<small>grafite e laranja, do Modelo Moderno</small></span>
+      </button>
       <button class="pal-btn" data-pal="pb">
         <span class="pal-swatch"><i style="background:#FFFFFF"></i><i style="background:#E9E9E9"></i><i style="background:#111111"></i><i style="background:#F4F4F4"></i></span>
         <span class="pal-txt">Preto e branco<small>alto contraste, sem cor</small></span>
@@ -955,9 +959,9 @@
       </button>
     </div>
     <div class="sd-sec">
-      <div class="e-hint">As duas paletas <b>Mosaico</b> são a paleta do deck, e o deck não tem
-      verde: parque e vegetação saem em cinza, e as rodovias ficam no laranja da marca.
-      Inventar um verde faria dela outra paleta.</div>
+      <div class="e-hint">As três paletas <b>Mosaico</b> são paletas de apresentação da marca, e
+      nenhuma delas tem verde: parque e vegetação saem em cinza, e as rodovias ficam no
+      laranja da marca. Inventar um verde faria delas outra paleta.</div>
     </div>
   </div>
 
@@ -1462,6 +1466,48 @@ var PALETAS = {
     placeOther:'#8C8C8C',       // rótulo de cidade/raio no mapa
     symbol:'#8C8C8C',
     halo:'#1D1D1B' },
+  // Modelo Moderno (tema escuro), a paleta do relatório Gleba Sousas. É
+  // OUTRA paleta da marca, não uma variação da de cima: grafite #17191E em
+  // vez do preto do deck FIDC, e três tons de base — fundo, superfície,
+  // linha — em lugar das zebras de tabela. 19 das 20 chaves são valor
+  // literal dela, com o papel anotado ao lado.
+  // A regra dela é mais dura que a do outro deck, e o mapa a herda:
+  //   • o laranja é o ÚNICO acento, "usado com parcimônia" — aqui, só as
+  //     rodovias, que são a camada mais esparsa do mapa;
+  //   • azul e amarelo são "apoio, só em formas e gráficos". Água é forma,
+  //     então o azul entra nela; AMARELO NÃO ENTRA — num mapa não há série
+  //     de gráfico, e a paleta proíbe amarelo em texto;
+  //   • magenta é proibido.
+  // E, como a outra, ela NÃO TEM VERDE: parque e vegetação saem no tom de
+  // superfície. O #FFFFFF e o #DADADA também ficam de fora — são do logo e
+  // da linha de data da capa, e não há papel para eles no mapa.
+  mosaicoModerno: {
+    bg:'#17191E',               // grafite escuro: fundo, a cor dominante
+    water:'#264264',            // derivado: azul #3973B9 a 45% sobre o fundo
+    waterway:'#3973B9',         // azul de apoio, em linha (forma, não texto)
+    waterText:'#9AA0AA',        // cinza azulado: texto secundário
+    park:'#22252C',             // grafite médio: superfície (cartão/painel)
+    parkText:'#6E7584',         // cinza ardósia: rótulo discreto
+    grass:'#22252C',            // superfície
+    // A paleta tem UMA cor de superfície, não três. A camada mais ampla
+    // fica no próprio fundo em vez de ganhar um quarto cinza inventado —
+    // seria o único valor fora da paleta, e para esconder o que o modelo
+    // deliberadamente deixa liso.
+    landcover:'#17191E',        // fundo: sem superfície
+    landuse:'#22252C',          // superfície (as "quadras" das cidades)
+    aeroway:'#22252C',          // superfície
+    boundary:'#33373F',         // grafite claro: "divisórias, separadores"
+    motorway:'#F87226',         // laranja MOSAICO, o único acento
+    motorwayCasing:'#33373F',   // linha fina — e não um laranja escurecido:
+                                // este modelo não traz um, e inventá-lo
+                                // daria um segundo tom de acento
+    major:'#33373F',            // linha fina
+    majorCasing:'#22252C',      // superfície
+    roadText:'#9AA0AA',         // texto secundário
+    placeCity:'#F2F2F0',        // branco quente: texto principal
+    placeOther:'#6E7584',       // cinza ardósia: rótulo discreto
+    symbol:'#6E7584',
+    halo:'#17191E' },           // fundo
   // Preto e branco — alto contraste, sem cor.
   pb: { bg:'#FFFFFF', water:'#E9E9E9', waterway:'#CFCFCF', waterText:'#555555',
     park:'#F4F4F4', parkText:'#555555', grass:'#F4F4F4', landcover:'#F7F7F7', landuse:'#F2F2F2',
