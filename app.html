@@ -961,7 +961,8 @@
     <div class="sd-sec">
       <div class="e-hint">As três paletas <b>Mosaico</b> são paletas de apresentação da marca, e
       nenhuma delas tem verde: parque e vegetação saem em cinza, e as rodovias ficam no
-      laranja da marca. Inventar um verde faria delas outra paleta.</div>
+      laranja da marca. Inventar um verde faria de qualquer uma delas outra
+      paleta.</div>
     </div>
   </div>
 
@@ -1409,7 +1410,9 @@ var PALETAS = {
     aeroway:'#EDE8E1', boundary:'#C9C2BA', motorway:'#F5C9B8', motorwayCasing:'#E0A98F',
     major:'#FFFFFF', majorCasing:'#E0DAD3', roadText:'#6B6560',
     placeCity:'#1C1917', placeOther:'#8A8F98', symbol:'#8A8F98', halo:'#FFFFFF' },
-  // ── As duas paletas da marca ────────────────────────────────────────────
+  // ── As duas paletas do deck FIDC ───────────────────────────────────────
+  // Duas das TRÊS paletas da marca; a terceira, mosaicoModerno, vem de
+  // outro documento e está logo abaixo destas.
   // Vêm da paleta do deck FIDC · Projetos (MOSAICO 2026_Slide-Base), e o
   // objetivo é que o PNG exportado entre no deck sem parecer de outro lugar.
   // Por isso quase todo valor abaixo é um valor REAL do deck, com o papel
@@ -1420,12 +1423,18 @@ var PALETAS = {
   //     NUNCA em título/rótulo. Água é a única coisa que fica azul, porque
   //     água azul não é um acento, é o que a coisa é.
   // E uma consequência que a interface precisa dizer em voz alta: o deck
-  // NÃO TEM VERDE. Parque e vegetação saem em cinza nas duas paletas. A
+  // NÃO TEM VERDE. Parque e vegetação saem em cinza nestas duas. A
   // alternativa seria inventar um verde, e aí não seria mais a paleta do
   // deck — que é justamente o motivo de ela existir aqui.
   mosaicoLight: {
     bg:'#FFFFFF',               // texto de destaque do deck, virado em papel
-    water:'#D7E3F2',            // derivado: azul #3973B9 a 25% sobre branco
+    // Era #D7E3F2 com um comentário dizendo "a 25% sobre branco", e 25% dá
+    // #CEDCEE: a conta afirmada não fechava. E #D7E3F2 não era mistura exata
+    // de nenhuma porcentagem — o alpha implícito saía 0,202 / 0,200 / 0,186
+    // por canal. Agora é o valor exato de 20%, que é o que a mistura dizia
+    // ser: um ponto de azul de diferença, invisível, em troca de uma conta
+    // que dá para verificar — e que o harness verifica.
+    water:'#D7E3F1',            // derivado: azul #3973B9 a 20% sobre branco
     waterway:'#3973B9',         // azul da marca, em linha
     waterText:'#3973B9',        // azul da marca
     park:'#E6E6E6',             // corpo de tabela / legenda

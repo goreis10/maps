@@ -5,6 +5,18 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.7.1
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Corrigido o azul da água na paleta Mosaico Light.** O tom estava um ponto
+  fora da mistura que o código dizia estar usando. A diferença é invisível na
+  tela; o que muda é que agora a conta pode ser conferida — e passou a ser, a
+  cada verificação.
+- Nenhuma outra cor mudou, em nenhuma das dez paletas.
+
+---
+
 ## Maker Map 3.7 — Mosaico Moderno
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
