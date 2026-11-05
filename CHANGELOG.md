@@ -5,6 +5,37 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.8.1
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Correções nas notas da versão anterior**, que diziam duas coisas que não se
+  sustentam. A 3.8 afirmou que cada uma das 21 cores das duas paletas Moderno é
+  "uma mistura declarada" — são **24 misturas e 18 literais** nas duas, e na
+  Moderno Claro os literais são a maioria. E afirmou que o verde é "a única cor
+  de fora do Modelo Moderno": isso não é verificável, porque o único registro
+  desse modelo no código é o tema escuro, e a Moderno Claro usa quatro tons de
+  tema claro que não estão registrados em lugar nenhum — três deles aparecem no
+  código em outro papel, vindos do deck FIDC.
+- **O quadradinho vermelho da paleta Contraste categórico era mentira.** Ele
+  mostrava `#E63946`, que é uma cor da interface e não da paleta: o botão
+  prometia um vermelho que o mapa nunca pinta. Agora mostra a rodovia dela,
+  como nos outros onze botões.
+- **A gaveta Cores dizia que parque e vegetação das paletas Mosaico "saem em
+  cinza".** Nas duas primeiras saem; na Mosaico Moderno saem em grafite
+  azulado. Agora diz o que cada uma faz.
+- **Ao reabrir um projeto, a paleta volta sempre ao Padrão.** Isso sempre foi
+  assim e não mudou agora, mas vale dito: se você compôs o mapa numa paleta
+  escura, ao reabrir o projeto os rótulos do Padrão ficam sobre as cores
+  escuras que foram salvas, e o nome de cidade fica ilegível. Reaplique a
+  paleta em **Cores** depois de abrir.
+- Duas notas técnicas do código prometiam mais do que entregam e foram medidas:
+  na Moderno Grafite o contorno escuro separa a via do **prédio**, mas não da
+  quadra; e a verificação automática não lia os comentários, então um comentário
+  errado passava — agora lê.
+
+---
+
 ## Maker Map 3.8 — Moderno Claro e Moderno Grafite
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
