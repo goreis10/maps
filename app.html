@@ -958,7 +958,10 @@
         <span class="pal-txt">Zoneamento urbano<small>terroso, aspecto de papel</small></span>
       </button>
       <button class="pal-btn" data-pal="contraste">
-        <span class="pal-swatch"><i style="background:#FAFAFA"></i><i style="background:#E63946"></i><i style="background:#457B9D"></i><i style="background:#2A9D8F"></i></span>
+        <!-- o 2º quadradinho era #E63946, que é o --bad-ln da interface e NÃO é
+             valor desta paleta: prometia um vermelho que o mapa nunca pinta.
+             Agora é a rodovia dela, como nos outros botões. -->
+        <span class="pal-swatch"><i style="background:#FAFAFA"></i><i style="background:#F4A261"></i><i style="background:#457B9D"></i><i style="background:#2A9D8F"></i></span>
         <span class="pal-txt">Contraste categórico<small>base clara para marcadores</small></span>
       </button>
       <button class="pal-btn" data-pal="dark">
@@ -968,8 +971,9 @@
     </div>
     <div class="sd-sec">
       <div class="e-hint">As três paletas <b>Mosaico</b> são paletas de apresentação da marca, e
-      nenhuma delas tem verde: parque e vegetação saem em cinza, e as rodovias ficam no
-      laranja da marca. Inventar um verde faria de qualquer uma delas outra
+      nenhuma delas tem verde: parque e vegetação saem no tom de superfície da paleta —
+      cinza nas duas primeiras, grafite azulado na Mosaico Moderno — e as rodovias ficam
+      no laranja da marca. Inventar um verde faria de qualquer uma delas outra
       paleta.<br><br>
       As duas <b>Moderno</b> vêm do mesmo Modelo Moderno, com duas escolhas
       diferentes: a vegetação usa o verde do Padrão diluído na base, e o
@@ -1545,10 +1549,15 @@ var PALETAS = {
   // Vêm do MESMO Modelo Moderno da `mosaicoModerno` acima, mas não são
   // variações dela: ali o mapa herdou os tokens do modelo nos papéis em que
   // o documento já os usava, e sobrou uma paleta de três tons. Aqui o dono
-  // escolheu as 21 cores uma por uma e ESCREVEU A CONTA DE CADA UMA — por
-  // isso quase toda chave abaixo é uma mistura declarada, e não um literal.
-  // A conta vem anotada em cada linha, no formato "X a N% sobre Y", e o
-  // harness confere as 42 contra a aritmética (`misturar`) dígito a dígito.
+  // escolheu as 21 cores uma por uma e DISSE DE ONDE VEIO CADA UMA.
+  //
+  // São 24 MISTURAS e 18 LITERAIS nas duas (Claro 11/10, Grafite 13/8) — não
+  // "quase todas misturas", como esta nota dizia até a 3.8.1. A mistura traz a
+  // conta na própria linha, no formato "X a N% sobre Y"; o literal nomeia o
+  // token. O harness confere as 42: a mistura contra a aritmética (`misturar`)
+  // e o literal contra o valor do token, as duas coisas no dígito — e, desde a
+  // 3.8.1, confere também o TEXTO destes comentários contra a sua tabela, que
+  // é o único jeito de um comentário errado aqui não passar liso.
   //
   // Duas regras do modelo que estas duas herdam, as mesmas da `mosaicoModerno`:
   //   • LARANJA E AMARELO FICAM FORA DO MAPA, de propósito. Não é que o
@@ -1556,15 +1565,35 @@ var PALETAS = {
   //     uma via ou um rótulo nessas cores competiria com o assunto. Nestas
   //     duas, portanto, nem as rodovias são laranja — é a única diferença de
   //     princípio em relação à `mosaicoModerno`, onde o laranja é o acento.
-  //   • O MODELO NÃO TEM VERDE. Em vez de sair em cinza como nas três de
-  //     marca, aqui a vegetação é o verde do Padrão (#5F7A5C) diluído na
-  //     base — a conta está escrita, e é a única cor de fora do modelo.
+  //   • O MODELO NÃO TEM VERDE. Em vez de sair no tom de superfície como nas
+  //     três de marca, aqui a vegetação é o verde do Padrão (#5F7A5C)
+  //     diluído na base, e a conta está escrita.
   //
-  // Quatro valores do Grafite (water, building, placeOther, symbol) saíram da
-  // folha a UM ponto em UM canal da aritmética que ela mesma declarava. Ficou
-  // o valor exato da conta: 1/255 de diferença, invisível, em troca de um
-  // comentário que dá para verificar — a mesma decisão da água da
-  // mosaicoLight na 3.7.1.
+  // O QUE ESTE REPOSITÓRIO NÃO SABE CONFERIR, e por isso fica dito: até a
+  // 3.8.1 esta nota afirmava que o verde era "a única cor de fora do modelo",
+  // e isso não dá para checar aqui. O único registro do Modelo Moderno no
+  // repositório é o tema ESCURO, na `mosaicoModerno` acima — onze tokens, e a
+  // nota da 3.7 diz que só #FFFFFF e #DADADA ficaram sem uso. Os quatro tokens
+  // de tema CLARO que a `modernoClaro` usa (#F4F4F2 painel, #B2B2B2 rótulo,
+  // #706F6F texto secundário, #1D1D1B grafite) vêm da folha do dono, não de
+  // nada registrado aqui, e três deles aparecem no repositório em OUTRO papel,
+  // do deck FIDC: #B2B2B2 são os valores de eixo (mosaicoDark.waterText),
+  // #706F6F é a nota de rodapé e a borda tracejada dos raios, e #1D1D1B é o
+  // fundo de slide. Pode ser o mesmo valor em dois documentos da marca; pode
+  // ser que o tema claro deste modelo nunca tenha sido registrado aqui. Quem
+  // for conferir a procedência precisa do documento, não deste arquivo.
+  //
+  // Quatro CHAVES do Grafite (três cores: placeOther e symbol são a mesma)
+  // saíram da folha a UM ponto em UM canal da aritmética que ela mesma
+  // declarava. Ficou o valor exato da conta: 1/255 de diferença, invisível, em
+  // troca de um comentário que dá para verificar — a mesma decisão da água da
+  // mosaicoLight na 3.7.1. Os hex da folha ficam aqui para que a afirmação
+  // seja checável sem ela, que não está no repositório:
+  //   water      folha #21344C   conta #21344D   (canal R: 76,5)
+  //   building   folha #2A2E36   conta #2B2E36   (canais R 42,5 e B 53,5 — a
+  //              folha truncou um e arredondou o outro; só R diverge)
+  //   placeOther folha #848A97   conta #848B97   (canal G: 138,5)
+  //   symbol     igual a placeOther
   modernoClaro: {
     bg:'#F4F4F2',               // painel do tema claro; branco puro fica duro
                                 // em área grande, e aqui a área é o mapa todo
@@ -1575,6 +1604,13 @@ var PALETAS = {
     park:'#CDD4CB',             // verde do Padrão #5F7A5C a 26% sobre o fundo
     building:'#DADADA',         // linha do tema claro, literal
     aeroway:'#E7E7E6',          // linha #DADADA a 50% sobre o fundo
+    // Duas consequências destes quatro valores, medidas e ditas aqui porque
+    // não estavam em lugar nenhum: a rodovia e a arterial têm a MESMA cor de
+    // linha, então a hierarquia entre elas é carregada só pelo contorno e pela
+    // largura (no `padrao` ela está na própria linha, #F5C9B8 contra #FFFFFF);
+    // e `majorCasing` é igual a `building`, então do zoom 12 para cima o
+    // contorno da arterial desaparece onde ela cruza um prédio (1,00:1).
+    // São escolhas do dono, não defeitos — mas é o que se vai ver na tela.
     motorway:'#FFFFFF',         // branco do tema claro
     motorwayCasing:'#B2B2B2',   // rótulo do tema claro, literal
     major:'#FFFFFF',            // branco do tema claro
@@ -1603,6 +1639,12 @@ var PALETAS = {
     // quadras e os prédios são mais CLAROS que o fundo, então é o contorno
     // escuro que separa a via deles. Um contorno claro coerente seria
     // #6E7584 (rodovia) e #4A4F59 (arteriais), se algum dia se quiser trocar.
+    // Medido, porque até a 3.8.1 esta nota prometia mais do que entrega: o
+    // contorno separa a via do PRÉDIO (1,30:1, um fio visível pela faixa de
+    // 1,03–1,6 do próprio produto), mas não da QUADRA (1,08:1, que é nada).
+    // Da quadra, o que separa a via é a clareza dela mesma — arterial 1,54:1 e
+    // rodovia 2,21:1 contra `landuse`. A arterial é discreta nesta paleta
+    // (1,67:1 contra o fundo) e nenhuma regra cobre via-contra-superfície.
     motorway:'#52565D',         // texto secundário #9AA0AA a 45% sobre o fundo
     motorwayCasing:'#17191E',   // o próprio fundo — ver a nota acima
     major:'#3C3F45',            // texto secundário #9AA0AA a 28% sobre o fundo
@@ -1712,7 +1754,7 @@ function paletaOps(l, PAL){
   // duas cores quase brancas, fixas. Nenhuma paleta tocava nisso, e o
   // `building` aparecia uma só vez no arquivo inteiro, dentro de camadasMapa().
   // Consequência medida: nas paletas claras o prédio se dissolve no fundo
-  // (1,02 a 1,21:1) e ninguém notou; nas três escuras ele dá 13,7 a 14,6:1 —
+  // (1,02 a 1,21:1) e ninguém notou; nas quatro escuras ele dá 13,7 a 14,6:1 —
   // manchas quase brancas, com um fio de contorno claro em volta, do zoom 12
   // para cima. O contorno vai junto: pintar só o preenchimento deixaria o fio.
   // Depois que o usuário mexer na cor em Mapa, o fio fica um passo atrás (a
