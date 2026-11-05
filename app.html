@@ -933,6 +933,14 @@
         <span class="pal-swatch"><i style="background:#17191E"></i><i style="background:#22252C"></i><i style="background:#F87226"></i><i style="background:#3973B9"></i></span>
         <span class="pal-txt">Mosaico Moderno<small>grafite e laranja, do Modelo Moderno</small></span>
       </button>
+      <button class="pal-btn" data-pal="modernoClaro">
+        <span class="pal-swatch"><i style="background:#F4F4F2"></i><i style="background:#D3E0F0"></i><i style="background:#3973B9"></i><i style="background:#52674F"></i></span>
+        <span class="pal-txt">Moderno Claro<small>fundo claro e azul, do Modelo Moderno</small></span>
+      </button>
+      <button class="pal-btn" data-pal="modernoGrafite">
+        <span class="pal-swatch"><i style="background:#17191E"></i><i style="background:#21344D"></i><i style="background:#8CACD2"></i><i style="background:#A1B09F"></i></span>
+        <span class="pal-txt">Moderno Grafite<small>grafite e azul, do Modelo Moderno</small></span>
+      </button>
       <button class="pal-btn" data-pal="pb">
         <span class="pal-swatch"><i style="background:#FFFFFF"></i><i style="background:#E9E9E9"></i><i style="background:#111111"></i><i style="background:#F4F4F4"></i></span>
         <span class="pal-txt">Preto e branco<small>alto contraste, sem cor</small></span>
@@ -962,7 +970,11 @@
       <div class="e-hint">As três paletas <b>Mosaico</b> são paletas de apresentação da marca, e
       nenhuma delas tem verde: parque e vegetação saem em cinza, e as rodovias ficam no
       laranja da marca. Inventar um verde faria de qualquer uma delas outra
-      paleta.</div>
+      paleta.<br><br>
+      As duas <b>Moderno</b> vêm do mesmo Modelo Moderno, com duas escolhas
+      diferentes: a vegetação usa o verde do Padrão diluído na base, e o
+      <b>laranja fica fora do mapa</b> — ele é o holofote das glebas, e uma via
+      laranja competiria com elas.</div>
     </div>
   </div>
 
@@ -1415,8 +1427,8 @@ var PALETAS = {
     // senão resetPadrao() e recolorLive('padrao') pintam prédios diferentes.
     building:'#E6E3DF' },
   // ── As duas paletas do deck FIDC ───────────────────────────────────────
-  // Duas das TRÊS paletas da marca; a terceira, mosaicoModerno, vem de
-  // outro documento e está logo abaixo destas.
+  // Duas das TRÊS paletas chamadas Mosaico; a terceira, mosaicoModerno, vem
+  // de outro documento de marca e está logo abaixo destas.
   // Vêm da paleta do deck FIDC · Projetos (MOSAICO 2026_Slide-Base), e o
   // objetivo é que o PNG exportado entre no deck sem parecer de outro lugar.
   // Por isso quase todo valor abaixo é um valor REAL do deck, com o papel
@@ -1529,6 +1541,81 @@ var PALETAS = {
     halo:'#17191E',             // fundo
     // derivado: landuse #22252C a 20% rumo a placeOther #6E7584
     building:'#31353E' },
+  // ── As duas paletas Moderno, montadas pelo dono ────────────────────────
+  // Vêm do MESMO Modelo Moderno da `mosaicoModerno` acima, mas não são
+  // variações dela: ali o mapa herdou os tokens do modelo nos papéis em que
+  // o documento já os usava, e sobrou uma paleta de três tons. Aqui o dono
+  // escolheu as 21 cores uma por uma e ESCREVEU A CONTA DE CADA UMA — por
+  // isso quase toda chave abaixo é uma mistura declarada, e não um literal.
+  // A conta vem anotada em cada linha, no formato "X a N% sobre Y", e o
+  // harness confere as 42 contra a aritmética (`misturar`) dígito a dígito.
+  //
+  // Duas regras do modelo que estas duas herdam, as mesmas da `mosaicoModerno`:
+  //   • LARANJA E AMARELO FICAM FORA DO MAPA, de propósito. Não é que o
+  //     modelo os proíba: é que no produto eles são o holofote das glebas, e
+  //     uma via ou um rótulo nessas cores competiria com o assunto. Nestas
+  //     duas, portanto, nem as rodovias são laranja — é a única diferença de
+  //     princípio em relação à `mosaicoModerno`, onde o laranja é o acento.
+  //   • O MODELO NÃO TEM VERDE. Em vez de sair em cinza como nas três de
+  //     marca, aqui a vegetação é o verde do Padrão (#5F7A5C) diluído na
+  //     base — a conta está escrita, e é a única cor de fora do modelo.
+  //
+  // Quatro valores do Grafite (water, building, placeOther, symbol) saíram da
+  // folha a UM ponto em UM canal da aritmética que ela mesma declarava. Ficou
+  // o valor exato da conta: 1/255 de diferença, invisível, em troca de um
+  // comentário que dá para verificar — a mesma decisão da água da
+  // mosaicoLight na 3.7.1.
+  modernoClaro: {
+    bg:'#F4F4F2',               // painel do tema claro; branco puro fica duro
+                                // em área grande, e aqui a área é o mapa todo
+    landcover:'#EEEEEC',        // linha #DADADA a 25% sobre o fundo
+    landuse:'#EAEAE8',          // linha #DADADA a 40% sobre o fundo
+    water:'#D3E0F0',            // azul da marca #3973B9 a 22% sobre branco
+    grass:'#DCE0DA',            // verde do Padrão #5F7A5C a 16% sobre o fundo
+    park:'#CDD4CB',             // verde do Padrão #5F7A5C a 26% sobre o fundo
+    building:'#DADADA',         // linha do tema claro, literal
+    aeroway:'#E7E7E6',          // linha #DADADA a 50% sobre o fundo
+    motorway:'#FFFFFF',         // branco do tema claro
+    motorwayCasing:'#B2B2B2',   // rótulo do tema claro, literal
+    major:'#FFFFFF',            // branco do tema claro
+    majorCasing:'#DADADA',      // linha do tema claro, literal
+    boundary:'#989797',         // texto secundário #706F6F a 40% sobre o
+                                // rótulo #B2B2B2
+    waterway:'#B0C7E3',         // azul da marca a 40% sobre branco
+    placeCity:'#1D1D1B',        // grafite da marca
+    roadText:'#706F6F',         // texto secundário do tema claro
+    placeOther:'#848383',       // texto secundário a 70% sobre o rótulo
+    waterText:'#3973B9',        // azul da marca, sem mistura
+    parkText:'#52674F',         // verde do Padrão a 80% sobre o grafite
+    symbol:'#848383',           // igual a placeOther
+    halo:'#FFFFFF' },
+  modernoGrafite: {
+    bg:'#17191E',               // fundo do tema escuro do Modelo Moderno
+    landcover:'#1B1D23',        // painel #22252C a 35% sobre o fundo
+    landuse:'#1E2026',          // painel #22252C a 60% sobre o fundo
+    water:'#21344D',            // azul da marca #3973B9 a 30% sobre o fundo
+    grass:'#242A29',            // verde do Padrão #5F7A5C a 18% sobre o fundo
+    park:'#2B342F',             // verde do Padrão #5F7A5C a 28% sobre o fundo
+    building:'#2B2E36',         // linha #33373F a 50% sobre o painel #22252C
+    aeroway:'#22252C',          // painel do tema escuro, literal
+    // O CONTORNO DAS VIAS É MAIS ESCURO QUE A VIA, decisão explícita do dono e
+    // o contrário do que vale em mapa escuro. O motivo: nesta paleta as
+    // quadras e os prédios são mais CLAROS que o fundo, então é o contorno
+    // escuro que separa a via deles. Um contorno claro coerente seria
+    // #6E7584 (rodovia) e #4A4F59 (arteriais), se algum dia se quiser trocar.
+    motorway:'#52565D',         // texto secundário #9AA0AA a 45% sobre o fundo
+    motorwayCasing:'#17191E',   // o próprio fundo — ver a nota acima
+    major:'#3C3F45',            // texto secundário #9AA0AA a 28% sobre o fundo
+    majorCasing:'#17191E',      // o próprio fundo — ver a nota acima
+    boundary:'#6E7584',         // rótulo do tema escuro, literal
+    waterway:'#264264',         // azul da marca a 45% sobre o fundo
+    placeCity:'#F2F2F0',        // texto principal do tema escuro
+    roadText:'#9AA0AA',         // texto secundário do tema escuro
+    placeOther:'#848B97',       // texto secundário a 50% sobre o rótulo
+    waterText:'#8CACD2',        // azul da marca a 55% sobre o texto principal
+    parkText:'#A1B09F',         // verde do Padrão a 55% sobre o texto principal
+    symbol:'#848B97',           // igual a placeOther
+    halo:'#17191E' },           // o próprio fundo
   // Preto e branco — alto contraste, sem cor.
   pb: { bg:'#FFFFFF', water:'#E9E9E9', waterway:'#CFCFCF', waterText:'#555555',
     park:'#F4F4F4', parkText:'#555555', grass:'#F4F4F4', landcover:'#F7F7F7', landuse:'#F2F2F2',
@@ -1590,8 +1677,8 @@ function misturar(a, b, t){
   return '#'+((r<<16)|(g<<8)|z).toString(16).padStart(6,'0').toUpperCase();
 }
 // Cor de edificação quando a paleta não declara uma. É a REDE DE SEGURANÇA:
-// as dez paletas trazem `building`, e esta função existe para a décima
-// primeira, que vai esquecer a chave.
+// as doze paletas trazem `building`, e esta função existe para a décima
+// terceira, que vai esquecer a chave.
 //
 // Um passo de 20% da superfície urbana rumo à tinta de rótulo secundário.
 // `placeOther` é a referência porque é neutra em toda paleta e contrasta com
@@ -1599,7 +1686,7 @@ function misturar(a, b, t){
 // precisar saber qual dos dois é. `boundary` seria a escolha óbvia e está
 // errada: em várias paletas ele é um acento saturado (na `dark` é magenta
 // #FF007F), e a mistura dava prédios ROXOS.
-// 20% mantém o passo discreto — 1,20:1 a 1,55:1 contra a superfície nas dez.
+// 20% mantém o passo discreto — 1,20:1 a 1,55:1 contra a superfície nas doze.
 // O produto é um holofote sobre as glebas; prédio é contexto, não assunto.
 function predioDe(PAL){ return misturar(PAL.landuse, PAL.placeOther, 0.20); }
 function paletaOps(l, PAL){

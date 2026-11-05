@@ -5,6 +5,34 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.8 — Moderno Claro e Moderno Grafite
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Duas paletas novas na gaveta Cores: Moderno Claro e Moderno Grafite.** São as
+  doze paletas agora. As duas saem do mesmo Modelo Moderno da Mosaico Moderno,
+  mas são paletas próprias, não variações dela: as 21 cores foram escolhidas uma
+  por uma, cada uma como uma mistura declarada dos tons do modelo com o azul da
+  marca, e a conta de cada uma está anotada no código.
+- **Nestas duas o laranja fica fora do mapa.** Na Mosaico Moderno ele é o acento e
+  pinta as rodovias; aqui nem as rodovias são laranja, porque no produto o laranja
+  é o holofote das glebas e uma via nessa cor competiria com elas. Amarelo e
+  magenta também ficam de fora.
+- **A vegetação sai verde nas duas.** O Modelo Moderno não tem verde, e nas três
+  paletas Mosaico parque e mata saem em cinza por isso. Nestas duas a vegetação é
+  o verde do Padrão diluído na base — a única cor de fora do modelo, e está dito
+  na gaveta.
+- **Na Moderno Grafite o contorno das vias é mais escuro que a via**, ao contrário
+  do que costuma valer em mapa escuro. É de propósito: nesta paleta as quadras e
+  os prédios são mais claros que o fundo, e é o contorno escuro que separa a via
+  deles.
+- Quatro cores da Moderno Grafite subiram a **um ponto em um canal** do valor da
+  folha original — o valor exato da conta que a própria folha declarava. A
+  diferença é de 1/255, invisível na tela, e serve para que o comentário do código
+  possa ser verificado.
+
+---
+
 ## Maker Map 3.7.3
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
