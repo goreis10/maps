@@ -1487,8 +1487,9 @@ var PALETAS = {
   // Modelo Moderno (tema escuro), a paleta do relatório Gleba Sousas. É
   // OUTRA paleta da marca, não uma variação da de cima: grafite #17191E em
   // vez do preto do deck FIDC, e três tons de base — fundo, superfície,
-  // linha — em lugar das zebras de tabela. 19 das 20 chaves são valor
-  // literal dela, com o papel anotado ao lado.
+  // linha — em lugar das zebras de tabela. 19 das 21 chaves são valor
+  // literal dela, com o papel anotado ao lado; os derivados são a água e,
+  // desde 3.7.2, o prédio.
   // A regra dela é mais dura que a do outro deck, e o mapa a herda:
   //   • o laranja é o ÚNICO acento, "usado com parcimônia" — aqui, só as
   //     rodovias, que são a camada mais esparsa do mapa;
@@ -1657,10 +1658,26 @@ function paletaOps(l, PAL){
 }
 
 // Carga inicial: mutação do JSON do estilo antes de criar o mapa.
+// paletaOps POR CAMADA, isolada. Os dois chamadores já protegiam cada
+// operação com try/catch, mas chamavam paletaOps() FORA dele — e desde que
+// predioDe() existe, a função pode lançar: uma paleta que esqueça `landuse`
+// ou `placeOther` (e também `building`) faz misturar() chamar .slice(1) em
+// undefined. Em recolorLive isso abortava o forEach inteiro, deixando as
+// camadas seguintes na paleta anterior E pulando os quatro passos finais
+// (esquecer os originais das vias, reafirmar vias, reafirmar rótulos, reler
+// a seção Mapa), sem toast nem botão marcado. Em aplicarPaleta a exceção
+// subia para o .then() do estilo e O MAPA NUNCA ERA CRIADO — página em
+// branco. Pior que o modo de falha que o arquivo documenta e aceita ("a
+// camada fica com a cor da paleta anterior"), e a rede de segurança foi
+// escrita exatamente para a paleta que esquece chave.
+function opsDaCamada(l, PAL){
+  try{ return paletaOps(l, PAL) || []; }
+  catch(e){ console.error('paleta/camada ' + (l && l.id), e); return []; }
+}
 function aplicarPaleta(style, palName){
   var PAL = PALETAS[palName] || PALETAS.padrao;
   style.layers.forEach(function(l){
-    paletaOps(l, PAL).forEach(function(op){
+    opsDaCamada(l, PAL).forEach(function(op){
       if(op.t === 'p') l.paint = Object.assign({}, l.paint, {[op.k]: op.v});
       else l.layout = Object.assign({}, l.layout, {[op.k]: op.v});
     });
@@ -1695,7 +1712,7 @@ function recolorLive(palName){
   if(!map) return;
   var PAL = PALETAS[palName] || PALETAS.padrao;
   (map.getStyle().layers || []).forEach(function(l){
-    paletaOps(l, PAL).forEach(function(op){
+    opsDaCamada(l, PAL).forEach(function(op){
       try{
         if(op.t === 'p') map.setPaintProperty(l.id, op.k, op.v);
         else map.setLayoutProperty(l.id, op.k, op.v);
@@ -4082,7 +4099,21 @@ function montarEditor(){
     camadasMapa(k).forEach(function(l){
       if(!map.getLayer(l.id)) return;
       if(l.type==='background') map.setPaintProperty(l.id,'background-color', mapaCfg[k].cor);
-      else if(l.type==='fill')  map.setPaintProperty(l.id,'fill-color', mapaCfg[k].cor);
+      else if(l.type==='fill'){
+        map.setPaintProperty(l.id,'fill-color', mapaCfg[k].cor);
+        // CONSTRUÇÕES são o único grupo desta seção cuja camada tem contorno
+        // próprio, e por isso o único par que podia divergir. Escrevendo só o
+        // preenchimento: escolher preto aqui no Padrão deixava prédio escuro
+        // com o fio claro da paleta em volta — o mesmo defeito que 3.7.2
+        // corrigiu, disparado pelo usuário. E um projeto salvo no Dark
+        // Mosaico reabre no Padrão (paletaAtual não entra no projeto) com
+        // mapaCfg.construcoes.cor da paleta escura: preenchimento de uma
+        // paleta, contorno de outra, na tela e no PNG.
+        if(k==='construcoes'){
+          var PAL = PALETAS[paletaAtual] || PALETAS.padrao;
+          map.setPaintProperty(l.id,'fill-outline-color', misturar(mapaCfg[k].cor, PAL.placeOther, 0.20));
+        }
+      }
       else if(l.type==='line')  map.setPaintProperty(l.id,'line-color', mapaCfg[k].cor);
     });
   }
