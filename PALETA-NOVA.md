@@ -90,6 +90,8 @@ subimos de primeira.
 | `motorway` ≠ `motorwayCasing` | contorno igual à via é o mesmo que não ter contorno |
 | `building` contra `landuse`: entre **1,05:1 e 2,2:1** | prédio discreto. O produto é um holofote sobre as glebas; prédio é contexto |
 | Em mapa escuro, `building` contra `bg`: **< 4:1** | era o defeito da 3.7.2 — prédio quase branco saltando no fundo escuro |
+| `building` com saturação **< 20%** | prédio tingido pelo acento da paleta chama mais atenção que as glebas |
+| Contorno do prédio entre **1,03:1 e 1,6:1** do preenchimento | é um fio, não um desenho. Eu derivo esse contorno; você não precisa escolhê-lo |
 
 Se quiser contrariar qualquer uma delas de propósito, diga — eu afrouxo a
 verificação para esta paleta e escrevo no código que foi decisão sua, em vez de

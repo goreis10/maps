@@ -5,6 +5,26 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.7.3
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Mudar a cor de construções em Mapa agora muda o contorno também.** Escolher
+  um tom escuro deixava o prédio escuro com um fio claro em volta — o mesmo
+  defeito que a versão anterior corrigiu, só que disparado por você. E um projeto
+  salvo numa paleta escura, reaberto, podia exibir preenchimento de uma paleta e
+  contorno de outra, na tela e na imagem exportada.
+- **Trocar de paleta não derruba mais o mapa** se uma paleta vier incompleta. O
+  erro de uma camada ficava com essa camada, menos num caso novo, em que podia
+  interromper a troca no meio ou deixar a página em branco na abertura.
+- **Correções nas notas da versão anterior**, que diziam duas coisas que o
+  programa não faz: que uma cor de construções escolhida à mão sobrevivia à troca
+  de paleta — não sobrevive, como nos outros seis grupos daquela seção — e que nas
+  paletas claras nada mudava, quando os prédios passaram a aparecer de leve onde
+  antes eram invisíveis.
+
+---
+
 ## Maker Map 3.7.2
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
@@ -16,10 +36,14 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   manchas claras sobre o fundo escuro, com um fio de contorno claro em volta.
 - **O contorno dos prédios também**, não só o preenchimento. Corrigir um e
   deixar o outro teria resolvido metade: o fio continuaria quase branco.
-- **O seletor de "Construções" em Mapa voltou a dizer a verdade.** Ele mostrava
-  a cor padrão enquanto o mapa exibia outra, e agora acompanha a paleta.
-- Se você já tinha escolhido uma cor de construções à mão, ela continua valendo:
-  a paleta é a base, não a palavra final.
+- **Nas paletas claras os prédios passam a aparecer de leve**, onde antes eram
+  praticamente invisíveis — blocos tênues do zoom 12 para cima. Vale também para
+  projetos salvos, se você reexportar a imagem.
+- **O seletor de "Construções" em Mapa passou a dizer a verdade.** Ele nasceu
+  mostrando a cor padrão enquanto o mapa exibia outra, e agora acompanha a paleta.
+- **Trocar de paleta redefine a cor de construções**, como já fazia com os outros
+  seis grupos da seção Mapa: ali a paleta é a base de todos eles. Se você quer uma
+  cor de prédio que sobreviva à troca, escolha-a depois de escolher a paleta.
 
 ---
 
