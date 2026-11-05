@@ -5,6 +5,24 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.7.2
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Os prédios passam a seguir a paleta.** Nenhuma das dez paletas pintava as
+  construções, então, a partir do zoom 12, elas ficavam com o cinza quase branco
+  original do mapa-base. Nas paletas claras isso se dissolvia no fundo e não
+  aparecia; nas três escuras — Dark Mosaico, Mosaico Moderno e Dark mode — eram
+  manchas claras sobre o fundo escuro, com um fio de contorno claro em volta.
+- **O contorno dos prédios também**, não só o preenchimento. Corrigir um e
+  deixar o outro teria resolvido metade: o fio continuaria quase branco.
+- **O seletor de "Construções" em Mapa voltou a dizer a verdade.** Ele mostrava
+  a cor padrão enquanto o mapa exibia outra, e agora acompanha a paleta.
+- Se você já tinha escolhido uma cor de construções à mão, ela continua valendo:
+  a paleta é a base, não a palavra final.
+
+---
+
 ## Maker Map 3.7.1
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:

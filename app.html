@@ -1409,7 +1409,11 @@ var PALETAS = {
     park:'#DDE8DA', parkText:'#5F7A5C', grass:'#E7EDE2', landcover:'#EEF0E9', landuse:'#F1EEE9',
     aeroway:'#EDE8E1', boundary:'#C9C2BA', motorway:'#F5C9B8', motorwayCasing:'#E0A98F',
     major:'#FFFFFF', majorCasing:'#E0DAD3', roadText:'#6B6560',
-    placeCity:'#1C1917', placeOther:'#8A8F98', symbol:'#8A8F98', halo:'#FFFFFF' },
+    placeCity:'#1C1917', placeOther:'#8A8F98', symbol:'#8A8F98', halo:'#FFFFFF',
+    // NÃO é o derivado: é a cor que a seção Mapa já usava como padrão de
+    // construções (MAPA_PADRAO.construcoes.cor). As duas têm de concordar,
+    // senão resetPadrao() e recolorLive('padrao') pintam prédios diferentes.
+    building:'#E6E3DF' },
   // ── As duas paletas do deck FIDC ───────────────────────────────────────
   // Duas das TRÊS paletas da marca; a terceira, mosaicoModerno, vem de
   // outro documento e está logo abaixo destas.
@@ -1452,7 +1456,10 @@ var PALETAS = {
     placeCity:'#1D1D1B',
     placeOther:'#8C8C8C',       // rótulo de cidade/raio no mapa
     symbol:'#8C8C8C',
-    halo:'#FFFFFF' },
+    halo:'#FFFFFF',
+    // derivado: landuse #F8F8F8 a 20% rumo a placeOther #8C8C8C. O documento
+    // não tem cor de edificação — ver o comentário de predioDe().
+    building:'#E2E2E2' },
   mosaicoDark: {
     bg:'#1D1D1B',               // fundo de slide de conteúdo
     water:'#2A4462',            // derivado: azul #3973B9 a 45% sobre o fundo
@@ -1474,7 +1481,9 @@ var PALETAS = {
     placeCity:'#FFFFFF',        // texto de destaque / rótulos no mapa
     placeOther:'#8C8C8C',       // rótulo de cidade/raio no mapa
     symbol:'#8C8C8C',
-    halo:'#1D1D1B' },
+    halo:'#1D1D1B',
+    // derivado: landuse #1F1F1D a 20% rumo a placeOther #8C8C8C
+    building:'#353533' },
   // Modelo Moderno (tema escuro), a paleta do relatório Gleba Sousas. É
   // OUTRA paleta da marca, não uma variação da de cima: grafite #17191E em
   // vez do preto do deck FIDC, e três tons de base — fundo, superfície,
@@ -1516,45 +1525,53 @@ var PALETAS = {
     placeCity:'#F2F2F0',        // branco quente: texto principal
     placeOther:'#6E7584',       // cinza ardósia: rótulo discreto
     symbol:'#6E7584',
-    halo:'#17191E' },           // fundo
+    halo:'#17191E',             // fundo
+    // derivado: landuse #22252C a 20% rumo a placeOther #6E7584
+    building:'#31353E' },
   // Preto e branco — alto contraste, sem cor.
   pb: { bg:'#FFFFFF', water:'#E9E9E9', waterway:'#CFCFCF', waterText:'#555555',
     park:'#F4F4F4', parkText:'#555555', grass:'#F4F4F4', landcover:'#F7F7F7', landuse:'#F2F2F2',
     aeroway:'#EDEDED', boundary:'#111111', motorway:'#111111', motorwayCasing:'#000000',
     major:'#444444', majorCasing:'#000000', roadText:'#111111',
-    placeCity:'#000000', placeOther:'#444444', symbol:'#444444', halo:'#FFFFFF' },
+    placeCity:'#000000', placeOther:'#444444', symbol:'#444444', halo:'#FFFFFF',
+    building:'#CFCFCF' },
   // Mapa antigo — tons pastéis / pergaminho, ar de carta antiga.
   antigo: { bg:'#F1E7CE', water:'#BFD8CE', waterway:'#A9C6BC', waterText:'#5E7D72',
     park:'#DCE0C0', parkText:'#6B7A4E', grass:'#DFE3C4', landcover:'#EAE1C6', landuse:'#EDE3C7',
     aeroway:'#E3D8B8', boundary:'#A98F5C', motorway:'#C9A96A', motorwayCasing:'#A9884C',
     major:'#F4ECD6', majorCasing:'#CBB483', roadText:'#7A5C34',
-    placeCity:'#4A3A22', placeOther:'#8A7452', symbol:'#8A7452', halo:'#F6EFD8' },
+    placeCity:'#4A3A22', placeOther:'#8A7452', symbol:'#8A7452', halo:'#F6EFD8',
+    building:'#D9CDB0' },
   // Tons de cinza — escala neutra.
   cinza: { bg:'#F0F0F0', water:'#DCDCDC', waterway:'#C9C9C9', waterText:'#6E6E6E',
     park:'#E6E6E6', parkText:'#6E6E6E', grass:'#E8E8E8', landcover:'#ECECEC', landuse:'#EAEAEA',
     aeroway:'#E2E2E2', boundary:'#9A9A9A', motorway:'#8C8C8C', motorwayCasing:'#6E6E6E',
     major:'#FBFBFB', majorCasing:'#C4C4C4', roadText:'#4A4A4A',
-    placeCity:'#2B2B2B', placeOther:'#7A7A7A', symbol:'#7A7A7A', halo:'#FFFFFF' },
+    placeCity:'#2B2B2B', placeOther:'#7A7A7A', symbol:'#7A7A7A', halo:'#FFFFFF',
+    building:'#D4D4D4' },
   // Zoneamento urbano — terroso, aspecto de papel. Rodovias em laranja
   // queimado como destaque; ruas em cinza neutro; bordas em azul petróleo.
   zoneamento: { bg:'#F4F1EA', water:'#C9D8DA', waterway:'#B4C7CA', waterText:'#5E7378',
     park:'#7B9C7A', parkText:'#3F5A3E', grass:'#8FAE8D', landcover:'#E7E2D4', landuse:'#EEE8DA',
     aeroway:'#E4DECF', boundary:'#2B3A42', motorway:'#E8A365', motorwayCasing:'#C9853F',
     major:'#FFFFFF', majorCasing:'#CCCCCC', roadText:'#2B3A42',
-    placeCity:'#2B3A42', placeOther:'#6B7A80', symbol:'#6B7A80', halo:'#F4F1EA' },
+    placeCity:'#2B3A42', placeOther:'#6B7A80', symbol:'#6B7A80', halo:'#F4F1EA',
+    building:'#D4D2C8' },
   // Contraste categórico — base clara e asséptica para destacar marcadores.
   // Rodovias em ocre, água/azul-aço e verde-esmeralda suaves.
   contraste: { bg:'#FAFAFA', water:'#D8E6EE', waterway:'#C3D8E3', waterText:'#457B9D',
     park:'#D8ECE7', parkText:'#2A9D8F', grass:'#DFEFE9', landcover:'#F0F0F0', landuse:'#F3F3F3',
     aeroway:'#EAEAEA', boundary:'#457B9D', motorway:'#F4A261', motorwayCasing:'#D98C43',
     major:'#FFFFFF', majorCasing:'#E2E2E2', roadText:'#3A4A52',
-    placeCity:'#1D2A33', placeOther:'#7A8A92', symbol:'#7A8A92', halo:'#FFFFFF' },
+    placeCity:'#1D2A33', placeOther:'#7A8A92', symbol:'#7A8A92', halo:'#FFFFFF',
+    building:'#DBDEE0' },
   // Dark mode — fundo chumbo; rodovias em ciano, bordas em magenta, texto gelo.
   dark: { bg:'#1E1E24', water:'#15303A', waterway:'#1C3E4A', waterText:'#5FB7CE',
     park:'#243027', parkText:'#7FB69A', grass:'#26302A', landcover:'#22222A', landuse:'#25252D',
     aeroway:'#2A2A32', boundary:'#FF007F', motorway:'#00B4D8', motorwayCasing:'#0784A0',
     major:'#44444C', majorCasing:'#33333A', roadText:'#F8F9FA',
-    placeCity:'#F8F9FA', placeOther:'#B8BCC4', symbol:'#B8BCC4', halo:'#1E1E24' }
+    placeCity:'#F8F9FA', placeOther:'#B8BCC4', symbol:'#B8BCC4', halo:'#1E1E24',
+    building:'#42434B' }
 };
 var paletaAtual = 'padrao';
 
@@ -1562,6 +1579,28 @@ var paletaAtual = 'padrao';
 // Retorna lista de {t:'p'|'l', k:prop, v:valor} — 'p'=paint, 'l'=layout.
 // Usado tanto na carga inicial (mutando o style) quanto ao trocar a paleta
 // ao vivo (setPaintProperty/setLayoutProperty).
+// Mistura duas cores da paleta. `escurecer()` não serve aqui: ele só escurece,
+// e numa paleta escura escurecer a superfície faz o prédio desaparecer no fundo.
+function misturar(a, b, t){
+  var A = parseInt(a.slice(1),16), B = parseInt(b.slice(1),16);
+  var r = Math.round(((A>>16)&255) + (((B>>16)&255) - ((A>>16)&255))*t);
+  var g = Math.round(((A>>8)&255)  + (((B>>8)&255)  - ((A>>8)&255))*t);
+  var z = Math.round((A&255)       + ((B&255)       - (A&255))*t);
+  return '#'+((r<<16)|(g<<8)|z).toString(16).padStart(6,'0').toUpperCase();
+}
+// Cor de edificação quando a paleta não declara uma. É a REDE DE SEGURANÇA:
+// as dez paletas trazem `building`, e esta função existe para a décima
+// primeira, que vai esquecer a chave.
+//
+// Um passo de 20% da superfície urbana rumo à tinta de rótulo secundário.
+// `placeOther` é a referência porque é neutra em toda paleta e contrasta com
+// o fundo na direção certa — clareia no mapa escuro, escurece no claro, sem
+// precisar saber qual dos dois é. `boundary` seria a escolha óbvia e está
+// errada: em várias paletas ele é um acento saturado (na `dark` é magenta
+// #FF007F), e a mistura dava prédios ROXOS.
+// 20% mantém o passo discreto — 1,20:1 a 1,55:1 contra a superfície nas dez.
+// O produto é um holofote sobre as glebas; prédio é contexto, não assunto.
+function predioDe(PAL){ return misturar(PAL.landuse, PAL.placeOther, 0.20); }
 function paletaOps(l, PAL){
   var ops = [];
   // Só mexe em camadas do basemap (têm 'source-layer') ou no fundo.
@@ -1580,6 +1619,22 @@ function paletaOps(l, PAL){
   if (sl === 'landuse' && l.type === 'fill'){ P('fill-color', PAL.landuse); return ops; }
   if (sl === 'aeroway' && l.type !== 'symbol'){ P(l.type==='fill'?'fill-color':'line-color', PAL.aeroway); return ops; }
   if (sl === 'boundary'){ if(l.type==='line') P('line-color', PAL.boundary); return ops; }
+  // PRÉDIOS. O positron traz uma única camada `building` (fill, minzoom 12)
+  // com fill-color rgb(234,234,229) e fill-outline-color rgb(219,219,218) —
+  // duas cores quase brancas, fixas. Nenhuma paleta tocava nisso, e o
+  // `building` aparecia uma só vez no arquivo inteiro, dentro de camadasMapa().
+  // Consequência medida: nas paletas claras o prédio se dissolve no fundo
+  // (1,02 a 1,21:1) e ninguém notou; nas três escuras ele dá 13,7 a 14,6:1 —
+  // manchas quase brancas, com um fio de contorno claro em volta, do zoom 12
+  // para cima. O contorno vai junto: pintar só o preenchimento deixaria o fio.
+  // Depois que o usuário mexer na cor em Mapa, o fio fica um passo atrás (a
+  // seção só escreve fill-color) — ainda dentro da paleta, não quase branco.
+  if (sl === 'building' && l.type === 'fill'){
+    var pr = PAL.building || predioDe(PAL);
+    P('fill-color', pr);
+    P('fill-outline-color', misturar(pr, PAL.placeOther, 0.20));
+    return ops;
+  }
   if (sl === 'transportation'){
     if (id.includes('rail') || id.includes('transit') || id.includes('ferry')){ HIDE(); return ops; }
     if (l.type !== 'line') return ops;
