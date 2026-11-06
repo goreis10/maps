@@ -22,13 +22,20 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   programa. A contagem de feições aparece ao lado de cada botão e é refeita toda
   vez que a gaveta abre.
 - **Os setores do censo saem com a renda já corrigida**, a mesma do painel, e
-  cada ponto carrega o mês da moeda e de quem é a renda. Quando o recorte é
-  pequeno para o tamanho dos setores, o arquivo leva o aviso no topo — pelo mesmo
-  motivo da planilha: um número em reais não pode chegar ao destino sem dizer de
-  quando e de quem ele é.
+  cada ponto carrega o mês da moeda e de quem é a renda. O arquivo leva no topo
+  os **mesmos três avisos da planilha** — estado que faltou carregar, área sem
+  setor censitário e margem de borda —, pelo mesmo motivo: um número em reais não
+  pode chegar ao destino sem dizer de quando, de quem e sobre o que ele é.
 - **As glebas saem com as coordenadas exatas que entraram.** Arredondar deixaria
   o arquivo uns 40% menor, e a isócrona faz isso de propósito — mas ali a
   coordenada é gerada por roteamento, e aqui é o limite de um imóvel.
+- **Raio e isócrona só saem quando estão no mapa.** Os dois círculos têm centro e
+  raio desde o primeiro segundo, mas nascem invisíveis; antes de publicar, uma
+  sessão nova oferecia "Raio da Edição · 100,0 km" e o arquivo "Tudo junto" levava
+  em silêncio dois círculos no centro de São Paulo. E a isócrona é etiquetada com o
+  meio de transporte que **gerou** o polígono, não com o que está no seletor — dá
+  para trocar de Carro para A pé sem recalcular, e o painel avisa que os
+  parâmetros mudaram.
 - **A isócrona sai cheia**: "dentro de 30 min" é a área toda até 30 minutos, não
   o anel entre 15 e 30. O anel existe para a cor no mapa bater com a legenda, e é
   recurso de desenho.
