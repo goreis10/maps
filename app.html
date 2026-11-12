@@ -1002,6 +1002,10 @@
         <span class="pal-swatch"><i style="background:#1E1E24"></i><i style="background:#44444C"></i><i style="background:#00B4D8"></i><i style="background:#FF007F"></i></span>
         <span class="pal-txt">Dark mode<small>fundo escuro, destaques vibrantes</small></span>
       </button>
+      <button class="pal-btn" data-pal="daltonismo">
+        <span class="pal-swatch"><i style="background:#F4F3F1"></i><i style="background:#9EC9E8"></i><i style="background:#E8820E"></i><i style="background:#A3BE8E"></i></span>
+        <span class="pal-txt">Daltonismo<small>medida nas três dicromacias</small></span>
+      </button>
     </div>
     <div class="sd-sec">
       <div class="e-hint">As três paletas <b>Mosaico</b> são paletas de apresentação da marca, e
@@ -1771,7 +1775,58 @@ var PALETAS = {
     aeroway:'#2A2A32', boundary:'#FF007F', motorway:'#00B4D8', motorwayCasing:'#0784A0',
     major:'#44444C', majorCasing:'#33333A', roadText:'#F8F9FA',
     placeCity:'#F8F9FA', placeOther:'#B8BCC4', symbol:'#B8BCC4', halo:'#1E1E24',
-    building:'#42434B' }
+    building:'#42434B' },
+  // ── Daltonismo ─────────────────────────────────────────────────────────
+  // Desenhada contra SIMULAÇÃO, não contra gosto. A régua: matrizes de
+  // Machado, Oliveira & Fernandes (2009) para protanopia, deuteranopia e
+  // tritanopia em severidade 1,0 (dicromacia completa — quem atende esse
+  // caso atende também as formas parciais, muito mais comuns), e CIEDE2000
+  // como distância perceptual.
+  //
+  // A REGRA DE PROJETO É UMA SÓ: significado por CLARIDADE, não por matiz.
+  // Matiz morre na dicromacia; L* não morre nunca. E só um eixo de matiz,
+  // AZUL-LARANJA, que é o que sobrevive a protanopia e deuteranopia — as
+  // duas que somam quase todos os casos. Nenhum par vermelho-verde carrega
+  // informação aqui.
+  //
+  // O que isso NÃO quer dizer: que a paleta é cinza. Água é azul, parque é
+  // verde, rodovia é laranja — um daltônico não vê menos cor, vê menos
+  // DISTINÇÃO entre certas cores. O que muda é que cada par que precisa ser
+  // distinguido foi medido, e o verde do parque se separa da quadra urbana
+  // por claridade além do matiz, para continuar separado quando o matiz cai.
+  //
+  // São 16 pares declarados como obrigatórios, com piso próprio cada um,
+  // conferidos nas quatro visões — ver `daltonismo.js`. O par mais apertado
+  // é nome de parque x nome de via (ΔE 8,3 em deuteranopia, piso 8).
+  daltonismo: {
+    bg:'#F4F3F1',               // neutro quase branco
+    landcover:'#E8E6E2',        // solo exposto: um passo
+    landuse:'#DEDCD7',          // quadras urbanas: dois passos
+    water:'#9EC9E8',            // azul — água azul não é acento, é o que é
+    // Os dois verdes saíram de busca, não de escolha: eles ficam COMPRIMIDOS
+    // entre a quadra urbana (clara) e o limite de ainda parecer vegetação, e
+    // afastar de um aproximava do outro. A busca maximizou a separação e
+    // devolveu L*66/L*56 — manchas escuras num fundo L*95, contra a regra de
+    // que o mapa-base é contexto e não assunto (a mesma do prédio). O
+    // objetivo então passou a ser "folga de 1,35x nos pisos e, entre as que
+    // passam, a mais clara". Estes dois têm folga de 1,41x.
+    grass:'#BBC4AE',            // vegetação
+    park:'#A3BE8E',             // parque: mais escuro E mais saturado
+    building:'#CBC8C2',         // prédio: neutro, 1,22:1 da superfície
+    aeroway:'#E4E1DB',          // pista
+    motorway:'#E8820E',         // laranja: o ÚNICO acento, par seguro do azul
+    motorwayCasing:'#9A5200',   // o mesmo laranja escurecido
+    major:'#FFFFFF',            // arterial branca
+    majorCasing:'#B4B0A8',      // contorno neutro
+    boundary:'#8A857C',         // divisa: neutro médio
+    waterway:'#6FA8D0',         // rio em linha
+    placeCity:'#16161A',        // nome de cidade
+    roadText:'#5A564F',         // nome de via
+    placeOther:'#6E6960',       // bairro
+    waterText:'#1F6698',        // nome de água: azul escuro
+    parkText:'#44603A',         // nome de parque: verde escuro
+    symbol:'#6E6960',           // igual a placeOther
+    halo:'#FFFFFF' }
 };
 var paletaAtual = 'padrao';
 
@@ -6986,7 +7041,62 @@ document.getElementById('upgradeOverlay').onclick = function(e){ if(e.target ===
 })();
 
 // ── Upload de KMZ/KML ──
-const POOL_CORES = ['#FFB020','#0FB5A6','#8B5CF6','#D946EF','#059669','#B45309','#DC2626','#0284C7','#4D7C0F','#9333EA'];
+// ── A COR DE CADA CIDADE ────────────────────────────────────────────────
+// Esta é a lista que mais importa para daltonismo em todo o produto, e era
+// a pior. Aqui a cor é CATEGORIA, não grandeza: não há ordem, então
+// qualquer par pode acabar vizinho no mapa, e a nota do conjunto é a do par
+// mais parecido — na pior das quatro visões.
+//
+// O que havia antes, medido: o par #8B5CF6/#D946EF ficava a ΔE 1,3 em
+// protanopia, ou seja INDISTINGUÍVEL, e a ΔE 13,4 mesmo na visão normal.
+// Nove das dez cores entravam em algum par ruim, e o problema começava na
+// QUARTA cidade do projeto. O produto entrega um mapa de apresentação em
+// que cada cidade tem uma cor; a partir da quarta, duas delas eram a mesma
+// coisa para o cliente daltônico, e o mapa deixava de responder a pergunta
+// que ele existe para responder.
+//
+// A lista nova tem espinha dorsal PUBLICADA: as seis primeiras são de
+// Okabe & Ito (2008), o conjunto qualitativo seguro de referência. Duas das
+// oito dele não servem aqui — o amarelo #F0E442 desaparece no fundo claro e
+// o preto no escuro, e o produto tem nove paletas claras e quatro escuras.
+// As quatro últimas saíram de busca, entrando pelo canal que o dicromata
+// NÃO perde, a claridade.
+//
+// ORDENADA POR PREFIXO, porque proximaCor() serve a lista EM ORDEM: um
+// projeto de três cidades usa só as três primeiras, então elas são as três
+// mais separadas que existem no conjunto, e não três de um arranjo
+// otimizado para dez. Medido (pior par, nas quatro visões):
+//
+//     cidades   antes      agora
+//        3      ΔE 24,6    ΔE 19,9
+//        4      ΔE  1,3    ΔE 12,5
+//       10      ΔE  1,3    ΔE 11,1
+//
+// O piso de 11,1 é o do próprio Okabe-Ito: a extensão não degrada nada.
+//
+// POR QUE NÃO A BUSCA CEGA, que marcou MELHOR (12,7 em dez cores). Ela
+// devolveu quatro verdes e cinco magentas. Contrariei a métrica de
+// propósito, por três razões: o CIEDE2000 foi ajustado em visão normal, e
+// aplicá-lo a imagens simuladas de dicromata é extrapolação que ninguém
+// validou, enquanto Okabe-Ito foi testado com dicromatas de verdade; num
+// mapa de apresentação alguém precisa dizer "a verde" e "a laranja" em voz
+// alta, e cinco malvas não se nomeiam; e a maioria dos leitores vê bem, para
+// quem lima-verde-verde escuro é um mapa ruim. A métrica informa, não decide.
+//
+// Projeto salvo guarda as cores dele (CORES entra em coletarProjeto), então
+// nada reabre diferente. O que muda é a cor que uma cidade NOVA recebe.
+const POOL_CORES = [
+  '#56B4E9',   // azul-céu      Okabe-Ito
+  '#D55E00',   // vermelhão     Okabe-Ito
+  '#0072B2',   // azul          Okabe-Ito
+  '#E69F00',   // laranja       Okabe-Ito
+  '#009E73',   // verde-azulado Okabe-Ito
+  '#CC79A7',   // roxo-rosado   Okabe-Ito
+  '#54414A',   // ameixa-acinzentada   derivada: ΔE 24,6 do conjunto
+  '#8A1C06',   // tijolo escuro        derivada: ΔE 21,0
+  '#CAB0AF',   // cinza-rosado claro   derivada: ΔE 14,7
+  '#52694D'    // sálvia escura        derivada: ΔE 14,4
+];
 function proximaCor(){
   const emUso = new Set(Object.values(CORES));
   return POOL_CORES.find(c=>!emUso.has(c)) || '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
