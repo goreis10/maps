@@ -5,6 +5,51 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.9 — Exportar dados
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Agora dá para levar as geometrias do mapa embora.** O novo botão **Dados**,
+  ao lado de Exportar imagem, abre uma gaveta com uma seção de **arquivos
+  GeoJSON** e um botão por camada. Até aqui a geometria só entrava no produto —
+  pelo KMZ, pelo desenho, pela isócrona — e não saía por formato nenhum.
+- **Oito arquivos, cada um com a sua explicação do lado:** as glebas, os pontos
+  de rótulo, os dois raios, as duas isócronas, os setores censitários do recorte
+  e um arquivo com tudo junto. GeoJSON abre no QGIS, no ArcGIS, no Google Earth
+  Pro e em praticamente qualquer coisa que leia mapa.
+- **Botão sem conteúdo fica desabilitado, dizendo por quê.** Um arquivo de zero
+  feições abre sem erro e não desenha nada — quem recebesse culparia o próprio
+  programa. A contagem de feições aparece ao lado de cada botão e é refeita toda
+  vez que a gaveta abre.
+- **Os setores do censo saem com a renda já corrigida**, a mesma do painel, e
+  cada ponto carrega o mês da moeda e de quem é a renda. O arquivo leva no topo
+  os **mesmos três avisos da planilha** — estado que faltou carregar, área sem
+  setor censitário e margem de borda —, pelo mesmo motivo: um número em reais não
+  pode chegar ao destino sem dizer de quando, de quem e sobre o que ele é.
+- **As glebas saem com as coordenadas exatas que entraram.** Arredondar deixaria
+  o arquivo uns 40% menor, e a isócrona faz isso de propósito — mas ali a
+  coordenada é gerada por roteamento, e aqui é o limite de um imóvel.
+- **Nada sai se não estiver no mapa.** Os dois círculos têm centro e raio desde o
+  primeiro segundo, e as duas isócronas ficam calculadas depois que você as
+  calcula — mas as quatro coisas têm liga/desliga. Antes de publicar, uma sessão
+  nova oferecia "Raio da Edição · 100,0 km" e o "Tudo junto" levava em silêncio
+  dois círculos no centro de São Paulo; e um projeto reaberto com a isócrona
+  escondida oferecia o download dela como se estivesse desenhada.
+- **A isócrona é etiquetada com o meio de transporte que gerou o polígono**, não
+  com o que está no seletor: dá para trocar de Carro para A pé sem recalcular, e
+  o painel avisa que os parâmetros mudaram.
+- **O arquivo "Tudo junto" leva as premissas e os avisos das camadas de origem.**
+  Ele jogava os dois fora: o arquivo dos setores saía com o mês da moeda e com os
+  três avisos, e o "Tudo junto" — justamente o que serve para enviar por e-mail,
+  o mais provável de ser repassado — saía sem nada.
+- **A isócrona sai cheia**: "dentro de 30 min" é a área toda até 30 minutos, não
+  o anel entre 15 e 30. O anel existe para a cor no mapa bater com a legenda, e é
+  recurso de desenho.
+- A **máscara** e o **mapa-base** não saem, e a gaveta diz por quê: a primeira é
+  um polígono do mundo com buracos, e o segundo não é nosso.
+
+---
+
 ## Maker Map 3.8.1
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:

@@ -46,6 +46,14 @@
   • Exportar imagem ..... btnExport abre #drawerExport; expGerar()
                           (PNG/JPEG/WebP, múltiplo ou largura exata,
                           expPrever() diz o tamanho antes de gerar)
+  • Exportar dados ...... btnDados abre #drawerDados; GEO_ITENS +
+                          geoLista() + geoBaixar() — um .geojson por
+                          camada. As nove fontes GeoJSON do mapa já
+                          estão no formato, então aqui não há conversão,
+                          só seleção, limpeza, premissas e avisos
+  • Margem de borda ..... censoMargemNivel() — a regra de corte que o
+                          painel, a planilha e a exportação leem; é
+                          PERCENTUAL (0 a 100), não fração
   • Zoom pelo scroll .... ZOOM_VEL, aplicarZoomVel() — fator sobre as
                           duas taxas da MapLibre (roda e trackpad),
                           escolhido em Configurações
@@ -411,6 +419,27 @@
   .pal-txt small{display:block;font-weight:500;font-size:var(--fs-2);color:var(--ink-2);margin-top:1px}
   .sd-empty{border:1px dashed var(--line);border-radius:var(--sp-3);padding:26px var(--sp-4);text-align:center;
     color:var(--ink-2);font-size:var(--fs-3);line-height:1.6}
+  /* Exportação de dados: um item = um botão, a contagem e a explicação.
+     A explicação fica em --fs-2 e --ink-3 em vez de --fs-1, porque aqui ela
+     não é dica de um controle que se entende sozinho: é o que diz o que vem
+     dentro do arquivo, e quem está decidindo qual baixar precisa ler. */
+  .geo-item{padding:11px 0;border-bottom:1px solid var(--line)}
+  .geo-item:last-child{border-bottom:0;padding-bottom:2px}
+  .geo-top{display:flex;align-items:center;gap:var(--sp-3)}
+  .geo-btn{flex:0 0 auto;border:1px solid var(--line);border-radius:9px;padding:8px 13px;cursor:pointer;
+    background:#fff;font:700 var(--fs-2) 'Archivo',sans-serif;color:var(--ink);
+    transition:border-color .15s,box-shadow .15s,background .15s}
+  .geo-btn:hover:not(:disabled){border-color:var(--azul);box-shadow:0 0 0 3px rgba(51,127,255,.15)}
+  /* Desabilitado tem de PARECER desabilitado: o item sem conteúdo continua
+     na lista de propósito (some um botão e o usuário procura o que ele fez
+     de errado), e a contagem ao lado diz o motivo. */
+  /* `background` não entra aqui: --paper é o mesmo #fff do estado habilitado,
+     e a declaração não fazia nada. Quem carrega o desabilitado é a borda
+     tracejada mais a tinta --ink-3. */
+  .geo-btn:disabled{cursor:not-allowed;color:var(--ink-3);border-style:dashed;opacity:.72}
+  .geo-meta{font-size:var(--fs-1);font-weight:700;color:var(--ink-2);line-height:1.35}
+  .geo-item.off .geo-meta{font-weight:600;color:var(--ink-3)}
+  .geo-txt{font-size:var(--fs-2);color:var(--ink-3);line-height:1.5;margin-top:6px}
   /* Controles de editor dentro de uma gaveta lateral (ex.: Raio do Mapa de renda).
      A gaveta já tem padding lateral, então zeramos o das linhas do editor. */
   .sd-toggles{display:flex;flex-wrap:wrap;gap:var(--sp-2);padding-bottom:var(--sp-3);margin-bottom:6px;border-bottom:1px solid var(--line)}
@@ -820,6 +849,11 @@
       <div class="chip chip-gav" id="btnIso"><span class="dot" style="background:var(--c-iso)"></span>Isócrona</div>
     </div>
     <div class="ctrl-grp">
+      <!-- "Dados" é .chip-gav e o "Exportar imagem" segue laranja, de
+           propósito: o produto deste software é a imagem, e aquele é o
+           botão que a entrega. A geometria é saída secundária — útil para
+           levar as glebas a um SIG, não é o que o cliente recebe. -->
+      <div class="chip chip-gav" id="btnDados" title="baixar as geometrias do mapa em GeoJSON"><span class="dot" style="background:var(--azul)"></span>Dados</div>
       <!-- Abre a gaveta de exportação. Continua laranja, e não .chip-gav como
            os outros abridores, porque é a saída do funil: o produto deste
            software é a imagem, e este é o botão que a entrega. -->
@@ -1274,6 +1308,42 @@
         <p>O navegador não desenha um quadro maior que <b>4.096 px</b> de lado, então pedir
         mais que isso entrega 4.096 — o quadro acima sempre diz o que de fato vai sair.</p>
       </div></details>
+    </div>
+  </div>
+
+  <!-- Gaveta: Exportar dados.
+       A outra gaveta entrega a IMAGEM, que é o produto. Esta entrega a
+       GEOMETRIA, que é o insumo — para abrir no QGIS, no Google Earth, ou
+       mandar para o cadastro da prefeitura. São saídas diferentes e por isso
+       são gavetas diferentes: a de imagem tem formato, qualidade e tamanho
+       em pixels, e nada disso significa coisa nenhuma aqui.
+       A seção é "Arquivos GeoJSON" e não "Arquivos", porque a próxima
+       (CSV, KML) entra ao lado dela e não dentro dela. -->
+  <div id="drawerDados" class="side-drawer" role="dialog">
+    <div class="sd-head">
+      <div class="sd-title">Exportar dados</div>
+      <button id="dadosClose" class="e-x" title="fechar">×</button>
+    </div>
+    <p class="sd-desc">Baixe as geometrias do mapa como arquivo, para abrir em outro
+    programa. Cada botão gera um arquivo só com aquela camada.</p>
+
+    <details id="secDadosGeo" open>
+      <summary>Arquivos GeoJSON<span class="sm-val" id="dadosGeoVal"></span></summary>
+      <div class="sd-sec">
+        <div class="e-hint">GeoJSON é o formato de geometria que quase todo
+        programa de mapa lê: <b>QGIS</b>, ArcGIS, Google Earth Pro, Felt, Mapbox,
+        e qualquer coisa que fale GIS. Coordenadas em <b>WGS 84</b> (EPSG:4326),
+        que é o padrão do formato.</div>
+        <div id="dadosGeoLista"></div>
+      </div>
+    </details>
+
+    <div class="sd-sec">
+      <div class="e-hint"><b>O que não está aqui.</b> A <b>máscara</b> (o véu) não
+      sai: ela é um polígono do mundo inteiro com buracos nas suas glebas — um
+      recurso de desenho, não um dado. Quem quer o contorno das áreas quer as
+      <b>glebas</b>. O <b>mapa-base</b> (ruas, água, prédios) também não: ele não é
+      nosso, vem do OpenStreetMap pelo OpenFreeMap, e é de lá que se baixa.</div>
     </div>
   </div>
 
@@ -4817,11 +4887,11 @@ window.MakerPlano = { get: getUserPlano, temAcesso: temAcesso, aplicar: aplicarP
 aplicarPlano();
 
 const __wrap = document.getElementById('wrap');
-var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda','drawerIso','drawerExport'];
+var GAVETAS_IDS = ['drawerSave','drawerProj','drawerCores','drawerRenda','drawerIso','drawerExport','drawerDados'];
 
 // Gaveta fechada sai do alcance do teclado.
 //
-// As seis gavetas e o #editor são escondidos só por
+// As sete gavetas e o #editor são escondidos só por
 // transform:translateX(101%) — continuam no fluxo, visíveis para o
 // navegador e para o leitor de tela. Sem `inert`, o Tab a partir do
 // cabeçalho entrava em dezenas de controles fora da tela (o #editor é a
@@ -4867,7 +4937,7 @@ document.getElementById('edFechar').onclick = function(){ abrirEdicao(false); };
 // Qual chip abre qual gaveta. Serve para marcar .aberta no chip: até aqui
 // nada na tela dizia QUAL das cinco gavetas estava aberta além do conteúdo
 // dela — e as três que são abridoras ficam lado a lado.
-var GAVETA_CHIP = {drawerCores:'btnCores', drawerRenda:'btnRenda', drawerIso:'btnIso', drawerExport:'btnExport'};
+var GAVETA_CHIP = {drawerCores:'btnCores', drawerRenda:'btnRenda', drawerIso:'btnIso', drawerExport:'btnExport', drawerDados:'btnDados'};
 function marcarChipGaveta(id){
   Object.keys(GAVETA_CHIP).forEach(function(g){
     var c = document.getElementById(GAVETA_CHIP[g]);
@@ -5570,6 +5640,52 @@ var censoUF = {};             // cod -> 'ok' | 'carregando' | 'erro'
 var censoStatus = 'vazio';    // vazio | carregando | ok | erro | fora
 var censoDist = null;         // Float32Array de distâncias (reaproveitado)
 var censoCache = {chave:null, res:null};
+
+// A CONSULTA DO RECORTE ATIVO, EM UM LUGAR SÓ.
+//
+// Isto morava dentro de renderRenda(). Virou função quando a exportação de
+// dados passou a precisar do MESMO recorte que o painel mostra: duas cópias
+// da chave de cache é como se fabrica um arquivo que discorda da tela — e a
+// chave aqui não é detalhe, ela é o que decide se a conta é refeita. É a
+// mesma razão pela qual censoAgregar() é uma função só para círculo e
+// polígono (ver o comentário lá).
+//
+// O fator entra na chave: mudar IPCA ou o % dos demais moradores refaz a
+// conta. No modo isócrona o recorte é identificado pelo INSTANTE do cálculo
+// mais a faixa escolhida, porque o polígono só muda quando é recalculado.
+// O NÍVEL DA MARGEM DE BORDA, EM UM LUGAR SÓ.
+//
+// `q.margem` é PERCENTUAL (0 a 100): censoConsulta e censoConsultaPoly o
+// calculam como domBorda/dom*100. A regra de corte estava escrita três
+// vezes — painel, planilha e, na 3.9, a exportação de dados — e a terceira
+// cópia leu o número como FRAÇÃO: o teto virou 0,05 em vez de 5, e o texto
+// multiplicou por 100 de novo. Resultado medido antes do conserto: um raio
+// de 30 km em Campinas (2,35%, que o painel e a planilha consideram limpo)
+// saía no arquivo com "Recorte pequeno para o tamanho dos setores: +234,8%
+// dos domicílios" — um percentual impossível, na frase que existe para
+// dizer "não use estes números", dentro do artefato mais copiável que o
+// produto gera. Agora os três chamam esta função.
+//
+// 'bad' = não use; 'warn' = tendência sim, número fechado não; '' = silêncio.
+function censoMargemNivel(q){
+  if(!q) return '';
+  return (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
+}
+function censoQChave(){
+  return rendaModo==='iso'
+    ? 'i|'+rendaIso.calcEm+'|'+rendaIso.faixaSel+'|'+fatorRenda().toFixed(6)
+    : 'r|'+rendaRaio.km+'|'+rendaRaio.centro[0]+'|'+rendaRaio.centro[1]+'|'+fatorRenda().toFixed(6);
+}
+function censoQAtual(){
+  var chave = censoQChave();
+  if(censoCache.chave!==chave){
+    censoCache.res = rendaModo==='iso'
+      ? censoConsultaPoly(rendaGeomAtiva())
+      : censoConsulta(rendaRaio.centro[1], rendaRaio.centro[0], rendaRaio.km);
+    censoCache.chave = chave;
+  }
+  return censoCache.res;
+}
 // Grade de ocupação (Set de células de 0,05°, ~5,5 km) usada para medir que
 // fração do recorte tem setor censitário na base. Montada por demanda e
 // invalidada junto com o cache quando uma UF entra — ver censoGradeMontar().
@@ -6276,19 +6392,7 @@ function renderRenda(){
     return;
   }
 
-  // o fator entra na chave: mudar IPCA ou % dos demais refaz a conta.
-  // No modo isócrona o recorte é identificado pelo instante do cálculo
-  // mais a faixa escolhida — o polígono só muda quando é recalculado.
-  var chave = rendaModo==='iso'
-    ? 'i|'+rendaIso.calcEm+'|'+rendaIso.faixaSel+'|'+fatorRenda().toFixed(6)
-    : 'r|'+rendaRaio.km+'|'+rendaRaio.centro[0]+'|'+rendaRaio.centro[1]+'|'+fatorRenda().toFixed(6);
-  if(censoCache.chave!==chave){
-    censoCache.res = rendaModo==='iso'
-      ? censoConsultaPoly(rendaGeomAtiva())
-      : censoConsulta(rendaRaio.centro[1], rendaRaio.centro[0], rendaRaio.km);
-    censoCache.chave=chave;
-  }
-  var q=censoCache.res;
+  var q=censoQAtual();
   censoCamadas(q);
 
   if(q.vazio){
@@ -6322,7 +6426,7 @@ function renderRenda(){
   }
 
   // Confiabilidade: em raio pequeno a margem de borda domina o resultado.
-  var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
+  var nivel = censoMargemNivel(q);
   var aviso='';
   if(nivel==='bad'){
     aviso='<div class="rd-msg bad">Recorte pequeno demais para a densidade local. '+
@@ -7258,6 +7362,351 @@ function baixarBlob(blob, nome, chave){
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  EXPORTAÇÃO DE DADOS — ARQUIVOS GeoJSON
+//
+//  A outra gaveta entrega a IMAGEM; esta entrega a GEOMETRIA. Até aqui a
+//  geometria só ENTRAVA no produto (KMZ, desenho, isócrona) e nunca saía:
+//  dava para trazer uma gleba de fora, não dava para levar a de dentro.
+//
+//  GeoJSON porque é o que todo SIG lê, e porque NOVE DAS FONTES do mapa já
+//  são GeoJSON por dentro — o `addSource({type:'geojson'})` exige isso. São
+//  fontes, não camadas: há mais camadas que isso, várias sobre a mesma fonte,
+//  e a décima fonte própria é o raster do satélite.
+//  Então aqui não há conversão de formato, só seleção e limpeza. É também
+//  por isso que não entra dependência nova: o mesmo raciocínio do .xlsx
+//  sobre o JSZip, mas ainda mais barato.
+//
+//  QUATRO REGRAS, TODAS APRENDIDAS EM OUTRO LUGAR DO ARQUIVO:
+//
+//  1. ARQUIVO VAZIO NÃO SAI. Um botão que entrega uma FeatureCollection de
+//     zero feições é a pior falha possível aqui: o arquivo abre, não dá
+//     erro, e não desenha nada — e quem recebeu vai culpar o próprio SIG.
+//     Cada item sabe dizer se tem conteúdo, e o botão fica desabilitado
+//     dizendo por quê, com a contagem na frente.
+//
+//  2. AS PREMISSAS VIAJAM COM O DINHEIRO. Os setores do censo saem com a
+//     renda JÁ CORRIGIDA por fatorRenda(), igual ao painel — e um valor em
+//     reais sem o mês da moeda e sem dizer de quem é a renda é afirmação
+//     incompleta. A planilha resolveu isso levando as premissas nas duas
+//     abas; aqui elas vão em DOIS lugares, porque GeoJSON tem um problema
+//     que a planilha não tem: membros estranhos à especificação (o
+//     `_premissas` da coleção) são DESCARTADOS por quase todo SIG na
+//     importação. Então vão também em duas propriedades de cada feição,
+//     que é o que sobrevive à viagem até a tabela de atributos.
+//
+//  3. NÃO SE MEXE NA GEOMETRIA DO CLIENTE. As glebas saem com as
+//     coordenadas exatas que entraram pelo KMZ. Arredondar economizaria uns
+//     40% do arquivo, e a função da isócrona faz isso de propósito — mas ali
+//     a coordenada é nossa, gerada por roteamento. Aqui é o limite de um
+//     imóvel, que pode acabar num processo.
+//     Os pontos de rótulo são o centro médio do desenho, calculado por nós,
+//     e já nascem com 5 casas em integrarFeats(); saem como estão.
+//     geoRed existe para o CENTRO do círculo, que vem de um clique no mapa
+//     com a precisão que o navegador der. O ANEL do círculo já sai com 5
+//     casas do próprio gerarCirculo() — antes de publicar este comentário dizia
+//     que ele tinha "15 dígitos de ruído de float" e que geoRed o
+//     arredondava, e nenhuma das duas coisas era verdade: a asserção do
+//     harness sobre isso era tautologia, porque conferia 6 casas num dado
+//     que já vinha com 5. 1e5 e não 1e6, para ser o mesmo degrau que
+//     gerarCirculo() e que a função da isócrona usam.
+//
+//  4. A ISÓCRONA SAI CHEIA, NÃO EM ANÉIS. isoFeicoes() constrói anéis para
+//     que a cor no mapa bata com a legenda; isso é recurso de DESENHO.
+//     "Dentro de 30 min" é a área toda até 30 min, não o anel de 15 a 30 —
+//     a mesma distinção que isoFaixas()/isoFeicoes() já fazem para a
+//     análise do Censo, e exportar o anel seria responder outra pergunta.
+// ──────────────────────────────────────────────────────────────────
+
+// CONTAGEM é inteiro. O `fmt` global força uma decimal, porque nasceu para
+// hectares — usá-lo aqui imprimiria "2,0 feições" e "1.234,0 setores".
+const fmtN = n => Number(n).toLocaleString('pt-BR',{maximumFractionDigits:0});
+
+// 5 casas ≈ 1 m, o mesmo degrau de gerarCirculo() e da função da isócrona.
+// Só para geometria que ESTE programa gerou — na prática, o centro do
+// círculo, que vem de um clique no mapa com a precisão que o navegador der.
+function geoRed(c){
+  return (c && c.length && Array.isArray(c[0]))
+    ? c.map(geoRed)
+    : [Math.round(c[0]*1e5)/1e5, Math.round(c[1]*1e5)/1e5];
+}
+// Cópia da feição sem as propriedades que são estado de desenho. `cor` fica
+// (é a cor que o usuário escolheu para a cidade, e serve de categoria no
+// SIG); `cor_final` e `fill_on` saem, porque são o que a camada está
+// pintando agora — ligar e desligar um filtro mudaria o arquivo.
+//
+// `properties` é objeto NOVO e `geometry` é a MESMA referência, de propósito:
+// as propriedades são meia dúzia de campos e precisam ser próprias (mexer no
+// arquivo não pode mexer no mapa), enquanto a geometria pode ter megabytes de
+// coordenadas e ninguém a altera daqui — só o JSON.stringify a lê.
+function geoLimpa(f){
+  var p={}, k;
+  for(k in f.properties) if(k!=='cor_final' && k!=='fill_on') p[k]=f.properties[k];
+  return {type:'Feature', properties:p, geometry:f.geometry};
+}
+function geoFC(feats, extra){
+  var fc={type:'FeatureCollection'};
+  // Os membros estranhos vêm ANTES de `features` por legibilidade: quem
+  // abrir o arquivo num editor de texto lê as premissas sem rolar 40 mil
+  // linhas. A ordem das chaves não é significativa em JSON.
+  if(extra) for(var k in extra) fc[k]=extra[k];
+  fc.features=feats;
+  return fc;
+}
+// As premissas em formato de objeto, para o membro `_premissas`.
+function geoPremissas(){
+  var o={}, ps=censoPremissas();
+  ps.forEach(function(p){ o[p[0].toLowerCase()]=p[1]; });
+  o.fonte='IBGE Censo 2022 · agregados por setor censitário';
+  o.recorte=censoTituloOrigem();
+  return o;
+}
+
+// Cada item: `monta()` devolve {fc, n, nota} ou null quando não há nada.
+// `nota` é o que o botão mostra depois da contagem.
+var GEO_ITENS = [
+  {id:'glebas', rotulo:'Glebas', arq:'glebas',
+   texto:'As áreas que você subiu ou desenhou — polígono, linha ou ponto, com nome, município, hectares e a cor da cidade. É o arquivo que leva o seu trabalho para outro programa.',
+   monta:function(){
+     if(!DATA.features.length) return null;
+     return {n:DATA.features.length, fc:geoFC(DATA.features.map(geoLimpa))};
+   }, vazio:'nenhuma gleba no mapa'},
+
+  {id:'rotulos', rotulo:'Pontos de rótulo', arq:'pontos_rotulo',
+   texto:'Um ponto por gleba, no lugar onde o nome aparece no mapa — o centro médio do desenho. Útil para rotular em outro programa sem recalcular nada.',
+   monta:function(){
+     if(!labelPts.features.length) return null;
+     return {n:labelPts.features.length, fc:geoFC(labelPts.features.map(geoLimpa))};
+   }, vazio:'nenhuma gleba no mapa'},
+
+  {id:'raio', rotulo:'Raio da Edição', arq:'raio',
+   texto:'O círculo da seção Raio e o ponto do centro dele, como estão agora. Duas feições.',
+   // SÓ SAI SE ESTIVER NO MAPA. O raio tem km e centro desde o primeiro
+   // segundo (100 km na Praça da Sé), mas nasce INVISÍVEL — o chip não vem
+   // ligado. Sem este teste, uma sessão nova com um KMZ de Goiás oferecia
+   // "Raio da Edição · 100,0 km" como download pronto, e o "Tudo junto"
+   // levava em silêncio dois círculos no centro de São Paulo. Isso
+   // contradizia o próprio texto da gaveta ("as geometrias do mapa") e a
+   // regra 1 deste módulo. O estado é lido como coletarEstado() o lê.
+   monta:function(){
+     var c=document.getElementById('chipRaio');
+     if(!c || !c.classList.contains('on')) return null;
+     return {n:2, nota:fmt(raioKm)+' km', fc:geoFC([
+       {type:'Feature', properties:{camada:'raio', raio_km:raioKm, papel:'area'},
+        geometry:{type:'Polygon', coordinates:[geoRed(gerarCirculo(raioKm, centroRaio))]}},
+       {type:'Feature', properties:{camada:'raio', raio_km:raioKm, papel:'centro'},
+        geometry:{type:'Point', coordinates:geoRed(centroRaio)}}
+     ])};
+   }, vazio:'o raio está desligado no mapa'},
+
+  {id:'raioRenda', rotulo:'Raio do Mapa de renda', arq:'raio_renda',
+   texto:'O outro círculo, o da gaveta Mapa de renda — independente do de cima, com centro e raio próprios.',
+   // Mesma regra do de cima; aqui o estado é o flag próprio, que nasce false.
+   monta:function(){
+     if(!rendaRaio.on) return null;
+     return {n:2, nota:fmt(rendaRaio.km)+' km', fc:geoFC([
+       {type:'Feature', properties:{camada:'raio_renda', raio_km:rendaRaio.km, papel:'area'},
+        geometry:{type:'Polygon', coordinates:[geoRed(gerarCirculo(rendaRaio.km, rendaRaio.centro))]}},
+       {type:'Feature', properties:{camada:'raio_renda', raio_km:rendaRaio.km, papel:'centro'},
+        geometry:{type:'Point', coordinates:geoRed(rendaRaio.centro)}}
+     ])};
+   }, vazio:'o círculo do Mapa de renda está desligado'},
+
+  {id:'iso', rotulo:'Isócrona da Edição', arq:'isocrona',
+   texto:'A área alcançável por estrada, uma feição por faixa de tempo, com os minutos e a área em km². Sai cheia — "dentro de 30 min" é a área toda até 30 min, não o anel de 15 a 30. Os tempos não consideram trânsito.',
+   // Mesma regra dos dois raios: a isócrona tem liga/desliga próprio
+   // (#chipIso), e ele entra no projeto salvo. Reabrir um projeto com a
+   // isócrona escondida oferecia o download dela como se estivesse no mapa,
+   // e as notas da 3.9 prometiam o contrário — a revisão pegou a promessa.
+   monta:function(){
+     if(!iso.on) return null;
+     return geoIsoFC(iso.poly, ISO_MAX_FAIXAS, iso.calcPerfil||iso.perfil, 'isocrona');
+   },
+   vazio:'isócrona desligada ou não calculada'},
+
+  {id:'isoRenda', rotulo:'Isócrona do Mapa de renda', arq:'isocrona_renda',
+   texto:'A isócrona da gaveta Mapa de renda, a que define o recorte da análise. Mesmas regras da de cima.',
+   monta:function(){
+     if(!rendaIso.on) return null;
+     return geoIsoFC(rendaIso.poly, RENDA_ISO_MAX, rendaIso.calcPerfil||rendaIso.perfil, 'isocrona_renda');
+   },
+   vazio:'isócrona desligada ou não calculada'},
+
+  {id:'censo', rotulo:'Setores censitários do recorte', arq:'setores_censo',
+   texto:'Um ponto por setor censitário dentro do recorte ativo, com domicílios, moradores e renda — a mesma renda corrigida que o painel mostra. Cada ponto carrega o mês da moeda e de quem é a renda, e o arquivo leva no topo os mesmos avisos da planilha: estado que faltou carregar, área sem setor censitário e margem de borda.',
+   monta:geoCensoFC,
+   vazio:'o Mapa de renda não está ativo'},
+
+  {id:'tudo', rotulo:'Tudo junto', arq:'tudo',
+   texto:'Um arquivo com todas as camadas que têm conteúdo, cada feição marcada com a camada de origem. Cômodo para enviar por e-mail; no QGIS os arquivos separados abrem melhor, porque ali cada tipo de geometria quer ser uma camada.',
+   monta:function(){
+     var feats=[], usadas=[], extra={};
+     GEO_ITENS.forEach(function(it){
+       if(it.id==='tudo') return;
+       var r=null;
+       try{ r=it.monta(); }catch(e){ r=null; }
+       if(!r || !r.fc.features.length) return;
+       usadas.push(it.arq);
+       // OS AVISOS E AS PREMISSAS DAS CAMADAS DE ORIGEM VÊM JUNTO.
+       // Até a revisão da 3.9 este item jogava fora o `extra` de cada fonte:
+       // o arquivo dos setores saía com as premissas e os três avisos, e o
+       // "Tudo junto" — justamente o que as notas chamam de "cômodo para
+       // enviar por e-mail", o mais provável de ser repassado — saía só com
+       // `type`, `_camadas` e `features`. Dinheiro corrigido sem o mês da
+       // moeda, e um recorte de 62% de margem de borda sem a frase que diz
+       // para não usar o número. É a mesma classe de defeito que a correção
+       // da margem tinha por nome, e contradizia a regra deste módulo.
+       // Prefixo com o nome do arquivo porque duas camadas podem um dia
+       // trazer a mesma chave, e aí um aviso apagaria o outro em silêncio.
+       Object.keys(r.fc).forEach(function(k){
+         if(k==='type' || k==='features') return;
+         extra[k==='_premissas' ? k : k+'_'+it.arq] = r.fc[k];
+       });
+       r.fc.features.forEach(function(f){
+         var p={}, k;
+         for(k in f.properties) p[k]=f.properties[k];
+         // `camada` entra DEPOIS da cópia, de propósito: antes, as feições
+         // que já traziam a sua (raio, isócrona) sobrescreviam a nossa e o
+         // arquivo saía com dois jeitos de nomear a mesma coisa — `glebas`
+         // pelo id e `isocrona` pelo valor interno. O valor é o NOME DO
+         // ARQUIVO que aquela camada teria sozinha, que é o que responde
+         // "de onde isto veio" para quem recebeu só este arquivo.
+         p.camada = it.arq;
+         feats.push({type:'Feature', properties:p, geometry:f.geometry});
+       });
+     });
+     if(!feats.length) return null;
+     // `_camadas` guarda o NOME DE ARQUIVO, o mesmo que vai em cada feição:
+     // listar os rótulos ("Raio da Edição") ao lado de um `camada:"raio"` punha
+     // dois vocabulários no mesmo arquivo.
+     extra._camadas = usadas;
+     return {n:feats.length, nota:usadas.length+' camadas', fc:geoFC(feats, extra)};
+   }, vazio:'nada no mapa para exportar'}
+];
+
+// As faixas de uma isócrona, cheias. Uma função para as duas, pelo mesmo
+// motivo de sempre: duas cópias divergem.
+function geoIsoFC(poly, maxFaixas, perfil, camada){
+  var fs=isoFaixas(poly, maxFaixas);
+  if(!fs.length) return null;
+  return {n:fs.length, nota:fs.map(function(f){ return f.min+' min'; }).join(' · '),
+    fc:geoFC(fs.map(function(f){
+      return {type:'Feature', geometry:f.g,
+        // "sem trânsito" é a mesma expressão que censoPremissas() usa, e o
+        // VALOR se explica sozinho em vez de depender do nome da coluna: numa
+        // tabela de atributos a célula é copiada sem o cabeçalho, e um tempo
+        // de deslocamento sem essa qualificação, numa apresentação comercial,
+        // é afirmação falsa sobre o ativo.
+        properties:{camada:camada, minutos:f.min, area_km2:+f.area.toFixed(3),
+                    perfil:perfil||'', transito:'sem trânsito · malha OSM'}};
+    }))};
+}
+
+// Os setores do recorte ativo. Lê o MESMO censoQAtual() do painel, para o
+// arquivo não poder discordar da tela.
+function geoCensoFC(){
+  if(!rendaAtivo() || !CENSO || censoStatus!=='ok') return null;
+  var q=censoQAtual();
+  if(!q || q.vazio || !q.idx || !q.idx.length) return null;
+  var fat=fatorRenda(), S=CENSO.s, pr=geoPremissas();
+  // As duas propriedades que sobrevivem à importação num SIG. Ver a regra 2.
+  var moeda=pr.moeda, de=censoQuemTxt();
+  var feats=new Array(q.idx.length);
+  for(var i=0;i<q.idx.length;i++){
+    var r=S[q.idx[i]];
+    feats[i]={type:'Feature',
+      properties:{municipio:CENSO.mun[r[2]]||'', domicilios:r[3], moradores:r[4],
+                  renda_media:Math.round(r[5]*fat), renda_mediana:Math.round(r[6]*fat),
+                  moeda:moeda, renda_de:de},
+      geometry:{type:'Point', coordinates:[r[1], r[0]]}};
+  }
+  var extra={_premissas:pr};
+  // OS AVISOS VÃO NO TOPO, como na planilha: no arquivo alguém pode copiar
+  // uma faixa só, então a frase que diz "não use estes números" não pode
+  // ficar onde se perde. São OS MESMOS TRÊS da planilha, e não só um:
+  // apresentar o total de um recorte com um estado silenciosamente ausente,
+  // ou com 40% da área sem setor nenhum, é número confiantemente errado —
+  // e as notas de versão prometem paridade com a planilha.
+  //
+  // A ORDEM É A DA PLANILHA E A DO PAINEL: estado faltando primeiro (contar
+  // metade do território é mais grave que contar mal a franja), cobertura
+  // depois, margem de borda por último. E as frases saem das MESMAS funções
+  // — censoUFsFaltando(), censoCoberturaFrase(), censoMargemNivel() —, não
+  // de redações paralelas que um dia divergiriam.
+  //
+  // `Math.round`, não `pctTxt`: o painel imprime `nf(q.margem)` com zero
+  // decimais e a planilha `Math.round(q.margem)`, e pctTxt nasceu para
+  // variação — num compartilhamento de domicílios imprimia "+6%".
+  var falta=censoUFsFaltando();
+  if(falta.length) extra._atencao_incompleto='Faltou carregar '+
+    falta.map(function(u){ return u.nome; }).join(', ')+
+    ' — os números deste arquivo cobrem só o restante d'+(rendaModo==='iso'?'a isócrona':'o raio')+'.';
+  if(q.cobertura<95){
+    var cob=censoCoberturaFrase(q);
+    extra._atencao_cobertura=cob[0]+' '+cob[1];
+  }
+  var nivel=censoMargemNivel(q);
+  if(nivel==='bad') extra._atencao_recorte='NÃO USE ESTES NÚMEROS COMO FECHADOS: recorte pequeno '+
+    'demais para a densidade local. '+(q.setores<30 ? 'São apenas '+q.setores+' setores aqui dentro. ' : '')+
+    Math.round(q.margem)+'% dos domicílios estão na faixa de incerteza da borda, e o corte é por '+
+    'centroide de setor: um setor na borda entra ou sai inteiro.';
+  else if(nivel==='warn') extra._atencao_recorte='Margem de borda de '+Math.round(q.margem)+
+    '% dos domicílios — suficiente para leitura de tendência, apertado para número fechado.';
+  return {n:feats.length, nota:fmtN(feats.length)+' setores', fc:geoFC(feats, extra)};
+}
+
+function geoBaixar(it){
+  var r=null;
+  try{ r=it.monta(); }catch(e){ console.error('exportar '+it.id, e); }
+  // Cinto e suspensório: a lista já desabilita o botão sem conteúdo, mas o
+  // estado pode ter mudado desde o último desenho da lista (o usuário move
+  // o centro do raio com a gaveta aberta). Melhor não entregar nada do que
+  // entregar um arquivo que não desenha.
+  if(!r || !r.fc.features.length){
+    toast('Nada para exportar em "'+it.rotulo+'".');
+    geoLista();
+    return;
+  }
+  var nome='MakerMap_'+it.arq+'_'+new Date().toISOString().slice(0,10)+'.geojson';
+  // application/geo+json é o tipo registrado do formato (RFC 7946).
+  baixarBlob(new Blob([JSON.stringify(r.fc)], {type:'application/geo+json'}), nome, 'dados');
+  toast(it.rotulo+': '+fmtN(r.n)+(r.n===1?' feição':' feições')+' em '+nome);
+}
+
+// Desenha a lista. Chamada ao abrir a gaveta, não uma vez só: a contagem
+// muda com o mapa (subir um KMZ, calcular uma isócrona, mover o raio).
+function geoLista(){
+  var box=document.getElementById('dadosGeoLista');
+  if(!box) return;
+  var html='', prontos=0;
+  GEO_ITENS.forEach(function(it){
+    var r=null;
+    try{ r=it.monta(); }catch(e){ console.error('exportar/listar '+it.id, e); }
+    var ok=!!(r && r.fc.features.length);
+    if(ok) prontos++;
+    var meta = ok
+      ? fmtN(r.n)+(r.n===1?' feição':' feições')+(r.nota?' · '+r.nota:'')
+      : (it.vazio||'nada para exportar');
+    html+='<div class="geo-item'+(ok?'':' off')+'">'+
+      '<div class="geo-top">'+
+        '<button type="button" class="geo-btn" data-geo="'+it.id+'"'+(ok?'':' disabled')+'>'+
+          esc(it.rotulo)+'</button>'+
+        '<span class="geo-meta">'+esc(meta)+'</span>'+
+      '</div>'+
+      '<div class="geo-txt">'+esc(it.texto)+'</div>'+
+    '</div>';
+  });
+  box.innerHTML=html;
+  var val=document.getElementById('dadosGeoVal');
+  if(val) val.textContent = prontos ? prontos+' de '+GEO_ITENS.length : 'nada pronto';
+  box.querySelectorAll('.geo-btn[data-geo]').forEach(function(b){
+    b.onclick=function(){
+      var it=GEO_ITENS.filter(function(x){ return x.id===b.getAttribute('data-geo'); })[0];
+      if(it) geoBaixar(it);
+    };
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  PLANILHA DA ANÁLISE DE RENDA (.xlsx)
 //
 //  Um .xlsx é um ZIP de XML, e o JSZip já está na página (é o que lê os
@@ -7479,7 +7928,7 @@ function rendaPlanilhaFolhas(q){
     L.push([]);
   }
 
-  var nivel = (q.setores<30 || q.margem>15) ? 'bad' : (q.margem>5 ? 'warn' : '');
+  var nivel = censoMargemNivel(q);
   if(nivel==='bad'){
     L.push([xT('ATENÇÃO — NÃO USE ESTES NÚMEROS COMO FECHADOS', E.NEG)]);
     L.push([xT('Recorte pequeno demais para a densidade local. '+
@@ -7797,6 +8246,16 @@ document.getElementById('btnExport').onclick = function(){
   expSync();
 };
 document.getElementById('expClose').onclick = fecharGaveta;
+
+// A lista é REDESENHADA a cada abertura, não montada uma vez. A contagem de
+// cada item depende do estado do mapa — subir um KMZ, calcular uma isócrona,
+// mover o centro do raio — e uma lista montada no carregamento diria "nenhuma
+// gleba" para sempre.
+document.getElementById('btnDados').onclick = function(){
+  abrirGaveta('drawerDados');
+  geoLista();
+};
+document.getElementById('dadosClose').onclick = fecharGaveta;
 
 document.querySelectorAll('#expFmt button').forEach(function(b){
   b.onclick = function(){
