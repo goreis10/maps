@@ -29,13 +29,19 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
 - **As glebas saem com as coordenadas exatas que entraram.** Arredondar deixaria
   o arquivo uns 40% menor, e a isócrona faz isso de propósito — mas ali a
   coordenada é gerada por roteamento, e aqui é o limite de um imóvel.
-- **Raio e isócrona só saem quando estão no mapa.** Os dois círculos têm centro e
-  raio desde o primeiro segundo, mas nascem invisíveis; antes de publicar, uma
-  sessão nova oferecia "Raio da Edição · 100,0 km" e o arquivo "Tudo junto" levava
-  em silêncio dois círculos no centro de São Paulo. E a isócrona é etiquetada com o
-  meio de transporte que **gerou** o polígono, não com o que está no seletor — dá
-  para trocar de Carro para A pé sem recalcular, e o painel avisa que os
-  parâmetros mudaram.
+- **Nada sai se não estiver no mapa.** Os dois círculos têm centro e raio desde o
+  primeiro segundo, e as duas isócronas ficam calculadas depois que você as
+  calcula — mas as quatro coisas têm liga/desliga. Antes de publicar, uma sessão
+  nova oferecia "Raio da Edição · 100,0 km" e o "Tudo junto" levava em silêncio
+  dois círculos no centro de São Paulo; e um projeto reaberto com a isócrona
+  escondida oferecia o download dela como se estivesse desenhada.
+- **A isócrona é etiquetada com o meio de transporte que gerou o polígono**, não
+  com o que está no seletor: dá para trocar de Carro para A pé sem recalcular, e
+  o painel avisa que os parâmetros mudaram.
+- **O arquivo "Tudo junto" leva as premissas e os avisos das camadas de origem.**
+  Ele jogava os dois fora: o arquivo dos setores saía com o mês da moeda e com os
+  três avisos, e o "Tudo junto" — justamente o que serve para enviar por e-mail,
+  o mais provável de ser repassado — saía sem nada.
 - **A isócrona sai cheia**: "dentro de 30 min" é a área toda até 30 minutos, não
   o anel entre 15 e 30. O anel existe para a cor no mapa bater com a legenda, e é
   recurso de desenho.

@@ -7403,7 +7403,7 @@ function baixarBlob(blob, nome, chave){
 //     e já nascem com 5 casas em integrarFeats(); saem como estão.
 //     geoRed existe para o CENTRO do círculo, que vem de um clique no mapa
 //     com a precisão que o navegador der. O ANEL do círculo já sai com 5
-//     casas do próprio gerarCirculo() — até a 3.9.1 este comentário dizia
+//     casas do próprio gerarCirculo() — antes de publicar este comentário dizia
 //     que ele tinha "15 dígitos de ruído de float" e que geoRed o
 //     arredondava, e nenhuma das duas coisas era verdade: a asserção do
 //     harness sobre isso era tautologia, porque conferia 6 casas num dado
@@ -7513,13 +7513,23 @@ var GEO_ITENS = [
 
   {id:'iso', rotulo:'Isócrona da Edição', arq:'isocrona',
    texto:'A área alcançável por estrada, uma feição por faixa de tempo, com os minutos e a área em km². Sai cheia — "dentro de 30 min" é a área toda até 30 min, não o anel de 15 a 30. Os tempos não consideram trânsito.',
-   monta:function(){ return geoIsoFC(iso.poly, ISO_MAX_FAIXAS, iso.calcPerfil||iso.perfil, 'isocrona'); },
-   vazio:'nenhuma isócrona calculada'},
+   // Mesma regra dos dois raios: a isócrona tem liga/desliga próprio
+   // (#chipIso), e ele entra no projeto salvo. Reabrir um projeto com a
+   // isócrona escondida oferecia o download dela como se estivesse no mapa,
+   // e as notas da 3.9 prometiam o contrário — a revisão pegou a promessa.
+   monta:function(){
+     if(!iso.on) return null;
+     return geoIsoFC(iso.poly, ISO_MAX_FAIXAS, iso.calcPerfil||iso.perfil, 'isocrona');
+   },
+   vazio:'isócrona desligada ou não calculada'},
 
   {id:'isoRenda', rotulo:'Isócrona do Mapa de renda', arq:'isocrona_renda',
    texto:'A isócrona da gaveta Mapa de renda, a que define o recorte da análise. Mesmas regras da de cima.',
-   monta:function(){ return geoIsoFC(rendaIso.poly, RENDA_ISO_MAX, rendaIso.calcPerfil||rendaIso.perfil, 'isocrona_renda'); },
-   vazio:'nenhuma isócrona calculada'},
+   monta:function(){
+     if(!rendaIso.on) return null;
+     return geoIsoFC(rendaIso.poly, RENDA_ISO_MAX, rendaIso.calcPerfil||rendaIso.perfil, 'isocrona_renda');
+   },
+   vazio:'isócrona desligada ou não calculada'},
 
   {id:'censo', rotulo:'Setores censitários do recorte', arq:'setores_censo',
    texto:'Um ponto por setor censitário dentro do recorte ativo, com domicílios, moradores e renda — a mesma renda corrigida que o painel mostra. Cada ponto carrega o mês da moeda e de quem é a renda, e o arquivo leva no topo os mesmos avisos da planilha: estado que faltou carregar, área sem setor censitário e margem de borda.',
@@ -7529,13 +7539,28 @@ var GEO_ITENS = [
   {id:'tudo', rotulo:'Tudo junto', arq:'tudo',
    texto:'Um arquivo com todas as camadas que têm conteúdo, cada feição marcada com a camada de origem. Cômodo para enviar por e-mail; no QGIS os arquivos separados abrem melhor, porque ali cada tipo de geometria quer ser uma camada.',
    monta:function(){
-     var feats=[], usadas=[];
+     var feats=[], usadas=[], extra={};
      GEO_ITENS.forEach(function(it){
        if(it.id==='tudo') return;
        var r=null;
        try{ r=it.monta(); }catch(e){ r=null; }
        if(!r || !r.fc.features.length) return;
        usadas.push(it.arq);
+       // OS AVISOS E AS PREMISSAS DAS CAMADAS DE ORIGEM VÊM JUNTO.
+       // Até a revisão da 3.9 este item jogava fora o `extra` de cada fonte:
+       // o arquivo dos setores saía com as premissas e os três avisos, e o
+       // "Tudo junto" — justamente o que as notas chamam de "cômodo para
+       // enviar por e-mail", o mais provável de ser repassado — saía só com
+       // `type`, `_camadas` e `features`. Dinheiro corrigido sem o mês da
+       // moeda, e um recorte de 62% de margem de borda sem a frase que diz
+       // para não usar o número. É a mesma classe de defeito que a correção
+       // da margem tinha por nome, e contradizia a regra deste módulo.
+       // Prefixo com o nome do arquivo porque duas camadas podem um dia
+       // trazer a mesma chave, e aí um aviso apagaria o outro em silêncio.
+       Object.keys(r.fc).forEach(function(k){
+         if(k==='type' || k==='features') return;
+         extra[k==='_premissas' ? k : k+'_'+it.arq] = r.fc[k];
+       });
        r.fc.features.forEach(function(f){
          var p={}, k;
          for(k in f.properties) p[k]=f.properties[k];
@@ -7553,8 +7578,8 @@ var GEO_ITENS = [
      // `_camadas` guarda o NOME DE ARQUIVO, o mesmo que vai em cada feição:
      // listar os rótulos ("Raio da Edição") ao lado de um `camada:"raio"` punha
      // dois vocabulários no mesmo arquivo.
-     return {n:feats.length, nota:usadas.length+' camadas',
-             fc:geoFC(feats, {_camadas:usadas})};
+     extra._camadas = usadas;
+     return {n:feats.length, nota:usadas.length+' camadas', fc:geoFC(feats, extra)};
    }, vazio:'nada no mapa para exportar'}
 ];
 
