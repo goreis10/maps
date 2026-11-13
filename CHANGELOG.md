@@ -5,6 +5,41 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.10 — Cores para daltonismo
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **A cor de cada cidade mudou, e era o defeito mais sério de cor do produto.**
+  O par roxo/magenta da lista antiga ficava **indistinguível** para quem tem
+  protanopia, e o problema começava já na **quarta cidade** de um projeto: duas
+  cidades do mapa eram a mesma cor para o cliente daltônico. A lista nova tem
+  como base as seis cores de Okabe & Ito, o conjunto de referência para
+  daltonismo, e está ordenada de forma que um projeto de três cidades receba as
+  três cores mais separadas que existem nela.
+- **Projetos salvos não mudam** — cada projeto guarda as cores dele. O que muda é
+  a cor que uma cidade **nova** recebe, então um mapa feito de hoje em diante não
+  vai parecer com um feito antes.
+- **Num mapa com muitas cidades, quem identifica a área é o contorno, não o
+  preenchimento.** O preenchimento das glebas é translúcido (32%), e a partir de
+  **três cidades** ele já não distingue uma da outra — a cor cheia do contorno
+  distingue. Se o mapa tem muitas cidades e ficou confuso, desligar o
+  preenchimento em **Por cidade** deixa os contornos falarem sozinhos.
+- **Paleta nova na gaveta Cores: Daltonismo.** São treze paletas agora. Ela foi
+  desenhada contra simulação das três dicromacias, não a olho: dezesseis pares de
+  cor que precisam ser distinguidos — água contra quadra urbana, parque contra
+  cidade, nome de parque contra nome de via — foram medidos um por um nas quatro
+  visões. O eixo dela é **azul e laranja**, que é o que sobrevive ao daltonismo
+  mais comum; nenhum par que carrega informação é vermelho-verde.
+- **As faixas de renda já estavam certas** e não mudaram: a escala padrão desde a
+  3.0 (âmbar) escurece de ponta a ponta sem voltar atrás, e é isso que faz ela
+  sobreviver impressa em preto e branco. A escala "semáforo", que continua a um
+  clique, sobe e desce — e agora há número para dizer isso.
+- O **calor de densidade** ficou como está, mas vale saber: a escala dele não tem
+  claridade crescente (ela sobe e desce), então morre impressa em preto e branco.
+  Mexer nela muda o mapa de todo mundo e fica para uma versão própria.
+
+---
+
 ## Maker Map 3.9 — Exportar dados
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
