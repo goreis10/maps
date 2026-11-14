@@ -13,10 +13,14 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   Earth pode trazer, além do perímetro, uma **imagem posicionada** sobre o
   terreno: a planta humanizada de um loteamento, uma foto de drone. Até aqui o
   perímetro entrava e a imagem era **descartada sem aviso**. Agora ela entra no
-  lugar certo, girada e esticada exatamente como no Google Earth.
-- **A imagem fica por cima do preenchimento da área e por baixo do contorno.**
-  Ela não é tingida pela cor da cidade nem escurecida pela máscara: aparece com
-  as cores dela. Onde a imagem é transparente, o mapa continua aparecendo.
+  lugar certo, posicionada pelos mesmos quatro cantos que o Google Earth usa.
+- **A imagem fica logo acima da máscara**, então não é escurecida, e **abaixo
+  do raio, do censo, da isócrona e das áreas**, para não esconder o ponto central
+  e a legenda do raio nem os pontos do censo. Onde a imagem é transparente, o
+  mapa continua aparecendo.
+- **Ao importar, o preenchimento da área é desligado**, porque ele tingiria a
+  planta com a cor da cidade. A mensagem da importação avisa; quem quiser o
+  preenchimento de volta religa em **Edição › Por cidade**.
 - **Ela pertence ao grupo do KMZ.** Desligar o grupo no painel desliga a imagem;
   excluir o grupo exclui a imagem. Um KMZ que só tem a imagem, sem perímetro,
   também entra, num grupo próprio, e o mapa se enquadra nela.
@@ -30,7 +34,10 @@ Esta atualização inclui os seguintes aprimoramentos e correções de erros:
   navegador, separado da lista de projetos (que não teria espaço para ela). Se
   o navegador recusar, o projeto é salvo mesmo assim e a mensagem diz que ele
   vai reabrir sem a imagem. Um projeto aberto em outro computador também avisa,
-  pelo nome, qual imagem não está ali — e abre normalmente sem ela.
+  pelo nome, qual imagem não está ali — e abre normalmente sem ela. Salvar
+  enquanto a imagem ainda está carregando não a perde; se ela não conseguir
+  abrir (memória do navegador), continua guardada no projeto e a mensagem diz
+  isso, em vez de culpar o armazenamento.
 - **Imagem muito grande é reduzida na entrada** para no máximo 4.096 pixels no
   lado maior. A planta humanizada do CJARDIM, de 9.591 × 9.273 pixels, entra com
   4.096 × 3.960, cerca de meio metro por pixel no terreno: mais detalhe do que
