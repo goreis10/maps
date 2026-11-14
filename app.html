@@ -7307,8 +7307,12 @@ function removerGrupo(m){
 function appendEditorCidade(m){
   const row = document.createElement('div');
   row.className='e-row';
+  // A caixa reflete o dado: um projeto reaberto com o preenchimento
+  // desligado (o import da imagem do KMZ desliga) nascia marcado.
+  const fs = DATA.features.filter(f=> f.properties.municipio === m && f.properties.tipo === 'poligono');
+  const ligado = !fs.length || fs.some(f=> f.properties.fill_on);
   row.innerHTML = `<input type="color" value="${CORES[m]}"><span class="e-nome">${esc(m)}</span>
-    <label title="preenchimento"><input type="checkbox" checked>fill</label>`;
+    <label title="preenchimento"><input type="checkbox" ${ligado?'checked':''}>fill</label>`;
   row.querySelector('input[type=color]').oninput = e=> setCidade(m,'cor_final',e.target.value);
   row.querySelector('input[type=checkbox]').onchange = e=> setCidade(m,'fill_on', e.target.checked?1:0);
   document.getElementById('edCidades').appendChild(row);
@@ -7676,10 +7680,13 @@ function plantaLiberarTexturaAntiga(src){
   let tex, img;
   try{ tex = src.texture; img = src.image; }catch(e){ return; }
   if(!tex) return;
+  let vezes = 0;
   const tentar = ()=>{
     try{
       const tiles = Object.values(src.tiles || {});
-      if(src.texture === tex || tiles.some(t=> t.texture === tex)){ map.once('idle', tentar); return; }
+      // carga abortada ou com erro deixa o ladrilho na textura antiga: depois
+      // de algumas tentativas, desiste (volta ao vazamento, nunca ao desenho quebrado)
+      if(src.texture === tex || tiles.some(t=> t.texture === tex)){ if(++vezes < 20) map.once('idle', tentar); return; }
       tex.destroy();
       if(img && img !== src.image && typeof img.close === 'function') img.close();
     }catch(e){}
@@ -7846,7 +7853,11 @@ function plantaDbOp(modo, fn){
 // (metadados) já foi gravado; quem chama avisa que ele reabre sem elas.
 async function plantasGuardar(dono){
   let falhas = 0;
-  for(const p of PLANTAS){
+  // CÓPIA: "começar do zero", abrir outro projeto ou excluir um grupo
+  // durante a gravação mexem em PLANTAS, e o laço sobre o próprio array
+  // parava no meio — o projeto listava 3 imagens, 1 ia para o IndexedDB e
+  // o aviso dizia "com a imagem do KMZ".
+  for(const p of PLANTAS.slice()){
     if(!p.blob) { falhas++; continue; }
     try{ await plantaDbOp('readwrite', st=> st.put(p.blob, dono + '|' + p.id)); }
     catch(e){ console.error('planta/guardar', e); falhas++; }
@@ -7891,7 +7902,8 @@ async function plantasRestaurar(dono, lista){
     try{
       const p = await plantaAdicionar(m, b, ger);
       if(ger !== plantasGeracao) return {ausentes, falhas};
-      if(p) tirar(m.id); else falhas.push(m.nome);
+      // null com o grupo já excluído = o usuário apagou; não é falha
+      if(p || !grupos[m.grupo]) tirar(m.id); else falhas.push(m.nome);
     }catch(e){ console.error('planta/restaurar', e); falhas.push(m.nome); }
   }
   return {ausentes, falhas};
@@ -7936,13 +7948,22 @@ document.getElementById('fileKmz').onchange = async e=>{
       for(const o of (zip ? ov.plantas : [])){
         try{
           // reimportar o mesmo arquivo não empilha a mesma imagem duas vezes
-          if(PLANTAS.some(p=> p.grupo===grupo && p.nome===o.nome && JSON.stringify(p.cantos)===JSON.stringify(o.cantos))) continue;
+          const igual = p=> p.grupo===grupo && p.nome===o.nome && JSON.stringify(p.cantos)===JSON.stringify(o.cantos);
+          if(PLANTAS.some(igual)) continue;
+          // A mesma imagem PENDENTE (falhou ao abrir) é o caso em que reimportar
+          // é justamente a saída: herda o id dela, então entra uma imagem só e
+          // o blob guardado é substituído no próximo salvar.
+          const pend = PLANTAS_PENDENTES.find(igual);
           const z = zipAcharImagem(zip, kmlNome, o.href);
           if(z.erro) throw new Error(z.erro);
           plantasImportando++;
           try{
             const bruto = await z.entrada.async('blob');
-            if(await plantaAdicionar({grupo, nome:o.nome, cantos:o.cantos, opac:o.opac, ordem:o.ordem}, bruto, ger)){ nImg++; nArq++; }
+            const meta = pend ? Object.assign({}, pend) : {grupo, nome:o.nome, cantos:o.cantos, opac:o.opac, ordem:o.ordem};
+            if(await plantaAdicionar(meta, bruto, ger)){
+              nImg++; nArq++;
+              if(pend){ const i = PLANTAS_PENDENTES.indexOf(pend); if(i >= 0) PLANTAS_PENDENTES.splice(i,1); }
+            }
           }finally{ plantasImportando--; }
         }catch(err){
           console.error(err);
