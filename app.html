@@ -39,6 +39,10 @@
   • Correção monetária .. carregarIPCA() (BCB SGS 433), fatorRenda()
                           — IPCA jul/2022→hoje-2m × demais moradores
   • Upload KMZ/KML ...... kmlParaFeats(), integrarFeats()
+  • Imagem do KMZ ....... kmlParaPlantas(), plantaPiramide(), PLANTAS,
+                          plantaAdicionar(), plantasAjustarNivel() (níveis:
+                          a ImageSource não tem mipmap); IndexedDB
+                          plantasGuardar()/plantasRestaurar()/plantasLixo()
   • Desenho ............. drawSetup(), drawSetMode(), drawFinalizar()
   • Reset ............... resetPadrao()    — restaura o padrão MOSAICO
   • Planilha da renda ... rdXlsx -> xlsxLivro() (.xlsx é ZIP de XML;
@@ -877,6 +881,8 @@
     <details id="secCidade" open><summary>Por cidade</summary><div id="edCidades"></div>
       <div class="e-hint">Pintar a cidade sobrescreve as áreas dela.</div></details>
     <details id="secArea"><summary>Por área</summary><div id="edAreas"></div></details>
+    <details id="secPlantas" style="display:none"><summary>Imagens do KMZ <span class="sm-val" id="plantasVal"></span></summary><div id="edPlantas"></div>
+      <div class="e-hint">Imagem georreferenciada que veio dentro do KMZ (planta, foto de drone). Fica logo acima da máscara (não é escurecida) e abaixo do raio, do censo, da isócrona e das áreas. O preenchimento da área tinge a imagem, por isso o import o desliga; religue em Por cidade se quiser. Liga, desliga e é excluída junto com o grupo.</div></details>
     <details id="secMapa"><summary>Mapa</summary><div id="edMapa"></div>
       <div class="e-hint">Cores do fundo do mapa. As “quadras” das cidades correspondem às <b>áreas urbanas</b> (uso do solo). Cada item liga/desliga e muda de cor.</div></details>
     <details id="secRotulos"><summary>Rótulos</summary><div id="edRotulos"></div>
@@ -2122,6 +2128,16 @@ fetch('https://tiles.openfreemap.org/styles/positron')
     // Sem isto a gaveta mostrava o tamanho de antes e deixava de avisar do
     // corte — que é justamente o que ela existe para dizer.
     map.on('resize', function(){ if(!expExportando) expSync(); });
+    // Imagem do KMZ: troca de nível no fim do movimento e em todo resize —
+    // inclusive DURANTE a exportação (sem a trava acima, de propósito: é
+    // ali que ela precisa subir para a resolução do arquivo). O resize() da
+    // MapLibre 4.7.1 já emite moveend quando o mapa está parado, que é o
+    // caso da exportação; o 'resize' cobre o redimensionamento no meio de
+    // uma animação, quando o moveend dele não sai.
+    map.on('moveend', plantasAjustarNivel);
+    map.on('resize', plantasAjustarNivel);
+    // fim de uma carga de nível: a troca que esperou (ver plantasAjustarNivel)
+    map.on('sourcedata', e=>{ if(e.sourceId && String(e.sourceId).startsWith('planta-') && e.isSourceLoaded) plantasAjustarNivel(); });
   })
   .catch(err=>{ console.error(err); fail(); });
 
@@ -2397,6 +2413,7 @@ function aplicarFiltros(){
   map.setFilter('gleba-ponto', filtroPonto());
   map.setFilter('gleba-rotulo', filtroPts());
   if (map.getSource('mascara')) map.getSource('mascara').setData(construirMascara());
+  plantasVisibilidade();   // a imagem do KMZ segue o liga/desliga do grupo
 }
 
 // ── Totais do cabeçalho (à prova de ausência do HTML) ──
@@ -2628,6 +2645,7 @@ function tierAcima(tier, on){
       if (b && map.getLayer(b)) map.moveLayer(id, b); else map.moveLayer(id);
     }
   });
+  plantasEmpilhar();
 }
 
 function setSat(on){
@@ -4064,6 +4082,7 @@ function montarEditor(){
       const ids = g==='cidades' ? clonesCidade : g==='demais' ? lblTiers.demais : [...viasTiers[g], ...viasNomes[g]];
       ids.forEach(id=>{ if(map.getLayer(id)) map.moveLayer(id, 'raio-fill'); });
     });
+    plantasEmpilhar();   // a imagem do KMZ fica acima do que subiu sobre o véu
   }
   // ── Ordenar "sobre a máscara" arrastando os itens ──
   function reordenarDOMAcima(){
@@ -4765,6 +4784,7 @@ var FEATURE_PLANS = {
   // Seções internas do painel de "Edição"
   secCidade:       'free',   // "Por cidade" — Free+
   secArea:         'free',   // "Por área" — Free+
+  secPlantas:      'free',   // "Imagens do KMZ" — Free+ (o import de KMZ é Free)
   secMapa:         'basic',  // "Mapa" (cores do fundo) — Basic+ apenas
   secRotulos:      'basic',  // "Rótulos" — Basic+ apenas
   secRaio:         'free',   // "Raio" — Free+
@@ -4783,6 +4803,7 @@ var FEATURE_ROTULOS = {
   edicao:          'Painel de Edição',
   secCidade:       'Cores por cidade',
   secArea:         'Cores por área',
+  secPlantas:      'Imagem do KMZ (planta) sobre o mapa',
   secRaio:         'Raio, com legenda editável',
   secMascara:      'Máscara de destaque (spotlight)',
   cores:           'Paletas de cores do mapa',
@@ -4828,6 +4849,7 @@ var FEATURE_ELEMENTS = {
   novosNegocios:   ['.nv-item[data-view="negocios"]'],
   secCidade:       ['#secCidade'],
   secArea:         ['#secArea'],
+  secPlantas:      ['#secPlantas'],
   secMapa:         ['#secMapa'],
   secRotulos:      ['#secRotulos'],
   secRaio:         ['#secRaio'],
@@ -7251,6 +7273,14 @@ function updatePanelRow(m){
 function excluirGrupo(m){
   if(!grupos[m]) return;
   if(!confirm(`Excluir "${m}" e todas as suas áreas? Esta ação não pode ser desfeita.`)) return;
+  removerGrupo(m);
+  toast(`"${m}" excluído.`);
+}
+// Sem confirmação nem aviso: excluirGrupo é a porta do usuário; o import
+// usa esta para desfazer o grupo vazio de um KMZ cuja imagem falhou.
+function removerGrupo(m){
+  if(!grupos[m]) return;
+  plantasRemoverGrupo(m);   // a imagem do KMZ vai com o grupo
   DATA.features = DATA.features.filter(f=> f.properties.municipio !== m);
   labelPts.features = labelPts.features.filter(f=> f.properties.municipio !== m);
   DATA.features.forEach((f,i)=> f.properties.idx = i);   // reindexa (setArea usa idx)
@@ -7273,13 +7303,16 @@ function excluirGrupo(m){
     aplicarFiltros();
   }
   refreshStats();
-  toast(`"${m}" excluído.`);
 }
 function appendEditorCidade(m){
   const row = document.createElement('div');
   row.className='e-row';
+  // A caixa reflete o dado: um projeto reaberto com o preenchimento
+  // desligado (o import da imagem do KMZ desliga) nascia marcado.
+  const fs = DATA.features.filter(f=> f.properties.municipio === m && f.properties.tipo === 'poligono');
+  const ligado = !fs.length || fs.some(f=> f.properties.fill_on);
   row.innerHTML = `<input type="color" value="${CORES[m]}"><span class="e-nome">${esc(m)}</span>
-    <label title="preenchimento"><input type="checkbox" checked>fill</label>`;
+    <label title="preenchimento"><input type="checkbox" ${ligado?'checked':''}>fill</label>`;
   row.querySelector('input[type=color]').oninput = e=> setCidade(m,'cor_final',e.target.value);
   row.querySelector('input[type=checkbox]').onchange = e=> setCidade(m,'fill_on', e.target.checked?1:0);
   document.getElementById('edCidades').appendChild(row);
@@ -7334,37 +7367,628 @@ function integrarFeats(feats, grupo, fit){
   renderKanban();
 }
 
+// ── Imagens do KMZ (GroundOverlay) ──
+// Um KMZ pode trazer, além das geometrias, uma IMAGEM georreferenciada — a
+// planta humanizada de um loteamento, uma foto de drone. Até a 3.10 ela era
+// descartada em silêncio: o perímetro entrava, a planta não, e nada dizia
+// que faltava alguma coisa.
+//
+// ONDE ELA MORA NA PILHA: logo acima do véu e do que o usuário levantou
+// sobre ele (vias, nomes), e ABAIXO de tudo que o produto desenha — raio,
+// censo, isócronas, glebas. Abaixo do véu ela sairia escurecida fora do
+// perímetro. Acima das análises (onde a 1ª versão a pôs, logo abaixo de
+// gleba-borda) ela ENGOLIA o ponto central e a legenda do raio, os pontos
+// do censo e o rótulo da isócrona onde fosse opaca — justo no uso normal,
+// raio centrado no empreendimento — e isso o usuário não teria como
+// desfazer. O preço desta posição é o preenchimento da gleba (32% da cor da
+// cidade) tingir a planta; por isso o import DESLIGA o preenchimento do
+// grupo que traz imagem e diz isso, e quem quiser religa em Por cidade.
+//
+// POR QUE NÍVEIS: a ImageSource da MapLibre 4.7.1 cria a textura SEM
+// mipmap (image_source.ts: `new Texture(context, image, gl.RGBA)`, sem
+// useMipmap). Uma imagem de 4096 px mostrada a 600 px na tela amostra 1
+// texel a cada 7 — linha de lote fina vira serrilhado que cintila ao
+// arrastar, justo na moldura natural do mapa. Então a imagem é guardada em
+// meias-resoluções sucessivas e, ao fim de cada movimento, a camada troca
+// para o MENOR nível que ainda não precise ser ampliado: a redução fica
+// sempre entre 1× e 2×, que a filtragem linear dá conta.
+const PLANTAS = [];
+// Metadados de imagens do projeto aberto que ainda não estão no mapa: em
+// restauração (segundos, numa planta grande) ou que falharam ao abrir
+// (memória). ENTRAM no salvar. Sem isto, salvar nesse intervalo gravava
+// `plantas: []` e a limpeza apagava do IndexedDB a imagem que o projeto
+// tinha — perdida para sempre, enquanto a tela a mostrava um instante depois.
+const PLANTAS_PENDENTES = [];
+let plantasImportando = 0;         // decodificações de import em curso
+let plantasGeracao = 0;            // limparProjetoAtual incrementa: import/restauração atrasados se descartam
+const PLANTA_LADO_MAX = 4096;      // ~0,54 m/px na planta do CJARDIM; 64 MB de GPU contra 256 MB a 8192
+const PLANTA_LADO_MIN = 256;       // menor nível da pirâmide
+const PLANTA_MAX_POR_ARQUIVO = 12; // super-overlay empacotado num KMZ só traria centenas de ladrilhos
+
+// filhos diretos por nome local — o KML mistura namespaces (kml, gx)
+function kmlFilho(el, nome){
+  for(const c of el.children) if(c.localName === nome) return c;
+  return null;
+}
+function kmlTexto(el, nome){ const c = el && kmlFilho(el, nome); return c ? c.textContent.trim() : ''; }
+
+// LatLonBox: norte/sul/leste/oeste + rotação (graus, anti-horária, em torno
+// do centro). Girada num plano LOCALMENTE MÉTRICO (longitude × cos(lat)),
+// porque girar em graus crus achataria a imagem fora do equador.
+// Devolve no formato da MapLibre: [sup-esq, sup-dir, inf-dir, inf-esq].
+function cantosDaCaixa(n, s, e, w, rot){
+  const cx = (e+w)/2, cy = (n+s)/2, k = Math.cos(cy*Math.PI/180);
+  const hx = (e-w)/2*k, hy = (n-s)/2;
+  const r = (rot||0)*Math.PI/180, c = Math.cos(r), sn = Math.sin(r);
+  const P = (dx,dy)=> [cx + (dx*c - dy*sn)/k, cy + (dx*sn + dy*c)];
+  return [P(-hx,hy), P(hx,hy), P(hx,-hy), P(-hx,-hy)];
+}
+function cantosValidos(cs){
+  if(!Array.isArray(cs) || cs.length !== 4) return false;
+  if(!cs.every(c=> Array.isArray(c) && isFinite(c[0]) && isFinite(c[1]) &&
+                   Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 85)) return false;
+  // área do quadrilátero (laço de Gauss): degenerado não desenha nada
+  let a = 0;
+  for(let i=0;i<4;i++){ const p=cs[i], q=cs[(i+1)%4]; a += p[0]*q[1] - q[0]*p[1]; }
+  return Math.abs(a) > 1e-12;
+}
+
+function kmlParaPlantas(txt){
+  const doc = new DOMParser().parseFromString(txt,'text/xml');
+  const res = {plantas:[], avisos:[]};
+  if(doc.getElementsByTagName('parsererror').length) return res;
+  if(doc.getElementsByTagNameNS('*','NetworkLink').length)
+    res.avisos.push('camadas ligadas por NetworkLink (fora do arquivo) não são carregadas');
+  for(const go of doc.getElementsByTagNameNS('*','GroundOverlay')){
+    const nome = kmlTexto(go,'name') || 'Imagem';
+    const icon = kmlFilho(go,'Icon');
+    const href = kmlTexto(icon,'href');
+    if(!href){ res.avisos.push(`"${nome}": sem imagem`); continue; }
+    let cantos = null;
+    const quad = kmlFilho(go,'LatLonQuad');
+    const box = kmlFilho(go,'LatLonBox');
+    if(quad){
+      // gx:LatLonQuad: anti-horário a partir do canto INFERIOR esquerdo
+      // (inf-esq, inf-dir, sup-dir, sup-esq). A MapLibre quer sup-esq e
+      // segue horário. Conferido projetando o perímetro do próprio KMZ
+      // sobre a imagem: com qualquer outra ordem ele não cai em cima.
+      const pts = parseCoords(kmlTexto(quad,'coordinates'));
+      if(pts.length === 4) cantos = [pts[3], pts[2], pts[1], pts[0]];
+    } else if(box){
+      const v = k=> parseFloat(kmlTexto(box,k));
+      const n=v('north'), s=v('south'), e=v('east'), w=v('west');
+      const rot = parseFloat(kmlTexto(box,'rotation')) || 0;
+      // e<=w seria a caixa cruzando o antimeridiano — fora do produto
+      if([n,s,e,w].every(isFinite) && n>s && e>w) cantos = cantosDaCaixa(n,s,e,w,rot);
+    }
+    if(!cantosValidos(cantos)){ res.avisos.push(`"${nome}": sem posição no mapa`); continue; }
+    // <color> do KML é AABBGGRR; só o alfa interessa (a imagem não é tingida)
+    const cor = kmlTexto(go,'color');
+    const opac = /^[0-9a-f]{8}$/i.test(cor) ? Math.round(100*parseInt(cor.slice(0,2),16)/255)/100 : 1;
+    const ordem = parseFloat(kmlTexto(go,'drawOrder')) || 0;
+    res.plantas.push({nome, href, cantos, opac, ordem});
+  }
+  if(res.plantas.length > PLANTA_MAX_POR_ARQUIVO){
+    res.avisos.push(`${res.plantas.length} imagens — carregadas as ${PLANTA_MAX_POR_ARQUIVO} primeiras`);
+    res.plantas.length = PLANTA_MAX_POR_ARQUIVO;
+  }
+  return res;
+}
+
+// href relativo ao KML dentro do zip. Endereço externo (http, file) não é
+// buscado: o produto não sai do navegador atrás de arquivo de terceiro.
+function zipAcharImagem(zip, kmlNome, href){
+  if(/^[a-z][a-z0-9+.-]*:/i.test(href)) return {erro:'imagem fora do KMZ (endereço externo)'};
+  let h = href.replace(/\\/g,'/');
+  try{ h = decodeURIComponent(h); }catch(e){}
+  const dir = kmlNome.includes('/') ? kmlNome.slice(0, kmlNome.lastIndexOf('/')+1) : '';
+  const norm = p=>{
+    const out=[];
+    p.split('/').forEach(s=>{ if(s==='..') out.pop(); else if(s && s!=='.') out.push(s); });
+    return out.join('/').toLowerCase();
+  };
+  const alvos = [norm(dir+h), norm(h)];
+  const nomes = Object.keys(zip.files).filter(n=> !zip.files[n].dir);
+  for(const a of alvos){ const n = nomes.find(x=> norm(x) === a); if(n) return {entrada: zip.files[n]}; }
+  return {erro:'imagem citada no KML não está dentro do KMZ'};
+}
+
+// Tipo pelos primeiros bytes — o zip não diz, e um blob sem tipo é o que
+// faria a imagem falhar em silêncio num navegador mais exigente.
+function imagemTipo(b){
+  if(b[0]===0x89 && b[1]===0x50 && b[2]===0x4E && b[3]===0x47) return 'image/png';
+  if(b[0]===0xFF && b[1]===0xD8) return 'image/jpeg';
+  if(b[0]===0x47 && b[1]===0x49 && b[2]===0x46) return 'image/gif';
+  if(b[0]===0x52 && b[1]===0x49 && b[2]===0x46 && b[3]===0x46 && b[8]===0x57 && b[9]===0x45) return 'image/webp';
+  if(b[0]===0x42 && b[1]===0x4D) return 'image/bmp';
+  return '';
+}
+// Dimensões sem decodificar (PNG: IHDR; JPEG: primeiro SOF). Servem para
+// pedir ao navegador que DECODIFIQUE JÁ REDUZIDO: a planta do CJARDIM tem
+// 9591×9273 px, 356 MB em RGBA — decodificar inteira para depois reduzir
+// é o que derruba a aba num notebook modesto.
+function imagemDims(b){
+  if(imagemTipo(b)==='image/png' && b.length>=24){
+    const u = i=> ((b[i]<<24)>>>0) + (b[i+1]<<16) + (b[i+2]<<8) + b[i+3];
+    return {w:u(16), h:u(20)};
+  }
+  if(imagemTipo(b)==='image/jpeg'){
+    let i=2;
+    while(i+9 < b.length){
+      if(b[i] !== 0xFF){ i++; continue; }
+      const m = b[i+1];
+      if(m===0xD8 || m===0x01 || (m>=0xD0 && m<=0xD7)){ i+=2; continue; }
+      const len = (b[i+2]<<8) + b[i+3];
+      if(m>=0xC0 && m<=0xCF && m!==0xC4 && m!==0xC8 && m!==0xCC)
+        return {w:(b[i+7]<<8)+b[i+8], h:(b[i+5]<<8)+b[i+6]};
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+// O lado maior cabe em `max`; nunca amplia; preserva a proporção.
+function plantaAlvo(w, h, max){
+  const f = Math.min(1, max/Math.max(w,h));
+  return {w: Math.max(1, Math.round(w*f)), h: Math.max(1, Math.round(h*f))};
+}
+// Quantos níveis (cada um metade do anterior) até o lado maior ficar
+// abaixo de PLANTA_LADO_MIN — sempre ao menos um.
+function plantaNiveisDims(w, h){
+  const out = [{w, h}];
+  while(Math.max(out[out.length-1].w, out[out.length-1].h) / 2 >= PLANTA_LADO_MIN){
+    const u = out[out.length-1];
+    out.push({w: Math.max(1, Math.round(u.w/2)), h: Math.max(1, Math.round(u.h/2))});
+  }
+  return out;
+}
+// Nível para um tamanho na tela (px de dispositivo): o menor que ainda não
+// precise ser AMPLIADO, de modo que a redução fique entre 1× e 2×.
+function plantaNivelPara(w0, h0, largPx, altPx, n){
+  const f = Math.max(w0/Math.max(1,largPx), h0/Math.max(1,altPx));
+  if(!(f > 1)) return 0;
+  return Math.max(0, Math.min(n-1, Math.floor(Math.log2(f))));
+}
+function plantaLadoMax(){
+  let max = PLANTA_LADO_MAX;
+  try{
+    // getContext do MESMO tipo devolve o contexto que a MapLibre já criou;
+    // nenhum contexto novo é aberto.
+    const c = map && map.getCanvas();
+    const gl = c && (c.getContext('webgl2') || c.getContext('webgl'));
+    const t = gl && gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    if(t > 0) max = Math.min(max, t);
+  }catch(e){}
+  return max;
+}
+function canvasParaBlob(cv, tipo){
+  return new Promise((res, rej)=> cv.toBlob(b=> b ? res(b) : rej(new Error('o navegador não gerou a imagem')), tipo, 0.92));
+}
+function imgDeBlob(blob){
+  return new Promise((res, rej)=>{
+    const u = URL.createObjectURL(blob), im = new Image();
+    im.onload = ()=>{ URL.revokeObjectURL(u); res(im); };
+    im.onerror = ()=>{ URL.revokeObjectURL(u); rej(new Error('o navegador não conseguiu ler a imagem')); };
+    im.src = u;
+  });
+}
+
+// blob (como veio do zip, ou o nível 0 guardado) → níveis com blob URL.
+// Devolve também o blob do nível 0, que é o que se guarda no projeto: o
+// original reduzido, nunca o original de 18 MB.
+async function plantaPiramide(bruto){
+  const bytes = new Uint8Array(await bruto.slice(0, 65536).arrayBuffer());
+  const tipo = imagemTipo(bytes);
+  if(!tipo) throw new Error('formato de imagem não reconhecido');
+  const blob = bruto.type === tipo ? bruto : new Blob([bruto], {type:tipo});
+  const dims = imagemDims(bytes);
+  const max = plantaLadoMax();
+  // `reduzida`: a decodificação já veio no tamanho final. Sem esta marca, o
+  // teste "nível 0 do tamanho do original" comparava o bitmap REDUZIDO
+  // consigo mesmo e reaproveitava o arquivo original — 9591 px e 18 MB
+  // indo para a textura e para o IndexedDB no lugar dos 4096 px.
+  let fonte = null, w, h, reduzida = false;
+  if(dims && Math.max(dims.w, dims.h) > max && typeof createImageBitmap === 'function'){
+    const a = plantaAlvo(dims.w, dims.h, max);
+    try{ fonte = await createImageBitmap(blob, {resizeWidth:a.w, resizeHeight:a.h, resizeQuality:'high'}); }
+    catch(e){ fonte = null; }
+    // navegador que ignora resizeWidth devolve o tamanho original
+    if(fonte && Math.max(fonte.width, fonte.height) > max){ fonte.close && fonte.close(); fonte = null; }
+    else if(fonte) reduzida = true;
+  }
+  if(!fonte){
+    try{ fonte = typeof createImageBitmap === 'function' ? await createImageBitmap(blob) : await imgDeBlob(blob); }
+    catch(e){
+      try{ fonte = await imgDeBlob(blob); }
+      catch(e2){ throw new Error('imagem grande demais para este navegador'); }
+    }
+  }
+  const fw = fonte.width || fonte.naturalWidth, fh = fonte.height || fonte.naturalHeight;
+  ({w, h} = plantaAlvo(fw, fh, max));
+  // JPEG continua JPEG (sem alfa a perder, e PNG de foto incharia 5×)
+  const saida = tipo === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+  const dimsN = plantaNiveisDims(w, h);
+  const niveis = [];
+  let anterior = null, nivel0 = null;
+  try{
+    for(let i=0;i<dimsN.length;i++){
+      const d = dimsN[i], cv = document.createElement('canvas');
+      cv.width = d.w; cv.height = d.h;
+      const ctx = cv.getContext('2d');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(i===0 ? fonte : anterior, 0, 0, d.w, d.h);
+      // nível 0 do mesmo tamanho e tipo do original: usa o próprio arquivo
+      const b = (i===0 && !reduzida && fw===d.w && fh===d.h && tipo===saida) ? blob : await canvasParaBlob(cv, saida);
+      if(i===0) nivel0 = b;
+      niveis.push({w:d.w, h:d.h, url:URL.createObjectURL(b)});
+      if(anterior){ anterior.width = 0; anterior.height = 0; }
+      anterior = cv;
+    }
+  }catch(e){
+    niveis.forEach(n=> URL.revokeObjectURL(n.url));
+    throw e;
+  }finally{
+    if(anterior){ anterior.width = 0; anterior.height = 0; }
+    if(fonte && fonte.close) fonte.close();
+  }
+  return {blob: nivel0, w, h, niveis};
+}
+
+function plantaIdCamada(p){ return 'planta-' + p.id; }
+function plantaVisivel(p){ return !!(p.on && grupos[p.grupo] && grupos[p.grupo].on); }
+
+// Px de dispositivo que a imagem ocupa agora. Usa a razão REAL do canvas
+// (não window.devicePixelRatio): na exportação a MapLibre limita a escala
+// a maxCanvasSize, e o nível tem de seguir o que ela de fato desenha.
+function plantaNivelIdeal(p){
+  const cv = map.getCanvas(), cw = map.getContainer().clientWidth || 1;
+  const dpr = cv.width / cw;
+  const a = map.project(p.cantos[0]), b = map.project(p.cantos[1]), d = map.project(p.cantos[3]);
+  return plantaNivelPara(p.niveis[0].w, p.niveis[0].h,
+    Math.hypot(b.x-a.x, b.y-a.y)*dpr, Math.hypot(d.x-a.x, d.y-a.y)*dpr, p.niveis.length);
+}
+// Chamado no fim de cada movimento E no 'resize' — inclusive o da
+// exportação, que redimensiona com o devicePixelRatio sobrescrito e espera
+// o 'idle'. updateImage() marca a fonte como não carregada na hora, então
+// o 'idle' espera o nível de alta resolução: o PNG não sai com o nível da tela.
+//
+// UMA TROCA DE CADA VEZ: na 4.7.1, um updateImage() que aborta o anterior
+// deixa o catch do abortado rodar DEPOIS e marcar a fonte como carregada
+// (image_source.ts, load()) com o novo nível ainda a caminho — e o 'idle'
+// da exportação passaria antes da alta resolução chegar. Enquanto a fonte
+// carrega, não troca; o 'sourcedata' do fim da carga chama de novo.
+function plantasAjustarNivel(){
+  if(!map) return;
+  PLANTAS.forEach(p=>{
+    if(!plantaVisivel(p)) return;
+    const src = map.getSource(plantaIdCamada(p));
+    if(!src || (src.loaded && !src.loaded())) return;
+    let k; try{ k = plantaNivelIdeal(p); }catch(e){ return; }
+    if(k === p.nivel) return;
+    p.nivel = k;
+    plantaLiberarTexturaAntiga(src);
+    src.updateImage({url: p.niveis[k].url});
+  });
+}
+// O updateImage() da 4.7.1 zera `texture` sem destroy() e não fecha o
+// bitmap antigo: cada troca deixava uma textura órfã na GPU (64 MB a cada
+// exportação, só para o nível 4096) até o coletor de lixo passar — risco
+// real de perder o contexto WebGL numa sessão de exportações. Guarda a
+// antiga e a destrói quando nenhum ladrilho a usa mais. Campos privados da
+// MapLibre: se mudarem de nome, isto não faz nada (volta ao vazamento),
+// nunca quebra o desenho.
+function plantaLiberarTexturaAntiga(src){
+  let tex, img;
+  try{ tex = src.texture; img = src.image; }catch(e){ return; }
+  if(!tex) return;
+  let vezes = 0;
+  const tentar = ()=>{
+    try{
+      const tiles = Object.values(src.tiles || {});
+      // carga abortada ou com erro deixa o ladrilho na textura antiga: depois
+      // de algumas tentativas, desiste (volta ao vazamento, nunca ao desenho quebrado)
+      if(src.texture === tex || tiles.some(t=> t.texture === tex)){ if(++vezes < 20) map.once('idle', tentar); return; }
+      tex.destroy();
+      if(img && img !== src.image && typeof img.close === 'function') img.close();
+    }catch(e){}
+  };
+  map.once('idle', tentar);
+}
+// Chamada também depois de qualquer mexida na pilha sobre o véu
+// (tierAcima/aplicarPilhaAcima também movem camadas para antes de
+// raio-fill): sem isso, a ordem final dependeria de quem chegou por último.
+function plantasEmpilhar(){
+  if(!map || !map.getLayer('raio-fill')) return;
+  // drawOrder crescente; a mais alta fica por cima
+  PLANTAS.slice().sort((a,b)=> a.ordem - b.ordem).forEach(p=>{
+    if(map.getLayer(plantaIdCamada(p))) map.moveLayer(plantaIdCamada(p), 'raio-fill');
+  });
+}
+function plantasVisibilidade(){
+  if(!map) return;
+  PLANTAS.forEach(p=>{
+    const id = plantaIdCamada(p);
+    if(map.getLayer(id)) map.setLayoutProperty(id, 'visibility', plantaVisivel(p) ? 'visible' : 'none');
+  });
+  plantasAjustarNivel();   // a que acabou de ligar pode estar no nível errado
+}
+function plantaNoMapa(p){
+  const id = plantaIdCamada(p);
+  try{ p.nivel = plantaNivelIdeal(p); }catch(e){ p.nivel = 0; }
+  map.addSource(id, {type:'image', url:p.niveis[p.nivel].url, coordinates:p.cantos});
+  map.addLayer({id, type:'raster', source:id,
+    layout:{visibility: plantaVisivel(p) ? 'visible' : 'none'},
+    paint:{'raster-opacity':p.opac, 'raster-fade-duration':0}}, 'raio-fill');
+  plantasEmpilhar();
+}
+function plantaTirarDoMapa(p){
+  const id = plantaIdCamada(p);
+  try{ if(map && map.getLayer(id)) map.removeLayer(id); }catch(e){}
+  try{ if(map && map.getSource(id)) map.removeSource(id); }catch(e){}
+  (p.niveis||[]).forEach(n=> URL.revokeObjectURL(n.url));
+  p.niveis = [];
+}
+// Entrada única: import e restauração passam por aqui. `ger` é a geração
+// em que o pedido começou — se o projeto foi limpo ou trocado no meio da
+// decodificação (segundos, numa imagem grande), a imagem é descartada em
+// vez de aparecer num projeto que não é o dela.
+async function plantaAdicionar(meta, bruto, ger){
+  const pir = await plantaPiramide(bruto);
+  if(ger !== plantasGeracao || !grupos[meta.grupo] || !map || !map.getLayer('raio-fill')){
+    pir.niveis.forEach(n=> URL.revokeObjectURL(n.url));
+    return null;
+  }
+  const p = {
+    id: meta.id || ('i' + Date.now().toString(36) + Math.random().toString(36).slice(2,8)),
+    grupo: meta.grupo, nome: meta.nome, cantos: meta.cantos,
+    opac: isFinite(meta.opac) ? Math.min(1, Math.max(0, +meta.opac)) : 1,
+    on: meta.on !== false, ordem: +meta.ordem || 0,
+    w: pir.w, h: pir.h, blob: pir.blob, niveis: pir.niveis, nivel: 0
+  };
+  PLANTAS.push(p);
+  plantaNoMapa(p);
+  plantasRenderEditor();
+  return p;
+}
+// Desliga o preenchimento de um grupo e acerta as caixas de Por cidade e
+// Por área. Devolve true se havia algo ligado.
+function grupoDesligarPreenchimento(m){
+  const tinha = DATA.features.some(f=> f.properties.municipio === m && f.properties.fill_on);
+  if(!tinha) return false;
+  setCidade(m, 'fill_on', 0);
+  document.querySelectorAll('#edCidades .e-row').forEach(r=>{
+    const n = r.querySelector('.e-nome'), c = r.querySelector('input[type=checkbox]');
+    if(n && c && n.textContent === m) c.checked = false;
+  });
+  document.querySelectorAll('#edAreas .e-row').forEach(r=>{
+    const cor = r.querySelector('input[type=color][data-mun]'), c = r.querySelector('input[type=checkbox]');
+    if(cor && c && cor.dataset.mun === m && !c.disabled) c.checked = false;
+  });
+  return true;
+}
+function plantasRemoverGrupo(m){
+  for(let i=PLANTAS.length-1;i>=0;i--) if(PLANTAS[i].grupo === m){ plantaTirarDoMapa(PLANTAS[i]); PLANTAS.splice(i,1); }
+  for(let i=PLANTAS_PENDENTES.length-1;i>=0;i--) if(PLANTAS_PENDENTES[i].grupo === m) PLANTAS_PENDENTES.splice(i,1);
+  plantasRenderEditor();
+}
+function plantasLimpar(){
+  plantasGeracao++;
+  PLANTAS.forEach(plantaTirarDoMapa);
+  PLANTAS.length = 0;
+  PLANTAS_PENDENTES.length = 0;
+  plantasRenderEditor();
+}
+// O que vai para o JSON do projeto: só metadados. A imagem vai para o
+// IndexedDB (plantasGuardar) — o localStorage inteiro tem ~5 MB para todos
+// os projetos da conta, e uma planta reduzida sozinha passa disso.
+function plantasColetar(){
+  const noMapa = PLANTAS.map(p=>({id:p.id, grupo:p.grupo, nome:p.nome, cantos:p.cantos,
+                                  opac:p.opac, on:p.on, ordem:p.ordem, w:p.w, h:p.h}));
+  const ids = new Set(noMapa.map(m=> m.id));
+  const pend = PLANTAS_PENDENTES.filter(m=> !ids.has(m.id) && grupos[m.grupo]).map(m=> Object.assign({}, m));
+  return noMapa.concat(pend);
+}
+function plantasCantosBbox(lista){
+  let mi=[180,90], ma=[-180,-90], tem=false;
+  lista.forEach(p=> (p.cantos||[]).forEach(c=>{ tem=true;
+    mi=[Math.min(mi[0],c[0]),Math.min(mi[1],c[1])]; ma=[Math.max(ma[0],c[0]),Math.max(ma[1],c[1])]; }));
+  return tem ? [mi, ma] : null;
+}
+
+function plantasRenderEditor(){
+  const sec = document.getElementById('secPlantas'), box = document.getElementById('edPlantas');
+  if(!sec || !box) return;
+  sec.style.display = PLANTAS.length ? '' : 'none';
+  const val = document.getElementById('plantasVal');
+  if(val) val.textContent = PLANTAS.length ? String(PLANTAS.length) : '';
+  box.innerHTML = '';
+  PLANTAS.forEach(p=>{
+    const row = document.createElement('div');
+    row.className = 'e-row';
+    const pct = Math.round(p.opac*100);
+    // esc(): nome e grupo vêm do KML e do nome do arquivo (ver "Escaping KMZ names")
+    row.innerHTML = `<input type="checkbox" ${p.on?'checked':''} title="mostrar/ocultar">
+      <span class="e-nome" title="${esc(p.grupo)} · ${esc(p.nome)} · ${p.w}×${p.h} px">${esc(p.nome)}</span>
+      <input type="range" min="0" max="100" value="${pct}" title="opacidade" style="flex:0 1 90px">
+      <span style="width:34px;text-align:right">${pct}%</span>`;
+    const ck = row.querySelector('input[type=checkbox]'), rg = row.querySelector('input[type=range]'),
+          lb = row.querySelector('span:last-child');
+    ck.onchange = ()=>{ p.on = ck.checked; plantasVisibilidade(); };
+    rg.oninput = ()=>{
+      p.opac = (+rg.value)/100; lb.textContent = rg.value + '%';
+      if(map && map.getLayer(plantaIdCamada(p))) map.setPaintProperty(plantaIdCamada(p), 'raster-opacity', p.opac);
+    };
+    box.appendChild(row);
+  });
+}
+
+// ── Persistência das imagens: IndexedDB ──
+// Chave = conta + '|' + id da imagem. A conta entra na chave porque a
+// limpeza (plantasLixo) apaga o que nenhum projeto DESTA conta cita, e sem
+// ela apagaria as imagens de outra conta no mesmo navegador.
+let plantaDbP = null;
+function plantaDb(){
+  if(plantaDbP) return plantaDbP;
+  plantaDbP = new Promise((res, rej)=>{
+    if(typeof indexedDB === 'undefined') return rej(new Error('IndexedDB indisponível'));
+    const rq = indexedDB.open('makermap', 1);
+    rq.onupgradeneeded = ()=>{ if(!rq.result.objectStoreNames.contains('plantas')) rq.result.createObjectStore('plantas'); };
+    rq.onsuccess = ()=> res(rq.result);
+    rq.onerror = ()=> rej(rq.error || new Error('IndexedDB recusou'));
+    rq.onblocked = ()=> rej(new Error('IndexedDB bloqueado'));
+  });
+  plantaDbP.catch(()=>{ plantaDbP = null; });   // nova tentativa na próxima vez
+  return plantaDbP;
+}
+function plantaDbOp(modo, fn){
+  return plantaDb().then(db=> new Promise((res, rej)=>{
+    const tx = db.transaction('plantas', modo), st = tx.objectStore('plantas');
+    let out;
+    const rq = fn(st);
+    if(rq) rq.onsuccess = ()=>{ out = rq.result; };
+    tx.oncomplete = ()=> res(out);
+    tx.onerror = tx.onabort = ()=> rej(tx.error || new Error('falha no IndexedDB'));
+  }));
+}
+// Grava as imagens da sessão. Resolve com quantas NÃO couberam — o projeto
+// (metadados) já foi gravado; quem chama avisa que ele reabre sem elas.
+async function plantasGuardar(dono){
+  let falhas = 0;
+  // CÓPIA: "começar do zero", abrir outro projeto ou excluir um grupo
+  // durante a gravação mexem em PLANTAS, e o laço sobre o próprio array
+  // parava no meio — o projeto listava 3 imagens, 1 ia para o IndexedDB e
+  // o aviso dizia "com a imagem do KMZ".
+  for(const p of PLANTAS.slice()){
+    if(!p.blob) { falhas++; continue; }
+    try{ await plantaDbOp('readwrite', st=> st.put(p.blob, dono + '|' + p.id)); }
+    catch(e){ console.error('planta/guardar', e); falhas++; }
+  }
+  return falhas;
+}
+// Apaga as imagens desta conta que nenhum projeto salvo cita. Nunca toca
+// um projeto: só blobs órfãos (projeto excluído, ou substituído por um
+// homônimo sem aquela imagem).
+async function plantasLixo(dono, idsVivos){
+  try{
+    const chaves = await plantaDbOp('readonly', st=> st.getAllKeys());
+    const mortas = (chaves||[]).filter(k=> typeof k === 'string' && k.startsWith(dono + '|') &&
+                                          !idsVivos.has(k.slice(dono.length + 1)));
+    if(mortas.length) await plantaDbOp('readwrite', st=>{ mortas.forEach(k=> st.delete(k)); return null; });
+  }catch(e){ console.error('planta/limpeza', e); }
+}
+// Reabre as imagens de um projeto. Resolve com os nomes das que não estão
+// neste navegador (projeto salvo noutro aparelho, armazenamento limpo, ou
+// salvo quando o IndexedDB recusou). Uma imagem ausente NUNCA impede o
+// projeto de abrir — projetos anteriores à 3.11 nem têm a lista.
+//
+// Resolve com {ausentes, falhas}: ausentes = o blob não está neste navegador
+// (somem do projeto no próximo salvar — não há o que guardar); falhas = o
+// blob está aqui mas não abriu (memória, navegador) — CONTINUAM pendentes e
+// voltam no salvar, para a imagem não ser apagada por uma falha passageira.
+async function plantasRestaurar(dono, lista){
+  const ger = plantasGeracao, ausentes = [], falhas = [];
+  const validos = (Array.isArray(lista) ? lista : []).filter(m=>{
+    const ok = m && m.id && cantosValidos(m.cantos) && grupos[m.grupo];
+    if(!ok) ausentes.push((m && m.nome) || 'imagem');
+    return ok;
+  });
+  validos.forEach(m=> PLANTAS_PENDENTES.push(Object.assign({}, m)));
+  const tirar = id=>{ const i = PLANTAS_PENDENTES.findIndex(x=> x.id === id); if(i >= 0) PLANTAS_PENDENTES.splice(i,1); };
+  for(const m of validos){
+    let b = null, erroDb = false;
+    try{ b = await plantaDbOp('readonly', st=> st.get(dono + '|' + m.id)); }catch(e){ erroDb = true; }
+    if(ger !== plantasGeracao) return {ausentes, falhas};   // outro projeto foi aberto no meio
+    if(erroDb){ falhas.push(m.nome); continue; }           // IndexedDB fora do ar ≠ imagem perdida
+    if(!(b instanceof Blob)){ tirar(m.id); ausentes.push(m.nome); continue; }
+    try{
+      const p = await plantaAdicionar(m, b, ger);
+      if(ger !== plantasGeracao) return {ausentes, falhas};
+      // null com o grupo já excluído = o usuário apagou; não é falha
+      if(p || !grupos[m.grupo]) tirar(m.id); else falhas.push(m.nome);
+    }catch(e){ console.error('planta/restaurar', e); falhas.push(m.nome); }
+  }
+  return {ausentes, falhas};
+}
+
 document.getElementById('addKmz').onclick = ()=> document.getElementById('fileKmz').click();
 // Mesmo disparo do "+ KMZ": um é atalho, o outro é o caminho do estado vazio.
 document.getElementById('addKmz2').onclick = ()=> document.getElementById('fileKmz').click();
 document.getElementById('fileKmz').onchange = async e=>{
   if(!map){ toast('Aguarde o mapa carregar.'); return; }
-  let total=0, erros=[];
-  for(const file of e.target.files){
+  let total=0, nImg=0, erros=[], fillDesl=false;
+  // e.target.files é uma FileList viva: zerar o value no fim a esvaziaria
+  // no meio da decodificação de uma imagem (await) se fosse lida depois.
+  const arquivos = Array.from(e.target.files);
+  e.target.value = '';
+  const ger = plantasGeracao;
+  for(const file of arquivos){
     try{
-      let kml;
+      let kml, zip = null, kmlNome = '', nArq = 0;
       if(file.name.toLowerCase().endsWith('.kmz')){
         if(typeof JSZip==='undefined') throw new Error('JSZip não carregou (rede)');
-        const zip = await JSZip.loadAsync(file);
+        zip = await JSZip.loadAsync(file);
         const entry = Object.values(zip.files).find(f=>f.name.toLowerCase().endsWith('.kml'));
         if(!entry) throw new Error('KMZ sem KML interno');
+        kmlNome = entry.name;
         kml = await entry.async('string');
       } else {
         kml = await file.text();
       }
       const grupo = file.name.replace(/\.(kmz|kml)$/i,'');
       const feats = kmlParaFeats(kml, grupo);
-      if(!feats.length) throw new Error('nenhuma geometria encontrada');
-      integrarFeats(feats, grupo);
+      const ov = kmlParaPlantas(kml);
+      if(!feats.length && !ov.plantas.length) throw new Error('nenhuma geometria encontrada');
+      // Sem geometria, o grupo nasce vazio só para a imagem ter dono: é ele
+      // que liga/desliga e exclui a imagem pelo painel.
+      integrarFeats(feats, grupo, feats.length > 0);
       total += feats.length;
+      ov.avisos.forEach(a=> erros.push(`${file.name}: ${a}`));
+      if(ov.plantas.length && !zip)
+        erros.push(`${file.name}: a imagem fica fora de um .kml solto — abra o .kmz`);
+      else if(ov.plantas.length) toast('Preparando a imagem do KMZ…');
+      for(const o of (zip ? ov.plantas : [])){
+        try{
+          // reimportar o mesmo arquivo não empilha a mesma imagem duas vezes
+          const igual = p=> p.grupo===grupo && p.nome===o.nome && JSON.stringify(p.cantos)===JSON.stringify(o.cantos);
+          if(PLANTAS.some(igual)) continue;
+          // A mesma imagem PENDENTE (falhou ao abrir) é o caso em que reimportar
+          // é justamente a saída: herda o id dela, então entra uma imagem só e
+          // o blob guardado é substituído no próximo salvar.
+          const pend = PLANTAS_PENDENTES.find(igual);
+          const z = zipAcharImagem(zip, kmlNome, o.href);
+          if(z.erro) throw new Error(z.erro);
+          plantasImportando++;
+          try{
+            const bruto = await z.entrada.async('blob');
+            const meta = pend ? Object.assign({}, pend) : {grupo, nome:o.nome, cantos:o.cantos, opac:o.opac, ordem:o.ordem};
+            if(await plantaAdicionar(meta, bruto, ger)){
+              nImg++; nArq++;
+              if(pend){ const i = PLANTAS_PENDENTES.indexOf(pend); if(i >= 0) PLANTAS_PENDENTES.splice(i,1); }
+            }
+          }finally{ plantasImportando--; }
+        }catch(err){
+          console.error(err);
+          erros.push(`${file.name} · ${o.nome}: ${err.message}`);
+        }
+      }
+      // A imagem fica abaixo do preenchimento da gleba (ver "ONDE ELA MORA
+      // NA PILHA"); com ele ligado, a planta sairia tingida pela cor da cidade.
+      if(nArq && feats.length && grupoDesligarPreenchimento(grupo)) fillDesl = true;
+      // só imagem, e ela não entrou: o grupo vazio não tem o que mostrar
+      if(!feats.length && !nArq && grupos[grupo] && !grupos[grupo].n && !PLANTAS.some(p=> p.grupo===grupo))
+        removerGrupo(grupo);
+      if(!feats.length && nArq){
+        const bb = plantasCantosBbox(PLANTAS.filter(p=> p.grupo===grupo));
+        if(bb) map.fitBounds(bb, {padding:80, maxZoom:17});
+      }
     }catch(err){
       console.error(err);
       erros.push(`${file.name}: ${err.message}`);
     }
   }
-  e.target.value = '';
-  toast(erros.length ? `Importadas ${total} áreas · Falhas: ${erros.join(' | ')}`
-                     : `Importadas ${total} áreas — sessão apenas, não fica salvo no arquivo.`);
+  const img = (nImg ? ` e ${nImg} ${nImg>1?'imagens':'imagem'}` : '') +
+              (fillDesl ? ' (preenchimento da área desligado para a planta aparecer com as cores dela — religue em Edição › Por cidade)' : '');
+  toast(erros.length ? `Importadas ${total} áreas${img} · Falhas: ${erros.join(' | ')}`
+                     : `Importadas ${total} áreas${img} — sessão apenas, não fica salvo no arquivo.`);
 };
 
 // ── Desenho de polígonos ──
@@ -8676,7 +9300,13 @@ document.getElementById('expGerar').onclick = async function(){
   function projKey(){ return 'makermap.projetos.' + email; }
   function listarProjetos(){ try{ return JSON.parse(localStorage.getItem(projKey()) || '[]'); }catch(e){ return []; } }
   function gravarProjetos(arr){ localStorage.setItem(projKey(), JSON.stringify(arr)); }
-  function excluirProjeto(id){ gravarProjetos(listarProjetos().filter(function(p){ return p.id !== id; })); }
+  function excluirProjeto(id){ gravarProjetos(listarProjetos().filter(function(p){ return p.id !== id; })); plantasLixoConta(); }
+  // ids de imagem que algum projeto salvo desta conta ainda cita
+  function plantasLixoConta(){
+    var vivos = new Set();
+    listarProjetos().forEach(function(p){ (p.plantas||[]).forEach(function(m){ if(m && m.id) vivos.add(m.id); }); });
+    return plantasLixo(email, vivos);
+  }
   function coletarProjeto(nome){
     return {
       id: 'p' + Date.now() + Math.floor(Math.random()*1000),
@@ -8685,6 +9315,7 @@ document.getElementById('expGerar').onclick = async function(){
       pts: JSON.parse(JSON.stringify(labelPts.features)),
       grupos: JSON.parse(JSON.stringify(grupos)),
       cores: JSON.parse(JSON.stringify(CORES)),
+      plantas: plantasColetar(),
       estado: (window.MakerMap && window.MakerMap.coletar) ? window.MakerMap.coletar() : null
     };
   }
@@ -8697,6 +9328,7 @@ document.getElementById('expGerar').onclick = async function(){
 
   // ── Limpar tudo (começar do zero) ──
   function limparProjetoAtual(){
+    plantasLimpar();
     DATA.features = [];
     labelPts.features = [];
     Object.keys(grupos).forEach(function(m){ delete grupos[m]; });
@@ -8739,10 +9371,25 @@ document.getElementById('expGerar').onclick = async function(){
       var g=f.geometry, cs = g.type==='Polygon' ? g.coordinates[0] : (g.type==='Point' ? [g.coordinates] : g.coordinates);
       cs.forEach(function(c){ tem=true; mi=[Math.min(mi[0],c[0]),Math.min(mi[1],c[1])]; ma=[Math.max(ma[0],c[0]),Math.max(ma[1],c[1])]; });
     });
+    var bbI = (!tem && Array.isArray(proj.plantas)) ? plantasCantosBbox(proj.plantas.filter(function(m){ return m && cantosValidos(m.cantos); })) : null;
     if(tem) map.fitBounds([mi,ma],{padding:80, maxZoom:14});
+    else if(bbI) map.fitBounds(bbI,{padding:80, maxZoom:17});
     if(proj.estado && window.MakerMap && window.MakerMap.aplicar) window.MakerMap.aplicar(proj.estado);
     renderKanban();
     toast('Projeto "' + proj.nome + '" aberto.');
+    // Imagens do KMZ: assíncronas (IndexedDB + decodificação). O projeto já
+    // está aberto e utilizável; a imagem chega depois, ou avisa que falta.
+    if(Array.isArray(proj.plantas) && proj.plantas.length){
+      plantasRestaurar(email, proj.plantas).then(function(r){
+        var msg = [];
+        if(r.ausentes.length) msg.push((r.ausentes.length>1 ? 'As imagens' : 'A imagem') + ' do KMZ ("' + r.ausentes.join('", "') +
+          '") não ' + (r.ausentes.length>1 ? 'estão guardadas' : 'está guardada') + ' neste navegador — importe o KMZ de novo e salve.');
+        if(r.falhas.length) msg.push((r.falhas.length>1 ? 'As imagens' : 'A imagem') + ' do KMZ ("' + r.falhas.join('", "') +
+          '") não ' + (r.falhas.length>1 ? 'puderam' : 'pôde') + ' ser aberta' + (r.falhas.length>1 ? 's' : '') +
+          ' agora (memória do navegador?). Continua guardada no projeto; feche outras abas e abra de novo.');
+        if(msg.length) toast(msg.join(' '));
+      });
+    }
   }
 
   // ── Janela: Salvar Projeto ──
@@ -8755,8 +9402,21 @@ document.getElementById('expGerar').onclick = async function(){
     if(!nome){ toast('Dê um nome ao projeto.'); saveNome.focus(); return; }
     if(listarProjetos().some(function(p){ return p.nome.toLowerCase()===nome.toLowerCase(); })
        && !confirm('Já existe um projeto "' + nome + '". Substituir?')) return;
-    if(salvarProjetoAtual(nome)){ fecharSave(); toast('Projeto "' + nome + '" salvo em Meus Projetos.'); }
-    else toast('Não foi possível salvar (armazenamento do navegador cheio?).');
+    if(!salvarProjetoAtual(nome)){ toast('Não foi possível salvar (armazenamento do navegador cheio?).'); return; }
+    fecharSave();
+    // Imagem de um import ainda sendo preparada não tem id nem blob: o
+    // projeto sai sem ela, e o aviso diz isso em vez de "salvo".
+    var aviso = plantasImportando ? ' A imagem do KMZ ainda estava sendo preparada e não entrou — salve de novo quando ela aparecer.' : '';
+    if(!PLANTAS.length){ toast('Projeto "' + nome + '" salvo em Meus Projetos.' + aviso); plantasLixoConta(); return; }
+    // A imagem vai para o IndexedDB depois do projeto. Se não couber, o
+    // projeto continua salvo — e diz que vai reabrir sem ela, em vez de
+    // descobrir isso na reunião.
+    plantasGuardar(email).then(function(falhas){
+      toast((falhas ? 'Projeto "' + nome + '" salvo, mas ' + (falhas>1 ? falhas + ' imagens do KMZ não couberam' : 'a imagem do KMZ não coube') +
+                     ' neste navegador — ao abrir, ele vem sem ela.'
+                   : 'Projeto "' + nome + '" salvo em Meus Projetos, com a imagem do KMZ.') + aviso);
+      return plantasLixoConta();
+    });
   }
   document.getElementById('btnSalvarProj').onclick = abrirSave;
   document.getElementById('saveClose').onclick = fecharSave;
