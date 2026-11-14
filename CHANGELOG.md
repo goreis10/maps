@@ -5,6 +5,44 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.11 — Imagem do KMZ no mapa
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **A planta que vem dentro do KMZ agora aparece no mapa.** Um KMZ do Google
+  Earth pode trazer, além do perímetro, uma **imagem posicionada** sobre o
+  terreno: a planta humanizada de um loteamento, uma foto de drone. Até aqui o
+  perímetro entrava e a imagem era **descartada sem aviso**. Agora ela entra no
+  lugar certo, girada e esticada exatamente como no Google Earth.
+- **A imagem fica por cima do preenchimento da área e por baixo do contorno.**
+  Ela não é tingida pela cor da cidade nem escurecida pela máscara: aparece com
+  as cores dela. Onde a imagem é transparente, o mapa continua aparecendo.
+- **Ela pertence ao grupo do KMZ.** Desligar o grupo no painel desliga a imagem;
+  excluir o grupo exclui a imagem. Um KMZ que só tem a imagem, sem perímetro,
+  também entra, num grupo próprio, e o mapa se enquadra nela.
+- **Nova seção na Edição: Imagens do KMZ.** Aparece quando há imagem e permite
+  mostrar ou ocultar cada uma e ajustar a opacidade. A transparência definida no
+  Google Earth é respeitada na importação.
+- **Entra na imagem exportada.** Na exportação a planta sobe para a resolução
+  mais alta que tiver, então um PNG em 4× sai com a planta nítida, não com a
+  versão da tela.
+- **Salvar Projeto guarda a imagem.** Ela fica num armazenamento próprio do
+  navegador, separado da lista de projetos (que não teria espaço para ela). Se
+  o navegador recusar, o projeto é salvo mesmo assim e a mensagem diz que ele
+  vai reabrir sem a imagem. Um projeto aberto em outro computador também avisa,
+  pelo nome, qual imagem não está ali — e abre normalmente sem ela.
+- **Imagem muito grande é reduzida na entrada** para no máximo 4.096 pixels no
+  lado maior. A planta humanizada do CJARDIM, de 9.591 × 9.273 pixels, entra com
+  4.096 × 3.960, cerca de meio metro por pixel no terreno: mais detalhe do que
+  uma exportação em 3× da área inteira consegue mostrar.
+- **O que ainda não entra, e o produto diz qual foi:** imagem que o KMZ aponta
+  para um endereço na internet em vez de trazer dentro do arquivo; camadas
+  ligadas por *NetworkLink*; e um `.kml` solto, que não carrega a imagem (abra o
+  `.kmz`). A imagem também não vai para a exportação de dados (GeoJSON), que é
+  só geometria.
+
+---
+
 ## Maker Map 3.10 — Cores para daltonismo
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
