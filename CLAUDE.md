@@ -65,6 +65,17 @@ Where the version shows up:
 
 Decide the number **when opening the PR**: look at `CHANGELOG.md` for the last shipped version and bump according to the table above.
 
+### The Novidades panel (3.12) — the in-app release notes
+
+`app.html` ends with `NOVIDADES`, the single source of the version the app shows: an array of `{v, data:'AAAA-MM-DD', titulo?, itens:[…]}`, **newest first**, and `VERSAO = NOVIDADES[0].v`. **Every release the user can perceive adds an entry at the top, in the same PR as the `CHANGELOG.md` section** — and a fixes-only `X.Y.Z` counts. Doc-only or internal changes add nothing and do not change the version.
+
+- `CHANGELOG.md` stays the full notes; `NOVIDADES` is the short version for the panel: **1 to 5 items**, Portuguese, active voice, short sentences, written for whoever uses the map — what the person can do now, not what changed in the code ("Mapa de renda: baixe a análise numa planilha .xlsx", not "Implementado export xlsx"). Start with the area of the app when it helps. `titulo` is the CHANGELOG title, omitted for fixes-only releases (which have none). `data` is the day it went live (the merge to `main`).
+- **The two must list the same versions in the same order** — `scratchpad/planta/novidades.js` asserts it against the CHANGELOG headings, plus the version format (no trailing `.0`), 1–5 items, ISO dates in non-increasing order. 1.0, 1.2 and 2.0 have no release commit, so their dates are when they entered the CHANGELOG (1.0 was numbered retroactively).
+- The panel is a native `<dialog id="nvDlg">` (`showModal()` makes the page inert, traps focus and closes on Esc). It opens **once per version**: `verificarNovidades()` compares `localStorage['makermap.versaoVista']` with `VERSAO` and writes the current one. With **no** stored value it opens only if the browser already holds another `makermap.*` key besides `makermap.user` — those are written only by something the person did (saving a project, the kanban, a section toggled, the drawer width, zoom or export preference), so it tells a returning user from a brand-new account. Without that, 3.12 itself would have reached nobody, since every existing user arrives at it with no record. The harness also asserts that page load writes no such key, which is what keeps a new account from looking like an old one.
+- `abrirNovidades()` is the manual entry point: Configurações has a `.cfg-sobre` line with the version (`#verAtual`) and **Ver novidades** (`#cfgNovidades`), which closes Configurações first.
+- Two layout traps the screenshots caught and the assertions did not: the file's CSS reset zeroes the margin that centres a `<dialog>`, so `#nvDlg` needs an explicit `margin:auto` (it opened in the top-left corner); and `showModal()` focuses the first focusable element, which put a focus ring on the ×, so `.nv-corpo` carries `autofocus tabindex="-1"` (the arrows also scroll the list).
+- PR titles keep this project's form (`Maker Map 3.12 — Novidades`), not the generic template's `App X.Y.Z: resumo`.
+
 ## Working on the code
 
 Since it's a single-file app, use `Grep`/`Read` to navigate `app.html`. The file opens with a comment block (the "ÍNDICE DO ARQUIVO") that maps every subsystem to its function names — read it first; search by the term to jump to a section.
