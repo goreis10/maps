@@ -745,12 +745,16 @@
      centralizava o <dialog> — sem isto ele abria colado no canto. */
   #nvDlg{margin:auto;border:0;border-radius:16px;padding:0;width:min(480px,94vw);background:var(--paper);color:var(--ink);
     font:400 var(--fs-3)/1.5 'Archivo',sans-serif;box-shadow:0 24px 60px rgba(28,25,23,.28)}
+  /* Navegador sem <dialog> (Safari 15.0–15.3) não esconde o fechado nem
+     posiciona o aberto: as duas regras fazem isso por ele. */
+  #nvDlg:not([open]){display:none}
+  #nvDlg[open]{position:fixed;inset:0;z-index:5000}
   #nvDlg::backdrop{background:rgba(28,25,23,.42)}
   #nvDlg .nv-x{position:absolute;top:var(--sp-3);right:var(--sp-3);width:30px;height:30px;border-radius:50%;border:0;
     background:#F5F5F4;color:var(--ink-3);font-size:20px;line-height:1;cursor:pointer}
   #nvDlg .nv-corpo{padding:var(--sp-5);max-height:min(640px,86vh);overflow:auto;outline:none}
   #nvDlg h2{margin:0 40px var(--sp-1) 0;font-size:var(--fs-5);font-weight:800}
-  #nvDlg .nv-sub{color:var(--ink-3);font-size:var(--fs-2);margin:0}
+  #nvDlg .nv-intro{color:var(--ink-3);font-size:var(--fs-2);margin:0}
   #nvDlg .nv-v{margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--line)}
   #nvDlg .nv-v.nv-1{border-top:0;padding-top:0}
   #nvDlg .nv-nome{font-weight:700;font-size:var(--fs-4)}
@@ -8112,6 +8116,9 @@ document.getElementById('chipDraw').onclick = ()=>{
 };
 window.addEventListener('keydown', e=>{
   if(e.key !== 'Escape') return;
+  // Com o painel de Novidades aberto, o Esc é dele: fecha só o painel, e
+  // não o desenho em curso nem a gaveta que estava aberta atrás.
+  if(document.querySelector('dialog[open]')) return;
   if(drawing) drawSetMode(false);
   if(pickAtivo){
     pickDesligar();
@@ -9499,6 +9506,7 @@ document.getElementById('expGerar').onclick = async function(){
   // Esc fecha qualquer janela/gaveta aberta
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape') return;
+    if(document.querySelector('dialog[open]')) return;   // o Esc é do painel de Novidades
     if(cfgOv.classList.contains('show')) fecharCfg();
     if(editOv.classList.contains('show')) fecharEdit();
     var up = document.getElementById('upgradeOverlay');
@@ -9537,7 +9545,7 @@ const NOVIDADES = [
     'Projetos salvos continuam com as cores que já tinham.']},
   {v:'3.9', data:'2026-11-11', titulo:'Exportar dados', itens:[
     'Novo botão Dados: baixe áreas, raios, isócronas e setores do censo em GeoJSON.',
-    'Cada arquivo leva as premissas e os avisos da análise.',
+    'O arquivo dos setores do censo leva as premissas e os avisos da análise.',
     'Só sai o que está ligado no mapa; um botão vazio fica desabilitado e diz por quê.']},
   {v:'3.8.1', data:'2026-11-05', itens:[
     'Cores: a amostra da paleta Contraste categórico mostra a cor que o mapa pinta.',
@@ -9568,9 +9576,9 @@ const NOVIDADES = [
   {v:'3.4', data:'2026-10-20', titulo:'Velocidade do zoom pelo scroll', itens:[
     'O zoom pela roda do mouse e pelo trackpad ficou mais calmo.',
     'Configurações: escolha a velocidade do zoom entre Lento, Médio e Rápido.']},
-  {v:'3.3', data:'2026-10-20', titulo:'Análise de renda em planilha', itens:[
+  {v:'3.3', data:'2026-10-20', titulo:'Baixar a análise de renda em planilha', itens:[
     'Mapa de renda: baixe a análise numa planilha .xlsx, com números que somam e ordenam.',
-    'As premissas e os avisos vão junto, em todas as abas.']},
+    'As premissas vão nas duas abas, e o aviso de recorte pequeno fica no topo.']},
   {v:'3.2', data:'2026-10-16', titulo:'Exportar em mais formatos e tamanhos', itens:[
     'Exportar imagem: escolha PNG, JPEG ou WebP.',
     'Escolha o tamanho pelo múltiplo da tela ou pela largura em pixels.',
@@ -9579,7 +9587,7 @@ const NOVIDADES = [
     'Mapa de renda: cada faixa de renda mostra o número de domicílios ao lado do percentual.',
     'A cor do ponto no mapa e a faixa contada no gráfico passam a sempre coincidir.',
     'Onde o IBGE não divulga renda, o painel diz isso em vez de mostrar R$ 0.']},
-  {v:'3.0', data:'2026-10-04', titulo:'Interface reorganizada', itens:[
+  {v:'3.0', data:'2026-10-04', titulo:'Interface reorganizada e legenda de renda na imagem', itens:[
     'Mapa de renda: a legenda das faixas aparece no mapa e sai na imagem exportada.',
     'Mapa de renda: a análise vem antes dos parâmetros, e os ajustes ficam em seções que abrem e fecham.',
     'As faixas de renda passam a usar tons de âmbar, legíveis impressos em preto e branco.',
@@ -9590,7 +9598,7 @@ const NOVIDADES = [
   {v:'2.5', data:'2026-10-04', titulo:'Renda dentro da isócrona', itens:[
     'Mapa de renda: analise a renda dentro de uma isócrona, não só dentro de um raio.',
     'Duas faixas de tempo; a análise responde pela faixa que você escolher.']},
-  {v:'2.4.1', data:'2026-10-04', itens:[
+  {v:'2.4.1', data:'2026-10-04', titulo:'A isócrona voltou a funcionar', itens:[
     'A isócrona voltou a funcionar.',
     'A correção pelo IPCA voltou a funcionar para quem via "indisponível".']},
   {v:'2.4', data:'2026-10-02', titulo:'Legenda da isócrona no mapa', itens:[
@@ -9599,9 +9607,9 @@ const NOVIDADES = [
   {v:'2.3', data:'2026-10-02', titulo:'Isócrona', itens:[
     'Nova ferramenta Isócrona: a área que se alcança em N minutos pelas ruas.',
     'De carro, de bicicleta ou a pé, com até quatro faixas de tempo.']},
-  {v:'2.2.1', data:'2026-10-02', itens:[
+  {v:'2.2.1', data:'2026-10-02', titulo:'Correção no mapa de calor de densidade', itens:[
     'Mapa de renda: o mapa de calor de densidade passa a contar todos os domicílios do painel.']},
-  {v:'2.2', data:'2026-10-02', titulo:'Minas Gerais no Mapa de renda', itens:[
+  {v:'2.2', data:'2026-10-02', titulo:'Minas Gerais, e São Paulo mais completo', itens:[
     'Mapa de renda: Minas Gerais entrou.',
     'São Paulo ficou mais completo, com as áreas rurais.']},
   {v:'2.1', data:'2026-09-29', titulo:'Bahia no Mapa de renda', itens:[
@@ -9613,7 +9621,7 @@ const NOVIDADES = [
   {v:'1.2', data:'2026-08-07', titulo:'Perfil de renda dentro do raio', itens:[
     'Novo Mapa de renda: o perfil de quem mora dentro de um raio, com dados do Censo 2022.',
     'A legenda do raio da Edição pode ser editada e desligada.']},
-  {v:'1.0', data:'2026-08-07', titulo:'Primeira versão', itens:[
+  {v:'1.0', data:'2026-08-07', titulo:'Primeira versão publicada', itens:[
     'Importe KMZ e KML ou desenhe áreas direto no mapa.',
     'Edite cores, rótulos, vias, máscara e raio; escolha entre paletas prontas.',
     'Salve e reabra projetos; exporte a imagem do mapa.']}
@@ -9621,18 +9629,23 @@ const NOVIDADES = [
 const VERSAO = NOVIDADES[0].v;
 const NV_CHAVE = 'makermap.versaoVista';
 
+function nvFechar(){
+  const dlg = document.getElementById('nvDlg');
+  if(!dlg) return;
+  if(typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
+}
 function abrirNovidades(){
   const dlg = document.getElementById('nvDlg');
   if(!dlg) return;
   const dt = d=> new Date(d+'T12:00').toLocaleDateString('pt-BR',{day:'numeric', month:'long', year:'numeric'});
   dlg.querySelector('.nv-corpo').innerHTML =
-    '<h2 id="nvTitulo">Novidades</h2><p class="nv-sub">O que mudou em cada versão do Maker Map.</p>' +
+    '<h2 id="nvTitulo">Novidades</h2><p class="nv-intro">O que mudou em cada versão do Maker Map.</p>' +
     NOVIDADES.map((n,i)=>
       `<div class="nv-v${i===0?' nv-1':''}"><div class="nv-nome">Maker Map ${esc(n.v)}${i===0?'<span class="nv-tag">Atual</span>':''}</div>` +
       (n.titulo ? `<div class="nv-tit">${esc(n.titulo)}</div>` : '') +
       `<div class="nv-data">${dt(n.data)}</div><ul>${n.itens.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`).join('') +
     '<button type="button" class="nv-ok">Continuar</button>';
-  dlg.querySelector('.nv-ok').onclick = ()=> dlg.close();
+  dlg.querySelector('.nv-ok').onclick = ()=> nvFechar();
   dlg.querySelector('.nv-corpo').scrollTop = 0;
   if(!dlg.open){
     // showModal() não existe em navegador muito antigo: abre sem modal
@@ -9641,7 +9654,7 @@ function abrirNovidades(){
 }
 (function(){
   const dlg = document.getElementById('nvDlg');
-  if(dlg) dlg.querySelector('.nv-x').onclick = ()=> dlg.close();
+  if(dlg) dlg.querySelector('.nv-x').onclick = nvFechar;
   const ver = document.getElementById('verAtual');
   if(ver) ver.textContent = VERSAO;
   const btn = document.getElementById('cfgNovidades');
