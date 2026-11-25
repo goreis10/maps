@@ -61,6 +61,8 @@
   • Zoom pelo scroll .... ZOOM_VEL, aplicarZoomVel() — fator sobre as
                           duas taxas da MapLibre (roda e trackpad),
                           escolhido em Configurações
+  • Novidades ........... NOVIDADES (fim do arquivo; 1ª entrada = VERSAO),
+                          abrirNovidades(), verificarNovidades()
   • Telas / menu ........ irPara('mapa'|'negocios'), #nav, #navBtn
   • Novos Negócios ...... NEGOCIOS (guarda própria em localStorage),
                           negSincronizar(), carregarNegocios(),
@@ -735,6 +737,38 @@
     .hd-stats .st:nth-child(3),.hd-stats .st:nth-child(4){display:none}
     #panel{width:220px}
   }
+  /* ── Painel de Novidades (3.12) ──
+     <dialog> nativo: showModal() já põe o resto da página inerte, prende o
+     foco e fecha com Esc — o que as .cfg-overlay fazem à mão. Tokens do
+     produto, sem tema escuro: o app inteiro é claro. */
+  /* margin:auto explícito: o reset do arquivo zera a margem, e era ela que
+     centralizava o <dialog> — sem isto ele abria colado no canto. */
+  #nvDlg{margin:auto;border:0;border-radius:16px;padding:0;width:min(480px,94vw);background:var(--paper);color:var(--ink);
+    font:400 var(--fs-3)/1.5 'Archivo',sans-serif;box-shadow:0 24px 60px rgba(28,25,23,.28)}
+  /* Navegador sem <dialog> (Safari 15.0–15.3) não esconde o fechado nem
+     posiciona o aberto: as duas regras fazem isso por ele. */
+  #nvDlg:not([open]){display:none}
+  #nvDlg[open]{position:fixed;inset:0;z-index:5000}
+  #nvDlg::backdrop{background:rgba(28,25,23,.42)}
+  #nvDlg .nv-x{position:absolute;top:var(--sp-3);right:var(--sp-3);width:30px;height:30px;border-radius:50%;border:0;
+    background:#F5F5F4;color:var(--ink-3);font-size:20px;line-height:1;cursor:pointer}
+  #nvDlg .nv-corpo{padding:var(--sp-5);max-height:min(640px,86vh);overflow:auto;outline:none}
+  #nvDlg h2{margin:0 40px var(--sp-1) 0;font-size:var(--fs-5);font-weight:800}
+  #nvDlg .nv-intro{color:var(--ink-3);font-size:var(--fs-2);margin:0}
+  #nvDlg .nv-v{margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--line)}
+  #nvDlg .nv-v.nv-1{border-top:0;padding-top:0}
+  #nvDlg .nv-nome{font-weight:700;font-size:var(--fs-4)}
+  #nvDlg .nv-tit{font-weight:600;color:var(--ink-2)}
+  #nvDlg .nv-tag{font:700 var(--fs-1) 'Archivo',sans-serif;padding:2px 8px;border-radius:999px;vertical-align:2px;
+    background:#FFF1EB;color:var(--laranja);margin-left:6px;text-transform:uppercase;letter-spacing:.4px}
+  #nvDlg .nv-data{color:var(--ink-3);font-size:var(--fs-2)}
+  #nvDlg ul{margin:var(--sp-2) 0 0;padding-left:20px}
+  #nvDlg li{margin:3px 0}
+  #nvDlg .nv-ok{display:block;margin:var(--sp-5) 0 0 auto;border:0;border-radius:10px;padding:10px 22px;cursor:pointer;
+    background:var(--laranja);color:#fff;font:700 var(--fs-3) 'Archivo',sans-serif}
+  .cfg-sobre{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-2);
+    border-top:1px solid var(--line);padding-top:var(--sp-3);margin-top:var(--sp-2);font-size:var(--fs-2);color:var(--ink-2)}
+  .cfg-sobre .cfg-link{display:inline;width:auto;margin:0;padding:0;font-size:var(--fs-2)}
 </style>
 </head>
 <body>
@@ -1390,9 +1424,19 @@
       rolagem. <b>Rápido</b> é a velocidade original do mapa.</p>
     </div>
     <p class="cfg-desc">Os <b>KMZ e a edição do mapa</b> ficam em <b>Meus Projetos</b> (botão no topo); use <b>Salvar Projeto</b> para criar um. O quadro de <b>Novos Negócios</b> é guardado automaticamente, à parte dos projetos.</p>
+    <div class="cfg-sobre"><span>Maker Map <b id="verAtual">—</b></span>
+      <button id="cfgNovidades" type="button" class="cfg-link">Ver novidades</button></div>
     <button id="cfgSair" class="cfg-link">Sair da conta</button>
   </div>
 </div>
+
+<!-- Painel de Novidades: conteúdo gerado de NOVIDADES (fim do arquivo) -->
+<dialog id="nvDlg" aria-labelledby="nvTitulo">
+  <button class="nv-x" type="button" aria-label="Fechar">×</button>
+  <!-- autofocus na lista: o foco inicial vai para o conteúdo (as setas
+       rolam) e não para o ×, que ganhava um anel de foco ao abrir -->
+  <div class="nv-corpo" tabindex="-1" autofocus></div>
+</dialog>
 
 <!-- Janela: Planos e o que cada um inclui (gerada de FEATURE_PLANS) -->
 <div id="planosOverlay" class="cfg-overlay">
@@ -8072,6 +8116,9 @@ document.getElementById('chipDraw').onclick = ()=>{
 };
 window.addEventListener('keydown', e=>{
   if(e.key !== 'Escape') return;
+  // Com o painel de Novidades aberto, o Esc é dele: fecha só o painel, e
+  // não o desenho em curso nem a gaveta que estava aberta atrás.
+  if(document.querySelector('dialog[open]')) return;
   if(drawing) drawSetMode(false);
   if(pickAtivo){
     pickDesligar();
@@ -9459,6 +9506,7 @@ document.getElementById('expGerar').onclick = async function(){
   // Esc fecha qualquer janela/gaveta aberta
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape') return;
+    if(document.querySelector('dialog[open]')) return;   // o Esc é do painel de Novidades
     if(cfgOv.classList.contains('show')) fecharCfg();
     if(editOv.classList.contains('show')) fecharEdit();
     var up = document.getElementById('upgradeOverlay');
@@ -9472,6 +9520,171 @@ document.getElementById('expGerar').onclick = async function(){
     if(document.getElementById('editor').classList.contains('show')) abrirEdicao(false);
   });
 })();
+
+// ══════════════════════════════════════════════════════════════════
+// ── Painel de Novidades (3.12) ──
+// Versões no estilo iOS: PRINCIPAL.SECUNDÁRIA.CORREÇÃO (3.11, 3.8.1), sem
+// zero final. A PRIMEIRA entrada é a versão atual (VERSAO). Ao publicar
+// algo que o usuário percebe, acrescente uma entrada NO TOPO: 1 a 5 itens,
+// voz ativa, frases curtas, escritos para quem usa o mapa — o que a pessoa
+// pode fazer agora, não o que mudou no código. O CHANGELOG.md continua
+// sendo as notas completas; isto é o resumo que aparece no app.
+// Data = dia em que a versão foi ao ar (merge no main).
+// ══════════════════════════════════════════════════════════════════
+const NOVIDADES = [
+  {v:'3.12', data:'2026-11-25', titulo:'Novidades', itens:[
+    'Depois de cada atualização, esta janela mostra o que mudou no Maker Map.',
+    'Configurações: veja a versão em uso e abra as novidades quando quiser.']},
+  {v:'3.11', data:'2026-11-14', titulo:'Imagem do KMZ no mapa', itens:[
+    'A planta que vem dentro do KMZ do Google Earth agora aparece no mapa, no lugar certo.',
+    'Edição › Imagens do KMZ: mostre, oculte e ajuste a opacidade de cada imagem.',
+    'A imagem sai em alta resolução na exportação e fica guardada em Salvar Projeto.']},
+  {v:'3.10', data:'2026-11-13', titulo:'Cores para daltonismo', itens:[
+    'As cores das cidades agora se distinguem também para quem tem daltonismo.',
+    'Cores: nova paleta Daltonismo, medida nas três formas de daltonismo.',
+    'Projetos salvos continuam com as cores que já tinham.']},
+  {v:'3.9', data:'2026-11-11', titulo:'Exportar dados', itens:[
+    'Novo botão Dados: baixe áreas, raios, isócronas e setores do censo em GeoJSON.',
+    'O arquivo dos setores do censo leva as premissas e os avisos da análise.',
+    'Só sai o que está ligado no mapa; um botão vazio fica desabilitado e diz por quê.']},
+  {v:'3.8.1', data:'2026-11-05', itens:[
+    'Cores: a amostra da paleta Contraste categórico mostra a cor que o mapa pinta.',
+    'Cores: a descrição das paletas Mosaico diz como cada uma pinta parque e vegetação.']},
+  {v:'3.8', data:'2026-11-05', titulo:'Moderno Claro e Moderno Grafite', itens:[
+    'Cores: duas paletas novas, Moderno Claro e Moderno Grafite.',
+    'Nelas o laranja fica fora do mapa, reservado para destacar as suas áreas.',
+    'A vegetação sai em verde nas duas.']},
+  {v:'3.7.3', data:'2026-11-05', itens:[
+    'Mapa: mudar a cor das construções muda também o contorno delas.',
+    'Trocar de paleta não interrompe mais o mapa quando uma paleta vem incompleta.']},
+  {v:'3.7.2', data:'2026-11-05', itens:[
+    'Os prédios passam a seguir a paleta, inclusive o contorno.',
+    'Nas paletas escuras, os prédios deixam de aparecer como manchas claras.']},
+  {v:'3.7.1', data:'2026-11-01', itens:[
+    'Paleta Mosaico Light: o azul da água foi acertado.']},
+  {v:'3.7', data:'2026-11-01', titulo:'Mosaico Moderno', itens:[
+    'Cores: nova paleta Mosaico Moderno, grafite e laranja, do Modelo Moderno.',
+    'O laranja aparece só nas rodovias, como o modelo pede.']},
+  {v:'3.6', data:'2026-10-21', titulo:'Mediana de verdade e aviso de cobertura', itens:[
+    'Mapa de renda: a renda mediana agora é uma mediana de verdade.',
+    'Mapa de renda: um aviso aparece quando parte do recorte fica sem dados do censo.',
+    'Áreas com furo (reserva, enclave) agora têm os hectares certos.',
+    'Trocar de paleta não apaga mais as cores que você ajustou nas vias e rótulos.',
+    'A legenda sai na imagem exportada no mesmo lugar em que está na tela.']},
+  {v:'3.5', data:'2026-10-20', titulo:'Mosaico Light e Dark Mosaico', itens:[
+    'Cores: duas paletas novas com as cores do deck MOSAICO, uma clara e uma escura.']},
+  {v:'3.4', data:'2026-10-20', titulo:'Velocidade do zoom pelo scroll', itens:[
+    'O zoom pela roda do mouse e pelo trackpad ficou mais calmo.',
+    'Configurações: escolha a velocidade do zoom entre Lento, Médio e Rápido.']},
+  {v:'3.3', data:'2026-10-20', titulo:'Baixar a análise de renda em planilha', itens:[
+    'Mapa de renda: baixe a análise numa planilha .xlsx, com números que somam e ordenam.',
+    'As premissas vão nas duas abas, e o aviso de recorte pequeno fica no topo.']},
+  {v:'3.2', data:'2026-10-16', titulo:'Exportar em mais formatos e tamanhos', itens:[
+    'Exportar imagem: escolha PNG, JPEG ou WebP.',
+    'Escolha o tamanho pelo múltiplo da tela ou pela largura em pixels.',
+    'A gaveta mostra as dimensões da imagem antes de exportar.']},
+  {v:'3.1', data:'2026-10-09', titulo:'Domicílios por faixa, em número', itens:[
+    'Mapa de renda: cada faixa de renda mostra o número de domicílios ao lado do percentual.',
+    'A cor do ponto no mapa e a faixa contada no gráfico passam a sempre coincidir.',
+    'Onde o IBGE não divulga renda, o painel diz isso em vez de mostrar R$ 0.']},
+  {v:'3.0', data:'2026-10-04', titulo:'Interface reorganizada e legenda de renda na imagem', itens:[
+    'Mapa de renda: a legenda das faixas aparece no mapa e sai na imagem exportada.',
+    'Mapa de renda: a análise vem antes dos parâmetros, e os ajustes ficam em seções que abrem e fecham.',
+    'As faixas de renda passam a usar tons de âmbar, legíveis impressos em preto e branco.',
+    'Salvar Projeto e os totais das áreas foram para o cabeçalho.']},
+  {v:'2.6', data:'2026-10-04', titulo:'Correção da renda informada por você', itens:[
+    'Mapa de renda: digite o percentual de correção quando não quiser depender do IPCA.',
+    'O painel sempre diz qual correção está valendo.']},
+  {v:'2.5', data:'2026-10-04', titulo:'Renda dentro da isócrona', itens:[
+    'Mapa de renda: analise a renda dentro de uma isócrona, não só dentro de um raio.',
+    'Duas faixas de tempo; a análise responde pela faixa que você escolher.']},
+  {v:'2.4.1', data:'2026-10-04', titulo:'A isócrona voltou a funcionar', itens:[
+    'A isócrona voltou a funcionar.',
+    'A correção pelo IPCA voltou a funcionar para quem via "indisponível".']},
+  {v:'2.4', data:'2026-10-02', titulo:'Legenda da isócrona no mapa', itens:[
+    'Cada faixa de tempo da isócrona tem a sua cor, igual à da legenda.',
+    'A legenda da isócrona aparece no mapa e sai na imagem exportada.']},
+  {v:'2.3', data:'2026-10-02', titulo:'Isócrona', itens:[
+    'Nova ferramenta Isócrona: a área que se alcança em N minutos pelas ruas.',
+    'De carro, de bicicleta ou a pé, com até quatro faixas de tempo.']},
+  {v:'2.2.1', data:'2026-10-02', titulo:'Correção no mapa de calor de densidade', itens:[
+    'Mapa de renda: o mapa de calor de densidade passa a contar todos os domicílios do painel.']},
+  {v:'2.2', data:'2026-10-02', titulo:'Minas Gerais, e São Paulo mais completo', itens:[
+    'Mapa de renda: Minas Gerais entrou.',
+    'São Paulo ficou mais completo, com as áreas rurais.']},
+  {v:'2.1', data:'2026-09-29', titulo:'Bahia no Mapa de renda', itens:[
+    'Mapa de renda: a Bahia entrou.']},
+  {v:'2.0', data:'2026-08-10', titulo:'Novos Negócios', itens:[
+    'Nova tela Novos Negócios: um quadro com um cartão por área, para acompanhar cada negociação.',
+    'Arraste os cartões entre as colunas; o quadro é guardado sozinho.',
+    'Mapa de renda: troque a cor de cada faixa de renda.']},
+  {v:'1.2', data:'2026-08-07', titulo:'Perfil de renda dentro do raio', itens:[
+    'Novo Mapa de renda: o perfil de quem mora dentro de um raio, com dados do Censo 2022.',
+    'A legenda do raio da Edição pode ser editada e desligada.']},
+  {v:'1.0', data:'2026-08-07', titulo:'Primeira versão publicada', itens:[
+    'Importe KMZ e KML ou desenhe áreas direto no mapa.',
+    'Edite cores, rótulos, vias, máscara e raio; escolha entre paletas prontas.',
+    'Salve e reabra projetos; exporte a imagem do mapa.']}
+];
+const VERSAO = NOVIDADES[0].v;
+const NV_CHAVE = 'makermap.versaoVista';
+
+function nvFechar(){
+  const dlg = document.getElementById('nvDlg');
+  if(!dlg) return;
+  if(typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
+}
+function abrirNovidades(){
+  const dlg = document.getElementById('nvDlg');
+  if(!dlg) return;
+  const dt = d=> new Date(d+'T12:00').toLocaleDateString('pt-BR',{day:'numeric', month:'long', year:'numeric'});
+  dlg.querySelector('.nv-corpo').innerHTML =
+    '<h2 id="nvTitulo">Novidades</h2><p class="nv-intro">O que mudou em cada versão do Maker Map.</p>' +
+    NOVIDADES.map((n,i)=>
+      `<div class="nv-v${i===0?' nv-1':''}"><div class="nv-nome">Maker Map ${esc(n.v)}${i===0?'<span class="nv-tag">Atual</span>':''}</div>` +
+      (n.titulo ? `<div class="nv-tit">${esc(n.titulo)}</div>` : '') +
+      `<div class="nv-data">${dt(n.data)}</div><ul>${n.itens.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`).join('') +
+    '<button type="button" class="nv-ok">Continuar</button>';
+  dlg.querySelector('.nv-ok').onclick = ()=> nvFechar();
+  dlg.querySelector('.nv-corpo').scrollTop = 0;
+  if(!dlg.open){
+    // showModal() não existe em navegador muito antigo: abre sem modal
+    if(typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open','');
+  }
+}
+(function(){
+  const dlg = document.getElementById('nvDlg');
+  if(dlg) dlg.querySelector('.nv-x').onclick = nvFechar;
+  const ver = document.getElementById('verAtual');
+  if(ver) ver.textContent = VERSAO;
+  const btn = document.getElementById('cfgNovidades');
+  if(btn) btn.onclick = function(){
+    const ov = document.getElementById('cfgOverlay');
+    if(ov) ov.classList.remove('show');
+    abrirNovidades();
+  };
+})();
+
+// Abre UMA vez depois de cada atualização. Sem registro de versão vista,
+// distingue quem nunca usou de quem já usava antes de o painel existir:
+// qualquer chave makermap.* além da sessão (makermap.user) só é gravada
+// por um gesto da pessoa — salvar projeto, mexer no quadro, arrastar a
+// gaveta, abrir uma seção. Sem isso, a própria 3.12 não apareceria para
+// ninguém: todo mundo chegaria nela "sem registro".
+function verificarNovidades(){
+  let vista = null, antigo = false;
+  try{
+    if(!localStorage.getItem('makermap.user')) return;   // a guarda do <head> já está saindo
+    vista = localStorage.getItem(NV_CHAVE);
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith('makermap.') && k !== 'makermap.user' && k !== NV_CHAVE){ antigo = true; break; }
+    }
+    localStorage.setItem(NV_CHAVE, VERSAO);
+  }catch(e){ return; }   // armazenamento bloqueado: só não abre sozinho
+  if(vista ? vista !== VERSAO : antigo) abrirNovidades();
+}
+verificarNovidades();
 </script>
 </body>
 </html>

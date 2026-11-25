@@ -5,6 +5,22 @@ Numeração no estilo iOS (`MAIOR.MENOR.CORREÇÃO`). A convenção está descri
 
 ---
 
+## Maker Map 3.12 — Novidades
+
+Esta atualização inclui os seguintes aprimoramentos e correções de erros:
+
+- **Janela de Novidades.** Depois de cada atualização, o Maker Map abre uma vez
+  uma janela com o que mudou, versão por versão, da mais nova para a mais
+  antiga. **Continuar**, o **×** ou a tecla Esc fecham.
+- **Quem entra pela primeira vez não vê a janela**: ela só aparece para quem já
+  usava o Maker Map antes da atualização.
+- **Configurações mostra a versão em uso** (role até o fim da janela) e tem o
+  botão **Ver novidades**, para abrir a lista quando quiser.
+- A lista traz todas as versões desde a 1.0, em frases curtas. As notas
+  completas de cada versão continuam neste arquivo.
+
+---
+
 ## Maker Map 3.11 — Imagem do KMZ no mapa
 
 Esta atualização inclui os seguintes aprimoramentos e correções de erros:
